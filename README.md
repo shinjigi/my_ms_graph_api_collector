@@ -34,6 +34,50 @@ GRAPH_USER_ID=utente@tenant.com
 TOP=25
 ```
 
+## Posso popolare `.env` con PowerShell + `az`?
+
+Sì. Ho aggiunto uno script che recupera automaticamente `TENANT_ID`, `CLIENT_ID` e `GRAPH_USER_ID`, e opzionalmente crea un nuovo `CLIENT_SECRET`.
+
+### Script disponibile
+
+- `scripts/bootstrap-env.ps1`
+
+### Requisiti script
+
+- Azure CLI installato
+- Login eseguito (`az login`)
+- Permessi per leggere app registration e utente Entra
+- Se usi `-RotateSecret`, permesso per creare credenziali applicative
+
+### Esempio (senza ruotare il secret)
+
+```powershell
+pwsh ./scripts/bootstrap-env.ps1 `
+  -AppObjectId "<app-object-id-o-appId>" `
+  -GraphUserUpn "nome.cognome@tenant.com"
+```
+
+Questo genera `.env` con:
+- `TENANT_ID`
+- `CLIENT_ID`
+- `GRAPH_USER_ID`
+- `TOP`
+- `CLIENT_SECRET` vuoto (da incollare manualmente)
+
+### Esempio (genera anche nuovo secret)
+
+```powershell
+pwsh ./scripts/bootstrap-env.ps1 `
+  -AppObjectId "<app-object-id-o-appId>" `
+  -GraphUserUpn "nome.cognome@tenant.com" `
+  -RotateSecret `
+  -SecretDurationYears 1
+```
+
+In questo caso lo script crea un nuovo client secret (`az ad app credential reset --append`) e lo scrive in `.env`.
+
+> Attenzione: il valore del secret è visibile solo in fase di creazione. Conservato in modo sicuro.
+
 ## Esecuzione
 
 ```bash
@@ -51,6 +95,7 @@ Output JSON generato in `data/`:
 - `src/graphClient.js`: autenticazione MSAL + Graph client
 - `src/collectors.js`: funzioni di raccolta per email/calendario/Teams
 - `src/index.js`: entrypoint del processo
+- `scripts/bootstrap-env.ps1`: helper PowerShell per generare `.env`
 
 ## Limiti e note
 
