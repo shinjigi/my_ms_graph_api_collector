@@ -2,7 +2,6 @@ const fs = require("fs/promises");
 const path = require("path");
 
 const config = require("./config");
-
 const outputDir = path.join(process.cwd(), "data");
 
 async function saveJson(filename, payload) {
@@ -14,7 +13,7 @@ async function saveJson(filename, payload) {
 
 async function collectEmails(client) {
   const response = await client
-    .api(`/users/${config.graphUserId}/messages`)
+    .api("/me/messages")
     .select("id,subject,from,receivedDateTime,bodyPreview,webLink")
     .orderby("receivedDateTime desc")
     .top(config.top)
@@ -25,7 +24,7 @@ async function collectEmails(client) {
 
 async function collectCalendarEvents(client) {
   const response = await client
-    .api(`/users/${config.graphUserId}/events`)
+    .api("/me/events")
     .select("id,subject,start,end,organizer,location,webLink")
     .orderby("start/dateTime")
     .top(config.top)
@@ -36,7 +35,7 @@ async function collectCalendarEvents(client) {
 
 async function collectTeamsChats(client) {
   const chatsResponse = await client
-    .api(`/users/${config.graphUserId}/chats`)
+    .api("/me/chats")
     .select("id,topic,chatType,lastUpdatedDateTime")
     .top(config.top)
     .get();
@@ -46,7 +45,7 @@ async function collectTeamsChats(client) {
   const messagesByChat = [];
   for (const chat of chats) {
     const messagesResponse = await client
-      .api(`/users/${config.graphUserId}/chats/${chat.id}/messages`)
+      .api(`/me/chats/${chat.id}/messages`)
       .select("id,createdDateTime,lastModifiedDateTime,from,body,webUrl")
       .top(Math.min(config.top, 20))
       .get();
