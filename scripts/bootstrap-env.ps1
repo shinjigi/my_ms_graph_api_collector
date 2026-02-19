@@ -2,14 +2,7 @@ param(
   [Parameter(Mandatory = $true)]
   [string]$AppObjectId,
 
-  [Parameter(Mandatory = $true)]
-  [string]$GraphUserUpn,
-
   [int]$Top = 25,
-
-  [switch]$RotateSecret,
-
-  [int]$SecretDurationYears = 1,
 
   [string]$OutputPath = ".env"
 )
@@ -44,38 +37,9 @@ if (-not $clientId) {
   throw "Impossibile leggere appId per AppObjectId '$AppObjectId'."
 }
 
-$upn = az ad user show --id $GraphUserUpn --query userPrincipalName -o tsv
-if (-not $upn) {
-  throw "Impossibile trovare utente '$GraphUserUpn'."
-}
-
-$clientSecret = ""
-if ($RotateSecret) {
-  $displayName = "graph-collector-secret-$(Get-Date -Format yyyyMMdd-HHmmss)"
-  $endDate = (Get-Date).AddYears($SecretDurationYears).ToString("yyyy-MM-dd")
-
-  $clientSecret = az ad app credential reset `
-    --id $AppObjectId `
-    --append `
-    --display-name $displayName `
-    --end-date $endDate `
-    --query password `
-    -o tsv
-
-  if (-not $clientSecret) {
-    throw "Impossibile creare/restituire il client secret."
-  }
-
-  Write-Host "Creato nuovo secret '$displayName' con scadenza $endDate" -ForegroundColor Green
-} else {
-  Write-Host "Nessun reset secret richiesto: lascia CLIENT_SECRET vuoto e incollalo manualmente." -ForegroundColor Yellow
-}
-
 $envContent = @(
   "TENANT_ID=$tenantId"
   "CLIENT_ID=$clientId"
-  "CLIENT_SECRET=$clientSecret"
-  "GRAPH_USER_ID=$upn"
   "TOP=$Top"
 ) -join [Environment]::NewLine
 

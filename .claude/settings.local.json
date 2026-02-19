@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(az account list:*)",
+      "Bash(az ad app list:*)",
+      "Bash($env:REQUESTS_CA_BUNDLE = \"C:\\\\SVN\\\\_GH\\\\_shinjigi_WIN\\\\my_ms_graph_api_collector\\\\corporate-bundle.pem\")",
+      "Bash(export REQUESTS_CA_BUNDLE=\"C:/SVN/_GH/_shinjigi_WIN/my_ms_graph_api_collector/corporate-bundle.pem\")",
+      "Bash(az config set:*)",
+      "Bash(export AZURE_CLI_DISABLE_CONNECTION_VERIFICATION=1)",
+      "Bash(export SSL_CERT_FILE=\"C:/SVN/_GH/_shinjigi_WIN/my_ms_graph_api_collector/corporate-bundle.pem\")",
+      "Bash(az ad app show:*)",
+      "Bash(az ad sp show:*)",
+      "Bash(az ad signed-in-user show:*)",
+      "Bash(az ad app owner list:*)",
+      "Bash(node --check:*)"
+    ]
+  }
+}
