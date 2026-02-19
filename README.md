@@ -29,7 +29,6 @@ Compila `.env` con i tuoi valori:
 ```env
 TENANT_ID=...
 CLIENT_ID=...
-CLIENT_SECRET=...
 GRAPH_USER_ID=utente@tenant.com
 TOP=25
 ```
@@ -62,7 +61,6 @@ Questo genera `.env` con:
 - `CLIENT_ID`
 - `GRAPH_USER_ID`
 - `TOP`
-- `CLIENT_SECRET` vuoto (da incollare manualmente)
 
 ### Esempio (genera anche nuovo secret)
 
