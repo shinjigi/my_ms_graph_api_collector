@@ -41,18 +41,28 @@ async function collectTeamsChats(client) {
     .get();
 
   const chats = chatsResponse.value || [];
-
   const messagesByChat = [];
+
   for (const chat of chats) {
+    // Chiamata senza .select() per evitare l'errore
     const messagesResponse = await client
       .api(`/me/chats/${chat.id}/messages`)
-      .select("id,createdDateTime,lastModifiedDateTime,from,body,webUrl")
       .top(Math.min(config.top, 20))
       .get();
 
+    // FILTRAGGIO MANUALE: Selezioniamo solo i campi che ci servono qui
+    const simplifiedMessages = (messagesResponse.value || []).map(m => ({
+      id: m.id,
+      createdDateTime: m.createdDateTime,
+      lastModifiedDateTime: m.lastModifiedDateTime,
+      from: m.from,
+      body: m.body,
+      webUrl: m.webUrl
+    }));
+
     messagesByChat.push({
       chat,
-      messages: messagesResponse.value || []
+      messages: simplifiedMessages
     });
   }
 
