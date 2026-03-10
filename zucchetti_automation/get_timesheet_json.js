@@ -178,38 +178,72 @@ if (values.date) {
 
     const validatedData = timesheetData.map(day => {
         const hOrdMinutes = timeToMinutes(day.hOrd);
-        
-        // Sum approved requests, cross-referencing justificatives if qta is missing
+        const EXCLUDED_FROM_HORD = ["FERIE", "SERVIZIO ESTERNO", "EX FESTIVITA'", "MALATTIA"];
+
+        // Sum approved requests
         const approvedReqs = day.richieste.filter(r => r.status === 'Approvata');
-        const sumReqMin = approvedReqs.reduce((acc, r) => {
+        
+        // sumReqAll: All approved requests
+        // sumReqHOrd: Approved requests NOT in the exclusion list
+        let sumReqAll = 0;
+        let sumReqHOrd = 0;
+        approvedReqs.forEach(r => {
             let qta = timeToMinutes(r.qta);
             if (qta === 0) {
-                // Try to find a matching justificative to infer the qta
                 const match = day.giustificativi.find(g => g.text === r.text);
                 if (match) qta = timeToMinutes(match.qta);
             }
-            return acc + qta;
-        }, 0);
-        
-        // Sum all justificatives
-        const sumGiuMin = day.giustificativi.reduce((acc, g) => acc + timeToMinutes(g.qta), 0);
+            sumReqAll += qta;
+            if (!EXCLUDED_FROM_HORD.includes(r.text)) {
+                sumReqHOrd += qta;
+            }
+        });
+
+        // Sum justificatives
+        // sumGiuAll: All justificatives
+        // sumGiuHOrd: Justificatives NOT in the exclusion list
+        let sumGiuAll = 0;
+        let sumGiuHOrd = 0;
+        day.giustificativi.forEach(g => {
+            const qta = timeToMinutes(g.qta);
+            sumGiuAll += qta;
+            if (!EXCLUDED_FROM_HORD.includes(g.text)) {
+                sumGiuHOrd += qta;
+            }
+        });
 
         const warnings = [];
 
-        // Check 1: approved richieste vs hOrd
-        if (sumReqMin > 0 && sumReqMin !== hOrdMinutes) {
-            warnings.push(`Discrepanza: hOrd (${day.hOrd || '0:00'}) != somma richieste approvate (${minutesToStr(sumReqMin)})`);
+        // Check 1: approved hOrd-type requests vs hOrd
+        if (sumReqHOrd > 0 && sumReqHOrd !== hOrdMinutes) {
+            warnings.push(`Discrepanza: hOrd (${day.hOrd || '0:00'}) != somma richieste hOrd approvate (${minutesToStr(sumReqHOrd)})`);
         }
 
-        // Check 2: giustificativi vs hOrd
-        if (sumGiuMin > 0 && sumGiuMin !== hOrdMinutes) {
-            warnings.push(`Discrepanza: hOrd (${day.hOrd || '0:00'}) != somma giustificativi (${minutesToStr(sumGiuMin)})`);
+        // Check 2: hOrd-type justificatives vs hOrd
+        if (sumGiuHOrd > 0 && sumGiuHOrd !== hOrdMinutes) {
+            warnings.push(`Discrepanza: hOrd (${day.hOrd || '0:00'}) != somma giustificativi hOrd (${minutesToStr(sumGiuHOrd)})`);
         }
 
-        // Check 3: richieste vs giustificativi (consistency)
-        // Only warn if there are actually approved requests or justificatives
-        if ((sumReqMin > 0 || sumGiuMin > 0) && sumReqMin !== sumGiuMin) {
-            warnings.push(`Incongruenza: Somma richieste approvate (${minutesToStr(sumReqMin)}) != somma giustificativi (${minutesToStr(sumGiuMin)})`);
+        // Check 3: total requests vs total justificatives (cross-check consistency)
+        // Note: We exclude "MALATTIA" from this cross-check because it often appears 
+        // in justificatives without a corresponding pre-approved request in the portal.
+        const sumReqConsistency = approvedReqs
+            .filter(r => r.text !== "MALATTIA")
+            .reduce((acc, r) => {
+                let qta = timeToMinutes(r.qta);
+                if (qta === 0) {
+                    const match = day.giustificativi.find(g => g.text === r.text);
+                    if (match) qta = timeToMinutes(match.qta);
+                }
+                return acc + qta;
+            }, 0);
+
+        const sumGiuConsistency = day.giustificativi
+            .filter(g => g.text !== "MALATTIA")
+            .reduce((acc, g) => acc + timeToMinutes(g.qta), 0);
+
+        if ((sumReqConsistency > 0 || sumGiuConsistency > 0) && sumReqConsistency !== sumGiuConsistency) {
+            warnings.push(`Incongruenza: Somma richieste approvate (${minutesToStr(sumReqConsistency)}) != somma giustificativi (${minutesToStr(sumGiuConsistency)}) (escluso Malattia)`);
         }
 
         if (warnings.length > 0) {
