@@ -91,7 +91,7 @@ if (!matchedActivity) {
     const serviziAggiuntiviSelector = 'a[title="Servizi aggiuntivi"]';
     
     try {
-        await page.waitForSelector(serviziAggiuntiviSelector, { state: 'visible', timeout: 15000 });
+        await page.waitForSelector(serviziAggiuntiviSelector, { state: 'visible', timeout: 30000 });
     } catch (error) {
         console.error("Could not find 'Servizi aggiuntivi'! Check home_error_debug.png.");
         await page.screenshot({ path: 'home_error_debug.png', fullPage: true });
@@ -107,13 +107,38 @@ if (!matchedActivity) {
     await page.getByText('Cartellino Mensile', { exact: false }).click();
 
     console.log("Waiting for new tab to open...");
-    const newPagePromise = context.waitForEvent('page');
+    const newPagePromise = context.waitForEvent('page', { timeout: 90000 });
     const newPage = await newPagePromise;
     await newPage.waitForLoadState('networkidle');
 
     console.log("New tab opened! Navigated to HR-WorkFlow.");
 
-    // 6. Click "Nuova richiesta" for target date
+    // 6. Check if activity already exists (and is NOT cancelled), then click "Nuova richiesta"
+    console.log(`Checking if '${matchedActivity}' already exists for ${targetDate}...`);
+    const dayCell = newPage.locator(`td.richieste`).filter({ has: newPage.locator(`span[onclick*="${targetDate}"]`) }).first();
+    
+    if (await dayCell.count() > 0) {
+        // Find all activity rows in the cell
+        const activityRows = dayCell.locator('div.fakeRow');
+        const rowCount = await activityRows.count();
+        
+        for (let i = 0; i < rowCount; i++) {
+            const row = activityRows.nth(i);
+            const rowText = await row.innerText();
+            
+            if (rowText.toUpperCase().includes(matchedActivity.toUpperCase())) {
+                const isCancelled = await row.locator('span[title="Cancellata"]').count() > 0;
+                if (!isCancelled) {
+                    console.log(`Success: Active activity '${matchedActivity}' already exists for ${targetDate}. Skipping submission.`);
+                    await browser.close();
+                    process.exit(0);
+                } else {
+                    console.log(`Found a cancelled instance of '${matchedActivity}' for ${targetDate}. Ignoring it.`);
+                }
+            }
+        }
+    }
+
     console.log(`Clicking 'Nuova richiesta' for ${targetDate}...`);
     await newPage.locator(`span[title="Nuova richiesta"][onclick*="${targetDate}"]`).click();
 
@@ -177,13 +202,18 @@ if (!matchedActivity) {
             
             await hoursInput.waitFor({ state: 'visible', timeout: 5000 });
             await hoursInput.fill(hours.toString(), { force: true });
+            await hoursInput.dispatchEvent('blur'); // Trigger validation/UI update
+
             await minutesInput.fill(minutes.toString(), { force: true });
+            await minutesInput.dispatchEvent('blur'); // Trigger validation/UI update
         }
 
         // 9. Click "Invia"
         console.log("Clicking Invia...");
-        const inviaButton = targetFrame.locator('input[id$="_InvioButton"]').filter({ visible: true }).first();
-        await inviaButton.waitFor({ state: 'visible', timeout: 5000 });
+        const inviaButton = targetFrame.locator('input[id$="_InvioButton"]').first();
+        
+        // Use a longer timeout (10s) as Zucchetti's UI can be slow to update visiblity
+        await inviaButton.waitFor({ state: 'visible', timeout: 10000 });
         await inviaButton.click({ force: true });
 
     } catch (error) {
