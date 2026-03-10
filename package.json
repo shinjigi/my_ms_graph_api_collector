@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node src/index.js",
     "check": "node --check src/index.js",
-    "zucchetti:smart-working": "node --env-file=.env zucchetti_automation/update_data.js"
+    "zucchetti:update": "node --env-file=.env zucchetti_automation/update_data.js"
   },
   "keywords": [
     "microsoft-graph",
