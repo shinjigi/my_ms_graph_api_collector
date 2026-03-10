@@ -1,4 +1,27 @@
 const { chromium } = require('playwright');
+const { parseArgs } = require('node:util');
+
+const options = {
+    date: { type: 'string' },
+    type: { type: 'string', default: 'SMART WORKING' },
+    'full-day': { type: 'boolean', default: false },
+    hours: { type: 'string', default: '0' },
+    minutes: { type: 'string', default: '0' },
+};
+
+const { values } = parseArgs({ options, args: process.argv.slice(2), strict: false });
+
+const targetDate = values.date; // format YYYY-MM-DD
+const activityType = values.type;
+const isFullDay = values['full-day'];
+const hours = values.hours;
+const minutes = values.minutes;
+
+if (!targetDate) {
+    console.error("Error: Please provide a target date.");
+    console.error("Usage: npm run zucchetti:update -- --date=YYYY-MM-DD [--full-day=true] [--type='SMART WORKING'] [--hours=4] [--minutes=30]");
+    process.exit(1);
+}
 
 (async () => {
     // 1. Launch browser (headful for now so you can see what it does)
@@ -71,25 +94,71 @@ const { chromium } = require('playwright');
 
     console.log("New tab opened! Navigated to HR-WorkFlow.");
 
-    // 6. Click "Nuova richiesta" for March 2nd
-    console.log("Clicking 'Nuova richiesta' for 2026-03-02...");
-    // Since the onclick contains '2026-03-02', we can locate it by an attribute
-    await newPage.locator('span[title="Nuova richiesta"][onclick*="2026-03-02"]').click();
+    // 6. Click "Nuova richiesta" for the given date
+    console.log(`Clicking 'Nuova richiesta' for ${targetDate}...`);
+    // Since the onclick contains the date, we can locate it by an attribute
+    await newPage.locator(`span[title="Nuova richiesta"][onclick*="${targetDate}"]`).click();
 
-    // 7. Wait for the popup and select "SMART WORKING"
-    console.log("Selecting SMART WORKING...");
-    const dropdown = newPage.locator('select').first(); // Adjust selector based on actual DOM ID like #i0cfq_Giustificativo
-    await dropdown.selectOption({ label: 'SMART WORKING' });
-    // Or if it's a searchable input:
-    // await newPage.locator('input for dropdown').fill('smart');
+    // 7. Wait for the popup and select the given TYPE
+    console.log("Waiting for the modal to fully load...");
+    
+    // Instead of a static timeout, wait for the select to actually get populated
+    await newPage.waitForFunction(() => {
+        const selects = document.querySelectorAll('select:not([name="TxtMese"])');
+        if (selects.length > 0) {
+            const dropdown = selects[selects.length - 1];
+            return dropdown.options && dropdown.options.length > 1;
+        }
+        return false;
+    }, { timeout: 30000 });
 
-    // 8. Check "Giornata intera"
-    console.log("Checking 'Giornata intera'...");
-    await newPage.locator('#i0cfq_cPeriodoBox').check();
+    console.log(`Selecting ${activityType}...`);
+    const dropdown = newPage.locator('select:not([name="TxtMese"])').last(); 
+    
+    // Find the right option dynamically, case-insensitive
+    const optionsText = await dropdown.locator('option').allInnerTexts();
+    const targetOption = optionsText.find(opt => opt.toUpperCase().includes(activityType.toUpperCase()));
+    
+    if (targetOption) {
+        await dropdown.selectOption({ label: targetOption });
+    } else {
+        console.error(`${activityType} option not found! Available options:`, optionsText);
+        await newPage.screenshot({ path: 'dropdown_error_debug.png', fullPage: true });
+        throw new Error(`${activityType} option missing`);
+    }
+
+    // 8. Handle duration: check "Giornata intera" or input hours/minutes
+    console.log(`Handling duration: FullDay=${isFullDay}`);
+    if (isFullDay) {
+        console.log("Checking 'Giornata intera' box...");
+        // IDs are dynamic, ending with _cPeriodoBox
+        await newPage.locator('input[type="checkbox"][id$="PeriodoBox"], input[type="checkbox"][name*="Periodo"]').first().check();
+    } else {
+        console.log(`Setting time to ${hours} hours and ${minutes} minutes...`);
+        // Zucchetti often uses fields ending in _nHh / _nMi or containing placeholder HH/MM
+        const hoursInput = newPage.locator('input[id$="nHh"], input[name*="Hh"], input[placeholder*="HH"]').first();
+        const minutesInput = newPage.locator('input[id$="nMi"], input[name*="Mi"], input[placeholder*="MM"]').first();
+        
+        // Wait briefly just to be sure inputs exist
+        await hoursInput.waitFor({ state: 'visible', timeout: 3000 }).catch(() => console.log("Hours input not immediately visible, continuing..."));
+        
+        if (await hoursInput.isVisible()) {
+            await hoursInput.fill(hours.toString());
+        } else {
+            console.log("Warning: Could not find hours input!");
+        }
+        
+        if (await minutesInput.isVisible()) {
+            await minutesInput.fill(minutes.toString());
+        } else {
+            console.log("Warning: Could not find minutes input!");
+        }
+    }
 
     // 9. Click "Invia"
     console.log("Clicking Invia...");
-    await newPage.locator('#i0cfq_InvioButton').click();
+    // ID ends with _InvioButton
+    await newPage.locator('[id$="InvioButton"]').first().click();
 
     console.log("Request submitted successfully!");
 
