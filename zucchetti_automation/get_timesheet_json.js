@@ -164,8 +164,62 @@ if (values.date) {
     }
 
     // Output JSON
+    const timeToMinutes = (timeStr) => {
+        if (!timeStr || !timeStr.includes(':')) return 0;
+        const [h, m] = timeStr.split(':').map(Number);
+        return (h || 0) * 60 + (m || 0);
+    };
+
+    const minutesToStr = (totalMinutes) => {
+        const h = Math.floor(totalMinutes / 60);
+        const m = totalMinutes % 60;
+        return `${h}:${m.toString().padStart(2, '0')}`;
+    };
+
+    const validatedData = timesheetData.map(day => {
+        const hOrdMinutes = timeToMinutes(day.hOrd);
+        
+        // Sum approved requests, cross-referencing justificatives if qta is missing
+        const approvedReqs = day.richieste.filter(r => r.status === 'Approvata');
+        const sumReqMin = approvedReqs.reduce((acc, r) => {
+            let qta = timeToMinutes(r.qta);
+            if (qta === 0) {
+                // Try to find a matching justificative to infer the qta
+                const match = day.giustificativi.find(g => g.text === r.text);
+                if (match) qta = timeToMinutes(match.qta);
+            }
+            return acc + qta;
+        }, 0);
+        
+        // Sum all justificatives
+        const sumGiuMin = day.giustificativi.reduce((acc, g) => acc + timeToMinutes(g.qta), 0);
+
+        const warnings = [];
+
+        // Check 1: approved richieste vs hOrd
+        if (sumReqMin > 0 && sumReqMin !== hOrdMinutes) {
+            warnings.push(`Discrepanza: hOrd (${day.hOrd || '0:00'}) != somma richieste approvate (${minutesToStr(sumReqMin)})`);
+        }
+
+        // Check 2: giustificativi vs hOrd
+        if (sumGiuMin > 0 && sumGiuMin !== hOrdMinutes) {
+            warnings.push(`Discrepanza: hOrd (${day.hOrd || '0:00'}) != somma giustificativi (${minutesToStr(sumGiuMin)})`);
+        }
+
+        // Check 3: richieste vs giustificativi (consistency)
+        // Only warn if there are actually approved requests or justificatives
+        if ((sumReqMin > 0 || sumGiuMin > 0) && sumReqMin !== sumGiuMin) {
+            warnings.push(`Incongruenza: Somma richieste approvate (${minutesToStr(sumReqMin)}) != somma giustificativi (${minutesToStr(sumGiuMin)})`);
+        }
+
+        if (warnings.length > 0) {
+            return { ...day, warnings };
+        }
+        return day;
+    });
+
     console.log("--- START JSON ---");
-    console.log(JSON.stringify({ header, days: timesheetData }, null, 2));
+    console.log(JSON.stringify({ header, days: validatedData }, null, 2));
     console.log("--- END JSON ---");
 
     await browser.close();
