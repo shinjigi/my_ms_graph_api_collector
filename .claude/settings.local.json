@@ -12,7 +12,12 @@
       "Bash(az ad sp show:*)",
       "Bash(az ad signed-in-user show:*)",
       "Bash(az ad app owner list:*)",
-      "Bash(node --check:*)"
+      "Bash(node --check:*)",
+      "Bash(for f:*)",
+      "Bash(do echo:*)",
+      "Read(//c/SVN/_GH/_shinjigi_WIN/my_ms_graph_api_collector/**)",
+      "Bash(done)",
+      "Bash(powershell -Command \"Get-ChildItem 'C:\\\\Users\\\\your-username\\\\AppData\\\\Roaming\\\\Code\\\\extensions' -Directory | Where-Object { $_.Name -match 'history|antigrav' } | Select-Object Name\")"
     ]
   }
 }
