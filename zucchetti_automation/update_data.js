@@ -160,30 +160,30 @@ if (!matchedActivity) {
         console.log(`Handling duration in same frame: FullDay=${isFullDay}`);
         if (isFullDay) {
             console.log("Checking 'Giornata intera' box...");
-            // Many checkboxes might exist, try to find the visible one or force it
-            const fullDayCheckbox = targetFrame.locator('input[id$="_cPeriodoBox"], input[id$="_InteraBox"]').first();
+            // Filter by visibility to avoid hitting hidden copies of the checkbox
+            const fullDayCheckbox = targetFrame.locator('input[id$="_cPeriodoBox"], input[id$="_InteraBox"]').filter({ visible: true }).first();
             
             try {
                 await fullDayCheckbox.waitFor({ state: 'visible', timeout: 5000 });
+                await fullDayCheckbox.check({ force: true });
             } catch (e) {
-                console.log("Checkbox not visible after wait, attempting force check...");
+                console.log("Direct check failed, trying to click by text 'Giornata intera'...");
+                await targetFrame.locator('label:has-text("Giornata intera")').filter({ visible: true }).first().click({ force: true });
             }
-            
-            await fullDayCheckbox.check({ force: true });
         } else {
             console.log(`Setting time to ${hours}:${minutes}...`);
-            const hoursInput = targetFrame.locator('input[id$="_qtahh"]').first();
-            const minutesInput = targetFrame.locator('input[id$="_qtamm"]').first();
+            const hoursInput = targetFrame.locator('input[id$="_qtahh"]').filter({ visible: true }).first();
+            const minutesInput = targetFrame.locator('input[id$="_qtamm"]').filter({ visible: true }).first();
             
-            await hoursInput.waitFor({ state: 'visible', timeout: 5000 }).catch(() => console.log("Hours input not visible, force filling..."));
+            await hoursInput.waitFor({ state: 'visible', timeout: 5000 });
             await hoursInput.fill(hours.toString(), { force: true });
             await minutesInput.fill(minutes.toString(), { force: true });
         }
 
         // 9. Click "Invia"
         console.log("Clicking Invia...");
-        const inviaButton = targetFrame.locator('input[id$="_InvioButton"]').first();
-        await inviaButton.waitFor({ state: 'visible', timeout: 5000 }).catch(() => console.log("Invia button not visible, attempting force click..."));
+        const inviaButton = targetFrame.locator('input[id$="_InvioButton"]').filter({ visible: true }).first();
+        await inviaButton.waitFor({ state: 'visible', timeout: 5000 });
         await inviaButton.click({ force: true });
 
     } catch (error) {
