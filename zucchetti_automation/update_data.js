@@ -101,30 +101,31 @@ if (!targetDate) {
 
     // 7. Wait for the popup and select the given TYPE
     console.log("Waiting for the modal to fully load...");
-    
-    // Instead of a static timeout, wait for the select to actually get populated
-    await newPage.waitForFunction(() => {
-        const selects = document.querySelectorAll('select:not([name="TxtMese"])');
-        if (selects.length > 0) {
-            const dropdown = selects[selects.length - 1];
-            return dropdown.options && dropdown.options.length > 1;
-        }
-        return false;
-    }, { timeout: 30000 });
+    await newPage.waitForTimeout(4000); // Give Zucchetti time to populate the comboboxes
 
     console.log(`Selecting ${activityType}...`);
-    const dropdown = newPage.locator('select:not([name="TxtMese"])').last(); 
-    
-    // Find the right option dynamically, case-insensitive
-    const optionsText = await dropdown.locator('option').allInnerTexts();
-    const targetOption = optionsText.find(opt => opt.toUpperCase().includes(activityType.toUpperCase()));
-    
-    if (targetOption) {
-        await dropdown.selectOption({ label: targetOption });
-    } else {
-        console.error(`${activityType} option not found! Available options:`, optionsText);
+    try {
+        // Zucchetti 2024/2026 uses custom Comboboxes. The input usually has value="-" initially.
+        const comboBoxInput = newPage.locator('input[value="-"], input.Combobox_input, [role="combobox"]').first();
+        if (await comboBoxInput.isVisible({ timeout: 5000 })) {
+            console.log("Found Combobox input. Clicking and typing...");
+            await comboBoxInput.click();
+            await comboBoxInput.fill(''); // clear the dash
+            await comboBoxInput.fill(activityType);
+            await newPage.waitForTimeout(1000); // Wait for dropdown items to filter
+            await newPage.keyboard.press('Enter');
+        } else {
+            console.log("Could not find standard Combobox input. Clicking the '-' text...");
+            await newPage.getByText('-', { exact: true }).first().click();
+            await newPage.waitForTimeout(1000);
+            
+            console.log("Clicking the option from the dropdown list...");
+            await newPage.getByText(activityType.toUpperCase(), { exact: false }).first().click();
+        }
+    } catch (error) {
+        console.error(`Failed to select ${activityType}!`);
         await newPage.screenshot({ path: 'dropdown_error_debug.png', fullPage: true });
-        throw new Error(`${activityType} option missing`);
+        throw error;
     }
 
     // 8. Handle duration: check "Giornata intera" or input hours/minutes
