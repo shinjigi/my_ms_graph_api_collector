@@ -12,14 +12,39 @@ const options = {
 const { values } = parseArgs({ options, args: process.argv.slice(2), strict: false });
 
 const targetDate = values.date; // format YYYY-MM-DD
-const activityType = values.type;
+const activityType = values.type.trim().toUpperCase();
 const isFullDay = values['full-day'];
 const hours = values.hours;
 const minutes = values.minutes;
 
+// Zucchetti valid giustificativi mapped perfectly to the HTML options
+const validActivities = [
+    "DONAZIONE SANGUE", "EX FESTIVITA'", "FERIE", "FORMAZIONE", 
+    "GIORNO PERMESSO STUDIO RETR. A", "PERM. AGG.VO INSERIMENTO ASILO", 
+    "PERMESSO NON RETRIBUITO MALATTIA FIGLIO 9 -14 ANNI", 
+    "PERMESSO NON RETRIBUITO MALATTIA FIGLIO FINO 3 ANN", 
+    "PERMESSO NON RETRIBUITO MALATTIA FIGLIO FINO 8  AN", 
+    "PERMESSO PER ESAMI", "PERMESSO STUDIO", "RIPOSO COMPENSATIVO", 
+    "RIPOSO COMPENSATIVO ELEZIONI", "SERVIZIO ESTERNO", "SMART WORKING", 
+    "Straordinario da autorizzare", "TRASFERTA CON PERNOTTO ALTRI P", 
+    "TRASFERTA CON PERNOTTO BELGIO", "TRASFERTA CON PERNOTTO BRASILE", 
+    "TRASFERTA CON PERNOTTO ITALIA", "TRASFERTA CON PERNOTTO PORTOGA", 
+    "TRASFERTA CON PERNOTTO SPAGNA", "TRASFERTA SENZA PERNOTTO ALTRI", 
+    "TRASFERTA SENZA PERNOTTO BELGI", "TRASFERTA SENZA PERNOTTO BRASI", 
+    "TRASFERTA SENZA PERNOTTO ITALI", "TRASFERTA SENZA PERNOTTO PORTO", 
+    "TRASFERTA SENZA PERNOTTO SPAGN", "VISITA MEDICA"
+];
+
 if (!targetDate) {
     console.error("Error: Please provide a target date.");
     console.error("Usage: npm run zucchetti:update -- --date=YYYY-MM-DD [--full-day=true] [--type='SMART WORKING'] [--hours=4] [--minutes=30]");
+    process.exit(1);
+}
+
+const matchedActivity = validActivities.find(a => a.toUpperCase().includes(activityType));
+if (!matchedActivity) {
+    console.error(`Error: Activity type "${activityType}" is not recognized.`);
+    console.error(`Valid options are: \n${validActivities.join('\n')}`);
     process.exit(1);
 }
 
@@ -113,16 +138,16 @@ if (!targetDate) {
         // Wait for options to be populated
         await dropdown.waitFor({ state: 'attached', timeout: 10000 });
 
-        // Retrieve all available options case-insensitively to find the exact match
-        const optionsText = await dropdown.locator('option').allInnerTexts();
-        const targetOption = optionsText.find(opt => opt.toUpperCase().includes(activityType.toUpperCase()));
-
-        if (targetOption) {
-            console.log(`Found matching option: "${targetOption}". Selecting it...`);
-            await dropdown.selectOption({ label: targetOption });
+        if (matchedActivity) {
+            console.log(`Selecting exact matched option: "${matchedActivity}"...`);
+            
+            // Wait for options to be populated dynamically within the Combobox
+            await dropdown.waitFor({ state: 'attached', timeout: 10000 });
+            
+            // Since it's a real select element now, we can use the label property exactly
+            await dropdown.selectOption({ label: matchedActivity });
         } else {
-            console.error(`${activityType} option not found! Available options:`, optionsText);
-            throw new Error(`${activityType} option missing`);
+            throw new Error(`Execution error: matching activity was lost.`);
         }
     } catch (error) {
         console.error(`Failed to select ${activityType}!`);
