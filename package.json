@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node src/index.js",
     "check": "node --check src/index.js",
-    "zucchetti:update": "node --env-file=.env zucchetti_automation/update_data.js"
+    "zucchetti:update": "node --env-file=.env zucchetti_automation/update_data.js",
+    "zucchetti:get-json": "node --env-file=.env zucchetti_automation/get_timesheet_json.js"
   },
   "keywords": [
     "microsoft-graph",
