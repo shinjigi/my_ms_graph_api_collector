@@ -101,26 +101,28 @@ if (!targetDate) {
 
     // 7. Wait for the popup and select the given TYPE
     console.log("Waiting for the modal to fully load...");
-    await newPage.waitForTimeout(4000); // Give Zucchetti time to populate the comboboxes
+    await newPage.waitForTimeout(4000); // Give Zucchetti time to populate
 
     console.log(`Selecting ${activityType}...`);
     try {
-        // Zucchetti 2024/2026 uses custom Comboboxes. The input usually has value="-" initially.
-        const comboBoxInput = newPage.locator('input[value="-"], input.Combobox_input, [role="combobox"]').first();
-        if (await comboBoxInput.isVisible({ timeout: 5000 })) {
-            console.log("Found Combobox input. Clicking and typing...");
-            await comboBoxInput.click();
-            await comboBoxInput.fill(''); // clear the dash
-            await comboBoxInput.fill(activityType);
-            await newPage.waitForTimeout(1000); // Wait for dropdown items to filter
-            await newPage.keyboard.press('Enter');
+        // The user provided the exact HTML snippet:
+        // <select id="j63j7_Combobox23" name="Combobox23" class="combobox Combobox23_ctrl" ...>
+        // We locate the select that contains the string "Combobox" in its class or ID
+        const dropdown = newPage.locator('select.combobox, select[id*="Combobox"]').first();
+        
+        // Wait for options to be populated
+        await dropdown.waitFor({ state: 'attached', timeout: 10000 });
+
+        // Retrieve all available options case-insensitively to find the exact match
+        const optionsText = await dropdown.locator('option').allInnerTexts();
+        const targetOption = optionsText.find(opt => opt.toUpperCase().includes(activityType.toUpperCase()));
+
+        if (targetOption) {
+            console.log(`Found matching option: "${targetOption}". Selecting it...`);
+            await dropdown.selectOption({ label: targetOption });
         } else {
-            console.log("Could not find standard Combobox input. Clicking the '-' text...");
-            await newPage.getByText('-', { exact: true }).first().click();
-            await newPage.waitForTimeout(1000);
-            
-            console.log("Clicking the option from the dropdown list...");
-            await newPage.getByText(activityType.toUpperCase(), { exact: false }).first().click();
+            console.error(`${activityType} option not found! Available options:`, optionsText);
+            throw new Error(`${activityType} option missing`);
         }
     } catch (error) {
         console.error(`Failed to select ${activityType}!`);
