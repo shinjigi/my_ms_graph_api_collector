@@ -6,7 +6,8 @@
   "type": "commonjs",
   "scripts": {
     "start": "node src/index.js",
-    "check": "node --check src/index.js"
+    "check": "node --check src/index.js",
+    "zucchetti:smart-working": "node --env-file=.env zucchetti_automation/update_data.js"
   },
   "keywords": [
     "microsoft-graph",
@@ -21,6 +22,7 @@
     "@azure/msal-node": "^2.8.0",
     "@microsoft/microsoft-graph-client": "^3.0.7",
     "dotenv": "^16.4.5",
-    "isomorphic-fetch": "^3.0.0"
+    "isomorphic-fetch": "^3.0.0",
+    "playwright": "^1.58.2"
   }
 }
