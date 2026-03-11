@@ -8,7 +8,11 @@
     "start": "node src/index.js",
     "check": "node --check src/index.js",
     "zucchetti:update": "node --env-file=.env zucchetti_automation/update_data.js",
-    "zucchetti:get-json": "node --env-file=.env zucchetti_automation/get_timesheet_json.js"
+    "zucchetti:get-json": "node --env-file=.env zucchetti_automation/get_timesheet_json.js",
+    "tp:projects": "ts-node --project tp/tsconfig.json tp/get-projects.ts",
+    "tp:userstories": "ts-node --project tp/tsconfig.json tp/get-userstories.ts",
+    "tp:us-detail": "ts-node --project tp/tsconfig.json tp/get-us-detail.ts",
+    "tp:log-time": "ts-node --project tp/tsconfig.json tp/log-time.ts"
   },
   "keywords": [
     "microsoft-graph",
@@ -25,5 +29,10 @@
     "dotenv": "^16.4.5",
     "isomorphic-fetch": "^3.0.0",
     "playwright": "^1.58.2"
+  },
+  "devDependencies": {
+    "@types/node": "^25.4.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
   }
 }
