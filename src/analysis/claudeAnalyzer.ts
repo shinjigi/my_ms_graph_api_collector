@@ -12,6 +12,7 @@
 import * as fs      from 'fs/promises';
 import * as path    from 'path';
 import * as dotenv  from 'dotenv';
+import { spawn }    from 'child_process';
 import Anthropic    from '@anthropic-ai/sdk';
 dotenv.config();
 
@@ -150,30 +151,95 @@ async function loadDefaults(): Promise<DefaultsConfig> {
     }
 }
 
+/** Calls the local `claude` CLI (Claude Code subscription) in non-interactive mode. */
+function callClaudeCli(systemPrompt: string, userPrompt: string, model: string): Promise<string> {
+    return new Promise((resolve, reject) => {
+        // Unset CLAUDECODE to allow subprocess invocation outside an active session
+        const env = { ...process.env, CLAUDECODE: undefined };
+        const proc = spawn('claude', ['-p', '--model', model], { env, stdio: ['pipe', 'pipe', 'pipe'] });
+
+        const chunks: Buffer[] = [];
+        proc.stdin.write(`${systemPrompt}\n\n${userPrompt}`);
+        proc.stdin.end();
+
+        proc.stdout.on('data', (chunk: Buffer) => chunks.push(chunk));
+        proc.stderr.on('data', (chunk: Buffer) => process.stderr.write(chunk));
+        proc.on('close', (code) => {
+            if (code !== 0) reject(new Error(`claude CLI exited with code ${code}`));
+            else resolve(Buffer.concat(chunks).toString('utf-8').trim());
+        });
+        proc.on('error', reject);
+    });
+}
+
+/**
+ * Calls an OpenAI-compatible API (Ollama, LM Studio, OpenRouter, etc.).
+ * Requires OPENAI_BASE_URL (e.g. http://localhost:11434/v1) and optionally OPENAI_API_KEY.
+ */
+async function callOpenAiCompatible(systemPrompt: string, userPrompt: string, model: string): Promise<string> {
+    const baseUrl = process.env['OPENAI_BASE_URL']!;
+    const apiKey  = process.env['OPENAI_API_KEY'] ?? 'ollama'; // Ollama ignores the key
+
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+        method:  'POST',
+        headers: {
+            'Content-Type':  'application/json',
+            'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+            model,
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user',   content: userPrompt },
+            ],
+            max_tokens: 1024,
+        }),
+    });
+
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`OpenAI-compatible API error ${response.status}: ${text}`);
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = await response.json() as any;
+    return (data.choices?.[0]?.message?.content ?? '') as string;
+}
+
 async function analyzeDay(
     day: AggregatedDay,
-    anthropic: Anthropic,
     kbItems: KbEntry[],
     defaults: DefaultsConfig
 ): Promise<DayProposal> {
-    const model   = process.env['CLAUDE_MODEL'] ?? 'claude-haiku-4-5-20251001';
+    const model         = process.env['CLAUDE_MODEL'] ?? process.env['OPENAI_MODEL'] ?? 'claude-haiku-4-5-20251001';
+    const anthropicKey  = process.env['CLAUDE_API_KEY'];
+    const openAiBaseUrl = process.env['OPENAI_BASE_URL'];
 
-    const message = await anthropic.messages.create({
-        model,
-        max_tokens:  1024,
-        system:      buildSystemPrompt(),
-        messages: [{
-            role:    'user',
-            content: buildUserPrompt(day, kbItems, defaults),
-        }],
-    });
+    const system = buildSystemPrompt();
+    const user   = buildUserPrompt(day, kbItems, defaults);
+    let responseText: string;
 
-    const block = message.content[0];
-    if (block.type !== 'text') {
-        throw new Error('Risposta Claude non testuale');
+    if (anthropicKey) {
+        // Backend 1: Anthropic API
+        const anthropic = new Anthropic({ apiKey: anthropicKey });
+        const message   = await anthropic.messages.create({
+            model,
+            max_tokens: 1024,
+            system,
+            messages: [{ role: 'user', content: user }],
+        });
+        const block = message.content[0];
+        if (block.type !== 'text') throw new Error('Risposta Claude non testuale');
+        responseText = block.text;
+    } else if (openAiBaseUrl) {
+        // Backend 2: OpenAI-compatible (Ollama, LM Studio, OpenRouter, …)
+        responseText = await callOpenAiCompatible(system, user, model);
+    } else {
+        // Backend 3: Claude Code CLI (uses subscription, no API key required)
+        responseText = await callClaudeCli(system, user, model);
     }
 
-    const entries = JSON.parse(stripCodeFence(block.text)) as ProposalEntry[];
+    const entries = JSON.parse(stripCodeFence(responseText)) as ProposalEntry[];
 
     const totalHours = entries.reduce((s, e) => s + e.inferredHours, 0);
 
@@ -190,12 +256,12 @@ async function run(): Promise<void> {
     const force     = process.argv.includes('--force');
     const dateArg   = process.argv.find(a => a.startsWith('--date='))?.split('=')[1];
 
-    const apiKey = process.env['CLAUDE_API_KEY'];
-    if (!apiKey) {
-        throw new Error('CLAUDE_API_KEY mancante in .env');
-    }
+    const backend =
+        process.env['CLAUDE_API_KEY']  ? 'Anthropic API' :
+        process.env['OPENAI_BASE_URL'] ? `OpenAI-compatible (${process.env['OPENAI_BASE_URL']})` :
+        'Claude Code CLI (subscription)';
+    console.log(`LLM backend: ${backend}`);
 
-    const anthropic = new Anthropic({ apiKey });
     const kbItems   = await loadKb();
     const defaults  = await loadDefaults();
 
@@ -234,7 +300,7 @@ async function run(): Promise<void> {
         console.log(`  Analisi ${date} (target ${day.oreTarget.toFixed(2)}h, ${day.calendar.length} eventi, ${day.gitCommits.length} commit git)...`);
 
         try {
-            const proposal = await analyzeDay(day, anthropic, kbItems, defaults);
+            const proposal = await analyzeDay(day, kbItems, defaults);
             await fs.writeFile(propPath, JSON.stringify(proposal, null, 2), 'utf-8');
             console.log(`    → ${proposal.entries.length} entries, totale ${proposal.totalHours}h`);
             processed++;
