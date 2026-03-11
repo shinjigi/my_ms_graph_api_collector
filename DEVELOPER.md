@@ -163,16 +163,38 @@ Copy `.env.example` to `.env`:
 | `TP_BASE_URL` | ✅ | TargetProcess instance URL |
 | `TP_TOKEN` | ✅ | Base64 TP API token |
 | `MISC_TASK_ID` | — | Fallback TP task for unattributed hours |
-| `CLAUDE_API_KEY` | ✅ | Anthropic API key |
-| `CLAUDE_MODEL` | — | Model ID (default claude-haiku-4-5-20251001) |
+| `CLAUDE_API_KEY` | — | Anthropic API key — **backend 1** (see below) |
+| `CLAUDE_MODEL` | — | Anthropic model ID (default `claude-haiku-4-5-20251001`) |
+| `OPENAI_BASE_URL` | — | OpenAI-compatible base URL — **backend 2**: Ollama (`http://localhost:11434/v1`), LM Studio, OpenRouter, etc. |
+| `OPENAI_API_KEY` | — | API key for the OpenAI-compatible endpoint (Ollama: any string) |
+| `OPENAI_MODEL` | — | Model name for the OpenAI-compatible endpoint (e.g. `llama3.2`) |
 | `GIT_ROOTS` | — | Semicolon-separated root dirs to scan for git repos (maxDepth 4). Supports Windows paths and WSL UNC paths: `//wsl.localhost/Ubuntu/home/<user>/projects` |
+| `GIT_EMAILS` | — | Semicolon-separated author emails to include; empty = all authors |
 | `SVN_URL` | — | SVN repository URL |
-| `SVN_USERNAME` / `SVN_PASSWORD` | — | SVN credentials |
+| `SVN_USERNAME` / `SVN_PASSWORD` | — | SVN credentials; `SVN_USERNAME` is also used as author filter |
 | `SVN_BIN` | — | Path to `svn.exe` |
 | `ZUCCHETTI_USERNAME` / `ZUCCHETTI_PASSWORD` | — | Zucchetti form auth |
 | `NIBOL_PROFILE_DIR` | — | Playwright session dir for Nibol |
 | `CHROME_PROFILE_DIRS` | — | Semicolon-separated Chrome profile dirs |
 | `FIREFOX_PROFILE_DIR` | — | Firefox profile dir |
+
+### AI analyzer backends
+
+`claudeAnalyzer.ts` selects the LLM backend in priority order:
+
+```mermaid
+flowchart TD
+    A{CLAUDE_API_KEY set?}
+    B[Anthropic SDK\nPay-per-token API]
+    C{OPENAI_BASE_URL set?}
+    D[OpenAI-compatible HTTP\nOllama · LM Studio · OpenRouter]
+    E[claude CLI  -p \nClaude Code subscription]
+
+    A -->|yes| B
+    A -->|no|  C
+    C -->|yes| D
+    C -->|no|  E
+```
 
 ---
 
