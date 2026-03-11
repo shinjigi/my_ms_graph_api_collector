@@ -44,7 +44,13 @@
       "Bash(cd \"C:\\\\SVN\\\\_GH\\\\_shinjigi_WIN\\\\my_ms_graph_api_collector\" && npm run tp:userstories -- 3173 2025-03-01 --json 2>&1 | head -30)",
       "Bash(cd \"C:\\\\SVN\\\\_GH\\\\_shinjigi_WIN\\\\my_ms_graph_api_collector\" && npm run tp:userstories -- 3173 2025-03-01 --json 2>&1 | node -e \"\nconst chunks = [];\nprocess.stdin.on\\('data', d => chunks.push\\(d\\)\\);\nprocess.stdin.on\\('end', \\(\\) => {\n    const text = chunks.join\\(''\\);\n    const jsonStart = text.indexOf\\('['\\);\n    const data = JSON.parse\\(text.slice\\(jsonStart\\)\\);\n    const withDesc = data.filter\\(s => s.Description\\);\n    console.log\\('US con description:', withDesc.length, '/', data.length\\);\n    if \\(withDesc[0]\\) console.log\\('Esempio:', JSON.stringify\\(withDesc[0].Description\\).slice\\(0, 200\\)\\);\n}\\);\n\")",
       "Bash(cd \"C:\\\\SVN\\\\_GH\\\\_shinjigi_WIN\\\\my_ms_graph_api_collector\" && node -e \"\nconst dotenv = require\\('dotenv'\\);\nrequire\\('isomorphic-fetch'\\);\ndotenv.config\\(\\);\nconst token = process.env.TP_TOKEN;\nconst base = process.env.TP_BASE_URL.replace\\(/\\\\/$/, ''\\);\n\nconst today = new Date\\(\\).toISOString\\(\\).slice\\(0, 10\\);\n\nconst payload = {\n    assignable: { id: 324911 },\n    user:       { id: 1902 },\n    spent:      0.5,\n    remain:     0,\n    date:       today,\n    description: 'standup [test v2]'\n};\n\nfetch\\(base + '/api/v2/times?access_token=' + token, {\n    method: 'POST',\n    headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },\n    body: JSON.stringify\\(payload\\)\n}\\)\n.then\\(r => { console.log\\('Status:', r.status\\); return r.text\\(\\); }\\)\n.then\\(d => console.log\\(d.substring\\(0, 400\\)\\)\\);\n\" 2>&1)",
-      "Bash(cd \"C:\\\\SVN\\\\_GH\\\\_shinjigi_WIN\\\\my_ms_graph_api_collector\" && npm run tp:log-time -- 324911 0.5 \"standup\" 2>&1)"
+      "Bash(cd \"C:\\\\SVN\\\\_GH\\\\_shinjigi_WIN\\\\my_ms_graph_api_collector\" && npm run tp:log-time -- 324911 0.5 \"standup\" 2>&1)",
+      "Bash(cd \"C:\\\\SVN\\\\_GH\\\\_shinjigi_WIN\\\\my_ms_graph_api_collector\" && npm install --save-dev tsx 2>&1 | tail -5)",
+      "Bash(cd \"C:\\\\SVN\\\\_GH\\\\_shinjigi_WIN\\\\my_ms_graph_api_collector\" && npm install --save @anthropic-ai/sdk express cors 2>&1 | tail -5)",
+      "Bash(cd \"C:\\\\SVN\\\\_GH\\\\_shinjigi_WIN\\\\my_ms_graph_api_collector\" && npm install --save-dev @types/express @types/cors 2>&1 | tail -5)",
+      "Bash(cd \"C:\\\\SVN\\\\_GH\\\\_shinjigi_WIN\\\\my_ms_graph_api_collector\" && npm install --save xml2js glob 2>&1 | tail -5)",
+      "Bash(cd \"C:\\\\SVN\\\\_GH\\\\_shinjigi_WIN\\\\my_ms_graph_api_collector\" && npm install --verbose --registry https://registry.npmjs.org 2>&1)",
+      "Bash(cd \"C:\\\\SVN\\\\_GH\\\\_shinjigi_WIN\\\\my_ms_graph_api_collector\" && npm install --verbose --registry https://registry.npmjs.org xml2js glob @types/xml2js 2>&1)"
     ]
   }
 }
