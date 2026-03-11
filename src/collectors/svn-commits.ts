@@ -3,14 +3,15 @@ import * as path       from 'path';
 import { spawn }       from 'child_process';
 import { parseString } from 'xml2js';
 import { promisify }   from 'util';
+import { mergeByKey, readMeta, writeMeta, shouldSkipMonth, lastDayOfMonth } from './utils';
 
 const parseXml = promisify(parseString);
-const RAW_DIR  = path.join(process.cwd(), 'data', 'raw');
+const SVN_DIR  = path.join(process.cwd(), 'data', 'raw', 'svn');
 
 export interface SvnCommit {
     revision: string;
     author:   string;
-    date:     string;   // ISO date string
+    date:     string;   // YYYY-MM-DD
     message:  string;
     paths:    string[];
 }
@@ -33,19 +34,15 @@ function runSvn(args: string[], svnBin: string): Promise<string> {
     });
 }
 
-export async function collectSvnCommits(): Promise<string> {
-    const svnUrl  = process.env['SVN_URL'];
-    const svnBin  = process.env['SVN_BIN'] ?? 'svn';
-    const since   = process.env['COLLECT_SINCE'] ?? '2025-01-01';
-    const user    = process.env['SVN_USERNAME'];
-    const pass    = process.env['SVN_PASSWORD'];
-
-    if (!svnUrl) {
-        console.warn('SVN_URL non configurato — collector SVN saltato.');
-        return path.join(RAW_DIR, 'svn-commits.json');
-    }
-
-    const args = ['log', '--xml', '-r', `{${since}}:HEAD`, '--limit', '2000'];
+async function fetchMonthCommits(
+    month:      string,
+    svnUrl:     string,
+    svnBin:     string,
+    user?:      string,
+    pass?:      string,
+): Promise<SvnCommit[]> {
+    const lastDay = lastDayOfMonth(month);
+    const args    = ['log', '--xml', '-r', `{${month}-01}:{${lastDay}}`];
 
     if (user && pass) {
         args.push('--username', user, '--password', pass, '--no-auth-cache');
@@ -53,22 +50,13 @@ export async function collectSvnCommits(): Promise<string> {
 
     args.push(svnUrl);
 
-    let xmlOutput: string;
-    try {
-        xmlOutput = await runSvn(args, svnBin);
-    } catch (err) {
-        console.warn(`SVN log fallito: ${(err as Error).message}. Collector saltato.`);
-        await fs.mkdir(RAW_DIR, { recursive: true });
-        const outPath = path.join(RAW_DIR, 'svn-commits.json');
-        await fs.writeFile(outPath, '[]', 'utf-8');
-        return outPath;
-    }
+    const xmlOutput = await runSvn(args, svnBin);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const parsed = await parseXml(xmlOutput) as any;
+    const parsed  = await parseXml(xmlOutput) as any;
     const entries = parsed?.log?.logentry ?? [];
 
-    const commits: SvnCommit[] = entries.map((e: {
+    return entries.map((e: {
         $: { revision: string };
         author: string[];
         date:   string[];
@@ -81,9 +69,66 @@ export async function collectSvnCommits(): Promise<string> {
         message:  ((e.msg ?? [''])[0] ?? '').trim(),
         paths:    (e.paths?.[0]?.path ?? []).map((p: { _: string }) => p._),
     }));
+}
 
-    await fs.mkdir(RAW_DIR, { recursive: true });
-    const outPath = path.join(RAW_DIR, 'svn-commits.json');
-    await fs.writeFile(outPath, JSON.stringify(commits, null, 2), 'utf-8');
-    return outPath;
+export async function collectSvnCommits(force = false): Promise<string[]> {
+    const svnUrl  = process.env['SVN_URL'];
+    const svnBin  = process.env['SVN_BIN'] ?? 'svn';
+    const since   = process.env['COLLECT_SINCE'] ?? '2025-01-01';
+    const user    = process.env['SVN_USERNAME'];
+    const pass    = process.env['SVN_PASSWORD'];
+    const today   = new Date().toISOString().slice(0, 10);
+
+    if (!svnUrl) {
+        console.warn('SVN_URL non configurato — collector SVN saltato.');
+        return [];
+    }
+
+    await fs.mkdir(SVN_DIR, { recursive: true });
+
+    const meta     = await readMeta(SVN_DIR);
+    const outPaths: string[] = [];
+    const sources  = [svnUrl];
+
+    const sinceDate = new Date(since);
+    let   current   = new Date(sinceDate.getFullYear(), sinceDate.getMonth(), 1);
+    const now       = new Date();
+
+    while (current <= now) {
+        const year  = current.getFullYear();
+        const mo    = current.getMonth() + 1;
+        const month = `${year}-${String(mo).padStart(2, '0')}`;
+        const isCurrentMonth = month === today.slice(0, 7);
+        const outPath        = path.join(SVN_DIR, `${month}.json`);
+
+        if (!force && !isCurrentMonth && shouldSkipMonth(meta[month], month, sources)) {
+            console.log(`  [SVN] ${month}: skip`);
+            outPaths.push(outPath);
+        } else {
+            try {
+                const commits = await fetchMonthCommits(month, svnUrl, svnBin, user, pass);
+                const merged  = await mergeByKey<SvnCommit>(outPath, commits, 'revision');
+                await fs.writeFile(outPath, JSON.stringify(merged, null, 2), 'utf-8');
+                await writeMeta(SVN_DIR, month, { lastExtractedDate: today, sources });
+                outPaths.push(outPath);
+                console.log(`  [SVN] ${month}: ${commits.length} commit`);
+            } catch (err) {
+                console.warn(`  [SVN] ${month}: ${(err as Error).message}. Mese saltato.`);
+                // Write empty file so the month is not retried on next run if already past
+                if (!isCurrentMonth) {
+                    try {
+                        await fs.writeFile(outPath, '[]', 'utf-8');
+                        await writeMeta(SVN_DIR, month, { lastExtractedDate: today, sources });
+                        outPaths.push(outPath);
+                    } catch {
+                        // Ignore write errors
+                    }
+                }
+            }
+        }
+
+        current = new Date(year, mo, 1);
+    }
+
+    return outPaths;
 }
