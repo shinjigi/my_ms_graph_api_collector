@@ -13,15 +13,19 @@ export interface EmailRaw {
     webLink:             string;
 }
 
-export async function collectGraphEmail(client: Client): Promise<string> {
-    const since   = process.env['COLLECT_SINCE'] ?? '2025-01-01';
-    const top     = Number(process.env['TOP'] ?? 500);
+export async function collectGraphEmail(client: Client, date?: string): Promise<string> {
+    const since = process.env['COLLECT_SINCE'] ?? '2025-01-01';
+    const top   = Number(process.env['TOP'] ?? 500);
+
+    const filter = date
+        ? `receivedDateTime ge ${date}T00:00:00Z and receivedDateTime le ${date}T23:59:59Z`
+        : `receivedDateTime ge ${since}T00:00:00Z`;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = client as any;
     const response = await c
         .api('/me/messages')
-        .filter(`receivedDateTime ge ${since}T00:00:00Z`)
+        .filter(filter)
         .select('id,subject,from,receivedDateTime,bodyPreview,webLink')
         .orderby('receivedDateTime desc')
         .top(top)

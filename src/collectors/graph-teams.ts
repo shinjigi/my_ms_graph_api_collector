@@ -17,7 +17,7 @@ export interface TeamsMessageRaw {
     messageType:          string;
 }
 
-export async function collectGraphTeams(client: Client): Promise<string> {
+export async function collectGraphTeams(client: Client, date?: string): Promise<string> {
     const top = Number(process.env['TOP'] ?? 50);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = client as any;
@@ -57,8 +57,11 @@ export async function collectGraphTeams(client: Client): Promise<string> {
         }
     }
 
+    // Teams API does not support $filter on createdDateTime for chat messages; filter client-side.
+    const filtered = date ? messages.filter(m => m.createdDateTime?.startsWith(date)) : messages;
+
     await fs.mkdir(RAW_DIR, { recursive: true });
     const outPath = path.join(RAW_DIR, 'graph-teams-messages.json');
-    await fs.writeFile(outPath, JSON.stringify(messages, null, 2), 'utf-8');
+    await fs.writeFile(outPath, JSON.stringify(filtered, null, 2), 'utf-8');
     return outPath;
 }
