@@ -48,4 +48,3 @@ registry=https://registry.npmjs.org/
 - Language in code comments and console output is **Italian**.
 - The app requires an Azure Entra ID App Registration with **"Allow public client flows"** enabled and **Delegated** permissions (not Application).
 - `.token-cache.json` contains sensitive tokens and is gitignored.
-- The `corporate-bundle.pem` file at the repo root is for corporate proxy environments (SSL interception).

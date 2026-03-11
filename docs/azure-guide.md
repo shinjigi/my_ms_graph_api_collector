@@ -80,7 +80,7 @@ Se ricevi errori `CERTIFICATE_VERIFY_FAILED`, la tua rete aziendale sta intercet
 ### Soluzione 1: Usa il Bundle Aziendale
 
 ```powershell
-$env:REQUESTS_CA_BUNDLE = ".\my_ms_graph_api_collector\corporate-bundle.pem"
+$env:REQUESTS_CA_BUNDLE = "C:\SVN\certs\euroconsumers-ca-bundle.pem"
 ```
 
 > **Nota (2026-02-19):** `REQUESTS_CA_BUNDLE` da solo **non è sufficiente** per i comandi `az ad` che usano l'SDK Python internamente. Funziona per `az account list` e comandi core, ma non per le chiamate a `graph.microsoft.com`.
