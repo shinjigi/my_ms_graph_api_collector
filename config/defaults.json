@@ -1,0 +1,14 @@
+{
+    "recurringActivities": [
+        {
+            "id":          "standup",
+            "label":       "Daily standup",
+            "hours":       0.7,
+            "autoApprove": true,
+            "taskId":      null,
+            "comment":     "Daily standup meeting"
+        }
+    ],
+    "minHoursForSignals": 1.0,
+    "proposalRoundingStep": 0.25
+}
