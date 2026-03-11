@@ -33,6 +33,16 @@ index.js  →  graphClient.js (auth + Graph client)
 
 `scripts/bootstrap-env.ps1` — PowerShell script that uses Azure CLI to generate `.env` from an App Registration Object ID. See `docs/azure-guide.md` for Azure portal setup and SSL/proxy troubleshooting.
 
+## npm Registry
+
+This is a **personal project** — always use the standard public npm registry, not the internal ProGet feed.
+When installing packages, always pass `--registry https://registry.npmjs.org` explicitly, or ensure the project-level `.npmrc` points to the public registry.
+
+Project-level `.npmrc` (already checked in):
+```
+registry=https://registry.npmjs.org/
+```
+
 ## Key conventions
 
 - Language in code comments and console output is **Italian**.
