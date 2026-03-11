@@ -61,9 +61,10 @@ function getCommitsFromRepo(repoPath: string, since: string): GitCommit[] {
 }
 
 export async function collectGitCommits(force = false): Promise<string[]> {
-    const roots = (process.env['GIT_ROOTS'] ?? '').split(';').map(r => r.trim()).filter(Boolean);
-    const since = process.env['COLLECT_SINCE'] ?? '2025-01-01';
-    const today = new Date().toISOString().slice(0, 10);
+    const roots      = (process.env['GIT_ROOTS']  ?? '').split(';').map(r => r.trim()).filter(Boolean);
+    const gitEmails  = (process.env['GIT_EMAILS'] ?? '').split(';').map(e => e.trim().toLowerCase()).filter(Boolean);
+    const since      = process.env['COLLECT_SINCE'] ?? '2025-01-01';
+    const today      = new Date().toISOString().slice(0, 10);
 
     if (roots.length === 0) {
         console.warn('GIT_ROOTS non configurato — collector Git saltato.');
@@ -81,9 +82,14 @@ export async function collectGitCommits(force = false): Promise<string[]> {
         }
     }
 
+    // Filter by author email when GIT_EMAILS is configured
+    const filtered = gitEmails.length > 0
+        ? allCommits.filter(c => gitEmails.includes(c.email.toLowerCase()))
+        : allCommits;
+
     // Group by month
     const byMonth = new Map<string, GitCommit[]>();
-    for (const commit of allCommits) {
+    for (const commit of filtered) {
         const month = commit.date?.slice(0, 7);
         if (!month) continue;
         if (!byMonth.has(month)) byMonth.set(month, []);
