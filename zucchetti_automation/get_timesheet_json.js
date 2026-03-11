@@ -54,24 +54,45 @@ if (values.date) {
     ]);
     await newPage.waitForLoadState('networkidle');
 
-    // Select target Month/Year if provided
+    // Select target Month/Year if provided.
+    // Zucchetti triggers a partial page reload on every select change; re-query each
+    // element after the reload and verify the value actually took effect.
     if (targetMonth || targetYear) {
         console.log(`Setting target period to ${targetMonth}/${targetYear}...`);
-        
+
+        const waitStable = async () => {
+            await newPage.waitForLoadState('networkidle');
+            // Re-wait until both selects are visible and not disabled
+            await newPage.waitForSelector('select[id$="_TxtAnno"]:not([disabled])', { state: 'visible', timeout: 15000 });
+            await newPage.waitForSelector('select[id$="_TxtMese"]:not([disabled])', { state: 'visible', timeout: 15000 });
+        };
+
         if (targetYear) {
             console.log("Selecting Year...");
             const yearSelect = newPage.locator('select[id$="_TxtAnno"]').filter({ visible: true }).first();
             await yearSelect.selectOption(targetYear);
-            await newPage.waitForLoadState('networkidle');
-            await newPage.waitForTimeout(2000); // Wait for Zucchetti reload
+            await waitStable();
+            // Verify the value was applied; retry once if not
+            const actualYear = await newPage.locator('select[id$="_TxtAnno"]').filter({ visible: true }).first().inputValue();
+            if (actualYear !== targetYear) {
+                console.warn(`Year select retry (got ${actualYear}, expected ${targetYear})...`);
+                await newPage.locator('select[id$="_TxtAnno"]').filter({ visible: true }).first().selectOption(targetYear);
+                await waitStable();
+            }
         }
 
         if (targetMonth) {
             console.log("Selecting Month...");
             const monthSelect = newPage.locator('select[id$="_TxtMese"]').filter({ visible: true }).first();
             await monthSelect.selectOption(targetMonth);
-            await newPage.waitForLoadState('networkidle');
-            await newPage.waitForTimeout(2000); // Wait for Zucchetti reload
+            await waitStable();
+            // Verify the value was applied; retry once if not
+            const actualMonth = await newPage.locator('select[id$="_TxtMese"]').filter({ visible: true }).first().inputValue();
+            if (actualMonth !== targetMonth) {
+                console.warn(`Month select retry (got ${actualMonth}, expected ${targetMonth})...`);
+                await newPage.locator('select[id$="_TxtMese"]').filter({ visible: true }).first().selectOption(targetMonth);
+                await waitStable();
+            }
         }
     }
 
