@@ -17,7 +17,9 @@ export interface ZucchettiRequest {
 export interface ZucchettiDay {
     date:            string;     // YYYY-MM-DD
     dayOfWeek:       string;
-    hOrd:            string;     // e.g. "7:42" or "" for holidays
+    timbrature:      string;
+    hOrd:            string;     // e.g. "7:42" or "" for holidays/weekends
+    hEcc:            string;     // overtime hours
     orario:          string;     // e.g. "N02", "DOM", "SAB"
     giustificativi:  ZucchettiJustification[];
     richieste:       ZucchettiRequest[];
@@ -44,6 +46,11 @@ function runScript(scriptPath: string, args: string[]): Promise<string> {
     });
 }
 
+interface ZucchettiRawResponse {
+    header: unknown;
+    days:   ZucchettiDay[];
+}
+
 function extractJson(output: string): ZucchettiDay[] {
     const start = output.indexOf('--- START JSON ---');
     const end   = output.indexOf('--- END JSON ---');
@@ -52,8 +59,11 @@ function extractJson(output: string): ZucchettiDay[] {
         throw new Error('Marker JSON non trovati nell\'output di get_timesheet_json.js');
     }
 
-    const raw = output.slice(start + '--- START JSON ---'.length, end).trim();
-    return JSON.parse(raw) as ZucchettiDay[];
+    const raw    = output.slice(start + '--- START JSON ---'.length, end).trim();
+    const parsed = JSON.parse(raw) as ZucchettiRawResponse | ZucchettiDay[];
+
+    // Handle both wrapped ({ header, days: [...] }) and flat array formats
+    return Array.isArray(parsed) ? parsed : parsed.days;
 }
 
 async function collectMonth(year: number, month: number): Promise<ZucchettiDay[]> {
