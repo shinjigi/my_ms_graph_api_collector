@@ -43,8 +43,8 @@ export async function writeMeta(dir: string, month: string, meta: MonthMeta): Pr
 /** Returns the last day of a month as "YYYY-MM-DD". */
 export function lastDayOfMonth(month: string): string {
     const [y, m] = month.split('-').map(Number);
-    // Day 0 of the next month equals the last day of this month
-    return new Date(y, m, 0).toISOString().slice(0, 10);
+    // Use UTC to avoid timezone offset shifting the result to the previous day
+    return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
 }
 
 /**

@@ -1,11 +1,24 @@
 {
-    "zucchetti": {
-        "fullDaySw":    { "script": "zucchetti_automation/update_data.js", "args": ["--type=SMART WORKING", "--full-day=true"] },
-        "halfDaySw":    { "script": "zucchetti_automation/update_data.js", "args": ["--type=SMART WORKING", "--hours=3", "--minutes=51"] },
-        "halfDayLeave": { "script": "zucchetti_automation/update_data.js", "args": ["--type=FERIE", "--hours=3", "--minutes=51"] }
+  "zucchetti": {
+    "fullDaySw": {
+      "script": "zucchetti_automation/update_data.js",
+      "args": ["--type=SMART WORKING", "--full-day=true"]
     },
-    "nibol": {
-        "book":    { "action": "bookDesk" },
-        "checkin": { "action": "checkIn" }
+    "halfDaySw": {
+      "script": "zucchetti_automation/update_data.js",
+      "args": ["--type=SMART WORKING", "--hours=3", "--minutes=51"]
+    },
+    "fullDayLeave": {
+      "script": "zucchetti_automation/update_data.js",
+      "args": ["--type=FERIE", "--full-day=true"]
+    },
+    "halfDayLeave": {
+      "script": "zucchetti_automation/update_data.js",
+      "args": ["--type=FERIE", "--hours=3", "--minutes=51"]
     }
+  },
+  "nibol": {
+    "book": { "action": "bookDesk" },
+    "checkin": { "action": "checkIn" }
+  }
 }
