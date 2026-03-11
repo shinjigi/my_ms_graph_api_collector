@@ -165,7 +165,7 @@ Copy `.env.example` to `.env`:
 | `MISC_TASK_ID` | — | Fallback TP task for unattributed hours |
 | `CLAUDE_API_KEY` | ✅ | Anthropic API key |
 | `CLAUDE_MODEL` | — | Model ID (default claude-haiku-4-5-20251001) |
-| `GIT_ROOTS` | — | Semicolon-separated root dirs for git scan |
+| `GIT_ROOTS` | — | Semicolon-separated root dirs to scan for git repos (maxDepth 4). Supports Windows paths and WSL UNC paths: `//wsl.localhost/Ubuntu/home/<user>/projects` |
 | `SVN_URL` | — | SVN repository URL |
 | `SVN_USERNAME` / `SVN_PASSWORD` | — | SVN credentials |
 | `SVN_BIN` | — | Path to `svn.exe` |
