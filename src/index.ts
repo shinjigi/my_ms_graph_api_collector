@@ -18,19 +18,21 @@ import { collectGitCommits }    from './collectors/git-commits';
 import { collectZucchetti }     from './collectors/zucchetti';
 
 async function run(): Promise<void> {
-    console.log('Avvio raccolta dati...');
+    const dateArg = process.argv.find(a => a.startsWith('--date='))?.split('=')[1];
+
+    console.log('Avvio raccolta dati...' + (dateArg ? ` (giorno: ${dateArg})` : ''));
 
     // Microsoft Graph collectors (require device code auth on first run)
     console.log('\n[Graph] Autenticazione...');
     const client = await createGraphClient();
 
-    const calPath = await collectGraphCalendar(client);
+    const calPath = await collectGraphCalendar(client, dateArg);
     console.log(`[Graph] Calendario → ${calPath}`);
 
-    const emailPath = await collectGraphEmail(client);
+    const emailPath = await collectGraphEmail(client, dateArg);
     console.log(`[Graph] Email → ${emailPath}`);
 
-    const teamsPath = await collectGraphTeams(client);
+    const teamsPath = await collectGraphTeams(client, dateArg);
     console.log(`[Graph] Teams → ${teamsPath}`);
 
     // SVN commits

@@ -24,16 +24,18 @@ export interface CalendarEventRaw {
     webLink:    string;
 }
 
-export async function collectGraphCalendar(client: Client): Promise<string> {
+export async function collectGraphCalendar(client: Client, date?: string): Promise<string> {
     const since = process.env['COLLECT_SINCE'] ?? '2025-01-01';
-    const now   = new Date().toISOString();
+
+    const startDateTime = date ? `${date}T00:00:00Z` : `${since}T00:00:00Z`;
+    const endDateTime   = date ? `${date}T23:59:59Z` : new Date().toISOString();
 
     // Use calendarView for date-range filtering (more reliable than /events with $filter)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = client as any;
     const response = await c
         .api('/me/calendarView')
-        .query({ startDateTime: `${since}T00:00:00Z`, endDateTime: now })
+        .query({ startDateTime, endDateTime })
         .select('id,subject,start,end,organizer,attendees,isOnlineMeeting,webLink')
         .orderby('start/dateTime')
         .top(2000)
