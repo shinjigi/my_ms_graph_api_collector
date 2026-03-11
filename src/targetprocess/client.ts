@@ -185,8 +185,10 @@ export class TargetprocessClient {
         const me    = await this.getMe();
         const items: TpOpenItem[] = [];
 
+        type TpUserStoryWithExtra = TpUserStory & { TimeSpent: number; Project: { Id: number; Name: string } | null };
+
         // Fetch open UserStories assigned to me
-        const usResult = await this.request<TpList<TpUserStory & { Project: { Id: number; Name: string } | null }>>('v1', 'UserStories', {
+        const usResult = await this.request<TpList<TpUserStoryWithExtra>>('v1', 'UserStories', {
             where:   `(Assignments.User.Id eq ${me.Id}) and (EntityState.IsFinal eq false)`,
             include: '[Id,Name,EntityState[Name],TimeSpent,Project[Id,Name],Assignments[GeneralUser[FullName]]]',
             take:    '200',
@@ -277,7 +279,8 @@ export class TargetprocessClient {
     async searchAssignables(keyword: string, take = 20): Promise<TpOpenItem[]> {
         const items: TpOpenItem[] = [];
 
-        const usResult = await this.request<TpList<TpUserStory & { Project: { Id: number; Name: string } | null }>>('v1', 'UserStories', {
+        type TpUsSearch = TpUserStory & { TimeSpent: number; Project: { Id: number; Name: string } | null };
+        const usResult = await this.request<TpList<TpUsSearch>>('v1', 'UserStories', {
             where:   `(Name contains '${keyword}')`,
             include: '[Id,Name,EntityState[Name],TimeSpent,Project[Id,Name]]',
             take:    String(take),

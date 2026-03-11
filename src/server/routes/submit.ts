@@ -15,8 +15,8 @@ export const submitRouter = Router();
 const PROPOSALS_DIR = path.join(process.cwd(), 'data', 'proposals');
 
 submitRouter.post('/:date', async (req: Request, res: Response) => {
-    const { date } = req.params;
-    const filePath  = path.join(PROPOSALS_DIR, `${date}.json`);
+    const date     = req.params['date'] as string;
+    const filePath = path.join(PROPOSALS_DIR, `${date}.json`);
 
     let proposal: DayProposal;
     try {
@@ -52,7 +52,7 @@ submitRouter.post('/:date', async (req: Request, res: Response) => {
         try {
             const result = await client.logTime({
                 usId:        entry.taskId,
-                entityType:  entry.entityType === 'recurring' ? 'Task' : entry.entityType,
+                entityType:  (entry.entityType === 'recurring' ? 'Task' : entry.entityType) as 'UserStory' | 'Task' | 'Bug',
                 description: entry.reasoning,
                 spent:       entry.inferredHours,
                 date,

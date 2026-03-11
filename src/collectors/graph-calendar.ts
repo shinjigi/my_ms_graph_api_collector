@@ -29,22 +29,17 @@ export async function collectGraphCalendar(client: Client): Promise<string> {
     const now   = new Date().toISOString();
 
     // Use calendarView for date-range filtering (more reliable than /events with $filter)
-    const response = await (client as unknown as {
-        api: (path: string) => {
-            query:   (p: Record<string, string>) => unknown;
-            select:  (s: string) => unknown;
-            orderby: (s: string) => unknown;
-            top:     (n: number) => { get: () => Promise<{ value: CalendarEventRaw[] }> };
-        };
-    }).api('/me/calendarView')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const c = client as any;
+    const response = await c
+        .api('/me/calendarView')
         .query({ startDateTime: `${since}T00:00:00Z`, endDateTime: now })
         .select('id,subject,start,end,organizer,attendees,isOnlineMeeting,webLink')
         .orderby('start/dateTime')
         .top(2000)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        .get() as Promise<{ value: CalendarEventRaw[] }>;
+        .get() as { value: CalendarEventRaw[] };
 
-    const events: CalendarEventRaw[] = (await response as unknown as { value: CalendarEventRaw[] }).value ?? [];
+    const events: CalendarEventRaw[] = response.value ?? [];
 
     await fs.mkdir(RAW_DIR, { recursive: true });
     const outPath = path.join(RAW_DIR, 'graph-calendar-events.json');
