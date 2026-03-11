@@ -45,18 +45,6 @@ my_ms_graph_api_collector/
 │       ├── composables/useProposals.ts
 │       └── types/index.ts
 ├── data/                             # gitignored — runtime data
-│   ├── raw/
-│   │   ├── graph-calendar/           YYYY-MM.json + .meta.json
-│   │   ├── graph-email/              YYYY-MM.json + .meta.json
-│   │   ├── graph-teams/              YYYY-MM.json + .meta.json + chat-states.json
-│   │   ├── git/                      YYYY-MM.json + .meta.json
-│   │   ├── svn/                      YYYY-MM.json + .meta.json
-│   │   ├── zucchetti/                YYYY-MM.json + .meta.json
-│   │   ├── browser-chrome/           YYYY-MM.json + .meta.json
-│   │   └── browser-firefox/          YYYY-MM.json + .meta.json
-│   ├── aggregated/                   YYYY-MM-DD.json
-│   ├── proposals/                    YYYY-MM-DD.json
-│   └── kb/                           us-summaries.json
 ├── zucchetti_automation/             # Playwright scripts (plain JS)
 ├── scripts/                          # one-off test/utility scripts
 ├── .env.example
@@ -68,39 +56,103 @@ my_ms_graph_api_collector/
 
 ## Data flow
 
+```mermaid
+flowchart TD
+    subgraph Collect["npm run collect — src/index.ts"]
+        C1[collectGraphCalendar]
+        C2[collectGraphEmail]
+        C3[collectGraphTeams]
+        C4[collectSvnCommits]
+        C5[collectGitCommits]
+        C6[collectZucchetti]
+        C7[collectBrowserHistory]
+    end
+
+    subgraph Raw["data/raw/"]
+        R1[graph-calendar/YYYY-MM.json]
+        R2[graph-email/YYYY-MM.json]
+        R3[graph-teams/YYYY-MM.json]
+        R4[svn/YYYY-MM.json]
+        R5[git/YYYY-MM.json]
+        R6[zucchetti/YYYY-MM.json]
+        R7[browser-chrome/ + browser-firefox/]
+    end
+
+    C1 --> R1
+    C2 --> R2
+    C3 --> R3
+    C4 --> R4
+    C5 --> R5
+    C6 --> R6
+    C7 --> R7
+
+    Raw --> AGG["npm run aggregate\naggregator.ts\nloadDirMonthly&lt;T&gt;(dir)"]
+    AGG --> AGGF[data/aggregated/YYYY-MM-DD.json]
+    AGGF --> ANA["npm run analyze\nclaudeAnalyzer.ts"]
+    ANA --> PROP[data/proposals/YYYY-MM-DD.json]
+    PROP --> SRV["npm run serve\nExpress :3001\nVite :5173"]
 ```
-npm run collect
-  └─ src/index.ts
-       ├─ collectGraphCalendar()  ─┐
-       ├─ collectGraphEmail()      ├─ data/raw/<source>/YYYY-MM.json
-       ├─ collectGraphTeams()      │  each with .meta.json sidecar
-       ├─ collectSvnCommits()      │  skip/force logic per month
-       ├─ collectGitCommits()      │
-       ├─ collectZucchetti()      ─┘
-       └─ collectBrowserHistory()
 
-npm run aggregate
-  └─ src/analysis/aggregator.ts
-       └─ loadDirMonthly<T>(dir)  ← reads all YYYY-MM.json from each source dir
-            └─ AggregatedDay { zucchetti, calendar, emails, teams,
-                               svnCommits, gitCommits, browserVisits }
-                 └─ data/aggregated/YYYY-MM-DD.json
+---
 
-npm run analyze
-  └─ src/analysis/claudeAnalyzer.ts
-       └─ Claude API (claude-haiku-4-5-20251001 by default)
-            └─ data/proposals/YYYY-MM-DD.json
+## Authentication — Microsoft Graph
 
-npm run serve
-  └─ src/server/app.ts  (port 3001)
-       └─ web/  (Vite dev server port 5173, proxies /api → 3001)
+```mermaid
+sequenceDiagram
+    participant App
+    participant MSAL
+    participant Cache as .token-cache.json
+    participant Browser
+    participant Graph
+
+    App->>MSAL: acquireTokenSilent()
+    alt token cached & valid
+        MSAL->>Cache: read refresh token
+        MSAL-->>App: access token
+    else no token / expired
+        MSAL->>App: device code + URL
+        App->>Browser: user opens URL, enters code
+        Browser->>MSAL: auth callback
+        MSAL->>Cache: store refresh token
+        MSAL-->>App: access token
+    end
+    App->>Graph: GET /me/... (Bearer token)
+    Graph-->>App: data
 ```
+
+**Required App Registration settings:**
+- Authentication → "Allow public client flows" → **Yes**
+- Delegated permissions: `Mail.Read`, `Calendars.Read`, `Chat.Read`, `Chat.ReadWrite`
+
+---
+
+## Skip / force logic
+
+```mermaid
+flowchart TD
+    START([For each month M\nfrom COLLECT_SINCE to today])
+    FORCE{--force\npassed?}
+    CURRENT{M == current\nmonth?}
+    META{meta[M].lastExtractedDate\n>= lastDayOfMonth\nAND sources match?}
+    SKIP[Skip month]
+    FETCH[Fetch + merge\nwrite YYYY-MM.json\nupdate .meta.json]
+
+    START --> FORCE
+    FORCE -->|yes| FETCH
+    FORCE -->|no| CURRENT
+    CURRENT -->|yes| FETCH
+    CURRENT -->|no| META
+    META -->|yes| SKIP
+    META -->|no| FETCH
+```
+
+Teams uses per-chat state instead of `.meta.json` — see [FUNCTIONAL.md](./FUNCTIONAL.md#data-sources).
 
 ---
 
 ## Environment variables
 
-Copy `.env.example` to `.env` and fill in:
+Copy `.env.example` to `.env`:
 
 | Variable | Required | Description |
 |---|---|---|
@@ -121,44 +173,6 @@ Copy `.env.example` to `.env` and fill in:
 | `NIBOL_PROFILE_DIR` | — | Playwright session dir for Nibol |
 | `CHROME_PROFILE_DIRS` | — | Semicolon-separated Chrome profile dirs |
 | `FIREFOX_PROFILE_DIR` | — | Firefox profile dir |
-
----
-
-## Authentication — Microsoft Graph
-
-The app uses **MSAL device code flow** (delegated permissions, no service principal):
-
-1. First run: a URL + code is printed; open it in a browser and authenticate
-2. Token cached in `.token-cache.json` (gitignored)
-3. Subsequent runs use `acquireTokenSilent` with the cached refresh token
-
-**Required Azure App Registration settings:**
-- Authentication → "Allow public client flows" → **Yes**
-- Delegated permissions: `Mail.Read`, `Calendars.Read`, `Chat.Read`, `Chat.ReadWrite`
-
----
-
-## Skip / force logic
-
-Every source directory has a `.meta.json` sidecar:
-
-```json
-{
-  "2026-02": { "lastExtractedDate": "2026-02-28", "sources": ["graph"] },
-  "2026-03": { "lastExtractedDate": "2026-03-11", "sources": ["graph"] }
-}
-```
-
-Rules applied per month on each run:
-
-| Condition | Action |
-|---|---|
-| `--force` passed | Always re-fetch |
-| Month = current month | Always re-fetch (may have new data) |
-| `lastExtractedDate >= last day of month` AND `sources` unchanged | **Skip** |
-| Otherwise | Re-fetch (month was incomplete, or sources changed) |
-
-Teams is handled differently: per-chat incremental state in `data/raw/graph-teams/chat-states.json` — stores `lastModifiedDateTime` per chat ID and uses `$filter=lastModifiedDateTime gt <stored>` on each run.
 
 ---
 
@@ -187,20 +201,25 @@ npm run collect -- --force
 
 ## Adding a new collector
 
-1. Create `src/collectors/<name>.ts`
-2. Export `async function collect<Name>(force = false): Promise<string[]>`
-3. Use `mergeByKey`, `readMeta`, `writeMeta`, `shouldSkipMonth` from `utils.ts`
-4. Write output to `data/raw/<name>/YYYY-MM.json`
-5. Import and call it in `src/index.ts`
-6. Add `loadDirMonthly<YourType>(dir)` in `src/analysis/aggregator.ts` and extend `AggregatedDay`
+```mermaid
+flowchart LR
+    A["Create\nsrc/collectors/name.ts"]
+    B["Export\ncollectName(force): Promise&lt;string[]&gt;"]
+    C["Use utils.ts\nmergeByKey, readMeta\nwriteMeta, shouldSkipMonth"]
+    D["Write to\ndata/raw/name/YYYY-MM.json"]
+    E["Import + call\nin src/index.ts"]
+    F["Add loadDirMonthly\nin aggregator.ts\nextend AggregatedDay"]
+
+    A --> B --> C --> D --> E --> F
+```
 
 ---
 
 ## TypeScript
 
 ```bash
-npx tsc --noEmit       # type-check (must be 0 errors before commit)
+npx tsc --noEmit       # type-check — must be 0 errors before commit
 npx tsx src/index.ts   # run without compile step
 ```
 
-The project is `"type": "commonjs"`. `tsx` handles TypeScript transpilation at runtime. There is no build step for the backend — `tsx` is used directly in all npm scripts.
+The project is `"type": "commonjs"`. `tsx` handles TypeScript transpilation at runtime; there is no build step for the backend.
