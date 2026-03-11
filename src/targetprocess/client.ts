@@ -2,6 +2,7 @@ import 'isomorphic-fetch';
 import * as dotenv from 'dotenv';
 import type {
     TpProject,
+    TpEntityRef,
     TpUserStory,
     TpUserStoryDetail,
     TpTask,
@@ -187,14 +188,18 @@ export class TargetprocessClient {
 
         type TpUserStoryWithExtra = TpUserStory & { TimeSpent: number; Project: { Id: number; Name: string } | null };
 
-        // Fetch open UserStories assigned to me
-        const usResult = await this.request<TpList<TpUserStoryWithExtra>>('v1', 'UserStories', {
-            where:   `(Assignments.User.Id eq ${me.Id}) and (EntityState.IsFinal eq false)`,
-            include: '[Id,Name,EntityState[Name],TimeSpent,Project[Id,Name],Assignments[GeneralUser[FullName]]]',
+        // NOTE: TP v1 does not support boolean filters (EntityState.IsFinal eq false raises a 400).
+        // We fetch all assigned items and filter client-side by EntityState.IsFinal.
+
+        // Fetch UserStories assigned to me
+        const usResult = await this.request<TpList<TpUserStoryWithExtra & { EntityState: TpEntityRef & { IsFinal: boolean } | null }>>('v1', 'UserStories', {
+            where:   `(Assignments.GeneralUser.Id eq ${me.Id})`,
+            include: '[Id,Name,EntityState[Name,IsFinal],TimeSpent,Project[Id,Name]]',
             take:    '200',
         });
 
         for (const us of usResult.Items) {
+            if (us.EntityState?.IsFinal) continue;
             items.push({
                 id:          us.Id,
                 name:        us.Name,
@@ -206,14 +211,15 @@ export class TargetprocessClient {
             });
         }
 
-        // Fetch open Tasks assigned to me
-        const taskResult = await this.request<TpList<TpTask>>('v1', 'Tasks', {
-            where:   `(Assignments.User.Id eq ${me.Id}) and (EntityState.IsFinal eq false)`,
-            include: '[Id,Name,EntityState[Name],TimeSpent,Project[Id,Name],UserStory[Id,Name],Assignments[GeneralUser[FullName]]]',
+        // Fetch Tasks assigned to me
+        const taskResult = await this.request<TpList<TpTask & { EntityState: TpEntityRef & { IsFinal: boolean } | null }>>('v1', 'Tasks', {
+            where:   `(Assignments.GeneralUser.Id eq ${me.Id})`,
+            include: '[Id,Name,EntityState[Name,IsFinal],TimeSpent,Project[Id,Name],UserStory[Id,Name]]',
             take:    '200',
         });
 
         for (const task of taskResult.Items) {
+            if ((task.EntityState as (TpEntityRef & { IsFinal?: boolean }) | null)?.IsFinal) continue;
             items.push({
                 id:          task.Id,
                 name:        task.Name,

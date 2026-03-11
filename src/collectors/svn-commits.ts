@@ -58,7 +58,10 @@ export async function collectSvnCommits(): Promise<string> {
         xmlOutput = await runSvn(args, svnBin);
     } catch (err) {
         console.warn(`SVN log fallito: ${(err as Error).message}. Collector saltato.`);
-        return path.join(RAW_DIR, 'svn-commits.json');
+        await fs.mkdir(RAW_DIR, { recursive: true });
+        const outPath = path.join(RAW_DIR, 'svn-commits.json');
+        await fs.writeFile(outPath, '[]', 'utf-8');
+        return outPath;
     }
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
