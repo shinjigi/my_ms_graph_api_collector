@@ -79,7 +79,10 @@
       "Bash(cmd /c 'dir \"C:\\\\Users\\\\ldepinto\\\\AppData\\\\Local\\\\Google\\\\Chrome\\\\User Data\\\\Default\\\\\" 2>&1 | head -50')",
       "Bash(cmd /c 'dir \"C:\\\\Users\\\\ldepinto\\\\AppData\\\\Roaming\\\\Mozilla\\\\Firefox\\\\Profiles\\\\\" 2>&1')",
       "Bash(powershell -Command \"Get-ChildItem -Path 'C:\\\\Users\\\\ldepinto\\\\AppData\\\\Local\\\\Google\\\\Chrome\\\\User Data\\\\Default\\\\' -Force | Select-Object Name | head -50\")",
-      "Bash(for p:*)"
+      "Bash(for p:*)",
+      "Bash(cd \"C:\\\\SVN\\\\_GH\\\\_shinjigi_WIN\\\\my_ms_graph_api_collector\" && npm install sql.js --registry https://registry.npmjs.org 2>&1 | tail -5)",
+      "Bash(cd \"C:\\\\SVN\\\\_GH\\\\_shinjigi_WIN\\\\my_ms_graph_api_collector\" && npm install @types/sql.js --save-dev --registry https://registry.npmjs.org 2>&1 | tail -5)",
+      "Bash(cd \"C:\\\\SVN\\\\_GH\\\\_shinjigi_WIN\\\\my_ms_graph_api_collector\" && rm -f data/raw/graph-calendar-events.json data/raw/graph-emails.json data/raw/graph-teams-messages.json data/raw/git-commits.json data/raw/svn-commits.json && echo \"Legacy flat files removed\")"
     ]
   }
 }

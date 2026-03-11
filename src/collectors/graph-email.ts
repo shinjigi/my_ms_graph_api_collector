@@ -1,25 +1,22 @@
 import * as fs   from 'fs/promises';
 import * as path from 'path';
 import type { Client } from '@microsoft/microsoft-graph-client';
+import { mergeByKey, readMeta, writeMeta, shouldSkipMonth, lastDayOfMonth } from './utils';
 
-const RAW_DIR = path.join(process.cwd(), 'data', 'raw');
+const EMAIL_DIR = path.join(process.cwd(), 'data', 'raw', 'graph-email');
 
 export interface EmailRaw {
-    id:                  string;
-    subject:             string;
-    from:                { emailAddress: { name: string; address: string } } | null;
-    receivedDateTime:    string;
-    bodyPreview:         string;
-    webLink:             string;
+    id:               string;
+    subject:          string;
+    from:             { emailAddress: { name: string; address: string } } | null;
+    receivedDateTime: string;
+    bodyPreview:      string;
+    webLink:          string;
 }
 
-export async function collectGraphEmail(client: Client, date?: string): Promise<string> {
-    const since = process.env['COLLECT_SINCE'] ?? '2025-01-01';
-    const top   = Number(process.env['TOP'] ?? 500);
-
-    const filter = date
-        ? `receivedDateTime ge ${date}T00:00:00Z and receivedDateTime le ${date}T23:59:59Z`
-        : `receivedDateTime ge ${since}T00:00:00Z`;
+async function fetchMonthEmails(client: Client, month: string, top: number): Promise<EmailRaw[]> {
+    const lastDay = lastDayOfMonth(month);
+    const filter  = `receivedDateTime ge ${month}-01T00:00:00Z and receivedDateTime le ${lastDay}T23:59:59Z`;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const c = client as any;
@@ -31,10 +28,83 @@ export async function collectGraphEmail(client: Client, date?: string): Promise<
         .top(top)
         .get() as { value: EmailRaw[] };
 
-    const emails: EmailRaw[] = response.value ?? [];
+    return response.value ?? [];
+}
 
-    await fs.mkdir(RAW_DIR, { recursive: true });
-    const outPath = path.join(RAW_DIR, 'graph-emails.json');
-    await fs.writeFile(outPath, JSON.stringify(emails, null, 2), 'utf-8');
-    return outPath;
+export async function collectGraphEmail(
+    client: Client,
+    date?:  string,
+    force = false,
+): Promise<string[]> {
+    const since = process.env['COLLECT_SINCE'] ?? '2025-01-01';
+    const top   = Number(process.env['TOP'] ?? 500);
+    const today = new Date().toISOString().slice(0, 10);
+
+    await fs.mkdir(EMAIL_DIR, { recursive: true });
+
+    const meta     = await readMeta(EMAIL_DIR);
+    const outPaths: string[] = [];
+
+    if (date) {
+        // Single-day mode: update only the file for that month
+        const month          = date.slice(0, 7);
+        const isCurrentMonth = month === today.slice(0, 7);
+        const outPath        = path.join(EMAIL_DIR, `${month}.json`);
+
+        if (!force && !isCurrentMonth && shouldSkipMonth(meta[month], month, ['graph'])) {
+            console.log(`  [Email] ${month}: skip`);
+            return [outPath];
+        }
+
+        const filter = `receivedDateTime ge ${date}T00:00:00Z and receivedDateTime le ${date}T23:59:59Z`;
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const c = client as any;
+        const response = await c
+            .api('/me/messages')
+            .filter(filter)
+            .select('id,subject,from,receivedDateTime,bodyPreview,webLink')
+            .orderby('receivedDateTime desc')
+            .top(top)
+            .get() as { value: EmailRaw[] };
+
+        const emails = response.value ?? [];
+        const merged = await mergeByKey<EmailRaw>(outPath, emails, 'id');
+        await fs.writeFile(outPath, JSON.stringify(merged, null, 2), 'utf-8');
+        await writeMeta(EMAIL_DIR, month, { lastExtractedDate: today, sources: ['graph'] });
+        return [outPath];
+    }
+
+    // Full-range mode: iterate months from COLLECT_SINCE to today
+    const sinceDate = new Date(since);
+    let   current   = new Date(sinceDate.getFullYear(), sinceDate.getMonth(), 1);
+    const now       = new Date();
+
+    while (current <= now) {
+        const year  = current.getFullYear();
+        const mo    = current.getMonth() + 1;
+        const month = `${year}-${String(mo).padStart(2, '0')}`;
+        const isCurrentMonth = month === today.slice(0, 7);
+        const outPath        = path.join(EMAIL_DIR, `${month}.json`);
+
+        if (!force && !isCurrentMonth && shouldSkipMonth(meta[month], month, ['graph'])) {
+            console.log(`  [Email] ${month}: skip`);
+            outPaths.push(outPath);
+        } else {
+            try {
+                const emails = await fetchMonthEmails(client, month, top);
+                const merged = await mergeByKey<EmailRaw>(outPath, emails, 'id');
+                await fs.writeFile(outPath, JSON.stringify(merged, null, 2), 'utf-8');
+                await writeMeta(EMAIL_DIR, month, { lastExtractedDate: today, sources: ['graph'] });
+                outPaths.push(outPath);
+                console.log(`  [Email] ${month}: ${emails.length} email`);
+            } catch (err) {
+                console.warn(`  [Email] ${month}: ${(err as Error).message}`);
+            }
+        }
+
+        current = new Date(year, mo, 1);
+    }
+
+    return outPaths;
 }
