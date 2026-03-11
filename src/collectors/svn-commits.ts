@@ -2,10 +2,15 @@ import * as fs         from 'fs/promises';
 import * as path       from 'path';
 import { spawn }       from 'child_process';
 import { parseString } from 'xml2js';
-import { promisify }   from 'util';
 import { mergeByKey, readMeta, writeMeta, shouldSkipMonth, lastDayOfMonth } from './utils';
 
-const parseXml = promisify(parseString);
+function parseXml(xml: string): Promise<unknown> {
+    return new Promise((resolve, reject) =>
+        parseString(xml, { trim: false, normalize: false }, (err, result) =>
+            err ? reject(err) : resolve(result)
+        )
+    );
+}
 const SVN_DIR  = path.join(process.cwd(), 'data', 'raw', 'svn');
 
 export interface SvnCommit {
@@ -35,14 +40,16 @@ function runSvn(args: string[], svnBin: string): Promise<string> {
 }
 
 async function fetchMonthCommits(
-    month:      string,
-    svnUrl:     string,
-    svnBin:     string,
-    user?:      string,
-    pass?:      string,
+    month:          string,
+    svnUrl:         string,
+    svnBin:         string,
+    user?:          string,
+    pass?:          string,
+    authorFilter?:  string,
 ): Promise<SvnCommit[]> {
     const lastDay = lastDayOfMonth(month);
-    const args    = ['log', '--xml', '-r', `{${month}-01}:{${lastDay}}`];
+    // --with-all-revprops ensures the server sends full revprop values (incl. full commit messages)
+    const args    = ['log', '--xml', '--with-all-revprops', '-r', `{${month}-01}:{${lastDay}}`];
 
     if (user && pass) {
         args.push('--username', user, '--password', pass, '--no-auth-cache');
@@ -56,19 +63,31 @@ async function fetchMonthCommits(
     const parsed  = await parseXml(xmlOutput) as any;
     const entries = parsed?.log?.logentry ?? [];
 
-    return entries.map((e: {
+    const commits: SvnCommit[] = entries.flatMap((e: {
         $: { revision: string };
-        author: string[];
-        date:   string[];
-        msg:    string[];
-        paths?: Array<{ path: Array<{ _: string }> }>;
-    }) => ({
-        revision: e.$.revision,
-        author:   (e.author ?? [''])[0],
-        date:     new Date((e.date ?? [''])[0]).toISOString().slice(0, 10),
-        message:  ((e.msg ?? [''])[0] ?? '').trim(),
-        paths:    (e.paths?.[0]?.path ?? []).map((p: { _: string }) => p._),
-    }));
+        author?: string[];
+        date?:   string[];
+        msg?:    string[];
+        paths?:  Array<{ path: Array<{ _: string }> }>;
+    }) => {
+        const rawDate = (e.date ?? [])[0] ?? '';
+        const d       = new Date(rawDate);
+        if (isNaN(d.getTime())) return []; // property-change or merge-tracking entries have no date
+        return [{
+            revision: e.$.revision,
+            author:   (e.author ?? [''])[0],
+            date:     d.toISOString().slice(0, 10),
+            message:  ((e.msg ?? [''])[0] ?? '').trim(),
+            paths:    (e.paths?.[0]?.path ?? []).map((p: { _: string }) => p._),
+        }];
+    });
+
+    // Filter to only commits by the configured author
+    if (authorFilter) {
+        return commits.filter(c => c.author === authorFilter);
+    }
+
+    return commits;
 }
 
 export async function collectSvnCommits(force = false): Promise<string[]> {
@@ -106,7 +125,7 @@ export async function collectSvnCommits(force = false): Promise<string[]> {
             outPaths.push(outPath);
         } else {
             try {
-                const commits = await fetchMonthCommits(month, svnUrl, svnBin, user, pass);
+                const commits = await fetchMonthCommits(month, svnUrl, svnBin, user, pass, user);
                 const merged  = await mergeByKey<SvnCommit>(outPath, commits, 'revision');
                 await fs.writeFile(outPath, JSON.stringify(merged, null, 2), 'utf-8');
                 await writeMeta(SVN_DIR, month, { lastExtractedDate: today, sources });
