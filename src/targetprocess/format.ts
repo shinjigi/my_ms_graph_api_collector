@@ -26,13 +26,20 @@ export function printTable<T>(rows: T[], columns: ColumnDef<T>[]): void {
 }
 
 /**
- * Parses a TargetProcess date string in /Date(ms+tz)/ format.
+ * Parses a TargetProcess date string in /Date(ms±hhmm)/ format.
  * Returns ISO date string (YYYY-MM-DD) or '-' if input is falsy.
+ *
+ * The ms value is UTC epoch, but TP dates represent local midnight (e.g. CET
+ * mezzanotte = UTC -1h). Adding the tz offset back gives the correct local date.
  */
 export function parseTpDate(tpDate: string | null | undefined): string {
     if (!tpDate) return '-';
-    const ms = parseInt(tpDate.replace(/\/Date\((\d+)[+-]\d+\)\//, '$1'), 10);
-    return new Date(ms).toISOString().slice(0, 10);
+    const match = tpDate.match(/\/Date\((\d+)([+-])(\d{2})(\d{2})\)\//);
+    if (!match) return '-';
+    const ms     = parseInt(match[1], 10);
+    const sign   = match[2] === '+' ? 1 : -1;
+    const tzMs   = sign * (parseInt(match[3], 10) * 60 + parseInt(match[4], 10)) * 60_000;
+    return new Date(ms + tzMs).toISOString().slice(0, 10);
 }
 
 /** Converts decimal hours to HH:MM string, e.g. 7.7 → "7:42". */
