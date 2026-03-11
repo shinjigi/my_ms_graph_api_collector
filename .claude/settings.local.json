@@ -82,7 +82,10 @@
       "Bash(for p:*)",
       "Bash(cd \"C:\\\\SVN\\\\_GH\\\\_shinjigi_WIN\\\\my_ms_graph_api_collector\" && npm install sql.js --registry https://registry.npmjs.org 2>&1 | tail -5)",
       "Bash(cd \"C:\\\\SVN\\\\_GH\\\\_shinjigi_WIN\\\\my_ms_graph_api_collector\" && npm install @types/sql.js --save-dev --registry https://registry.npmjs.org 2>&1 | tail -5)",
-      "Bash(cd \"C:\\\\SVN\\\\_GH\\\\_shinjigi_WIN\\\\my_ms_graph_api_collector\" && rm -f data/raw/graph-calendar-events.json data/raw/graph-emails.json data/raw/graph-teams-messages.json data/raw/git-commits.json data/raw/svn-commits.json && echo \"Legacy flat files removed\")"
+      "Bash(cd \"C:\\\\SVN\\\\_GH\\\\_shinjigi_WIN\\\\my_ms_graph_api_collector\" && rm -f data/raw/graph-calendar-events.json data/raw/graph-emails.json data/raw/graph-teams-messages.json data/raw/git-commits.json data/raw/svn-commits.json && echo \"Legacy flat files removed\")",
+      "Bash(cd \"C:\\\\SVN\\\\_GH\\\\_shinjigi_WIN\\\\my_ms_graph_api_collector\" && npx tsx scripts/test-teams-thursday.ts 2026-03-05 2>&1)",
+      "Bash(cd \"C:\\\\SVN\\\\_GH\\\\_shinjigi_WIN\\\\my_ms_graph_api_collector\" && npx tsx scripts/test-standup-paginate.ts 2>&1)",
+      "Bash(cd \"C:\\\\SVN\\\\_GH\\\\_shinjigi_WIN\\\\my_ms_graph_api_collector\" && npx tsx scripts/test-teams-filter.ts 2026-03-01 2>&1)"
     ]
   }
 }
