@@ -1,0 +1,1394 @@
+<!DOCTYPE html>
+<html data-theme="night" lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Activity Portal — shinjigi</title>
+    <link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.10/dist/full.min.css" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* ── Base ── */
+        .nav-link.active { background:hsl(var(--p)/0.15); color:hsl(var(--p)); font-weight:600; }
+        .commit-dot { width:8px; height:8px; border-radius:50%; display:inline-block; flex-shrink:0; }
+        .source-git   { background:#6366f1; }
+        .source-svn   { background:#f59e0b; }
+        .source-teams { background:#0ea5e9; }
+        .source-mail  { background:#10b981; }
+        .bar { height:8px; border-radius:4px; background:hsl(var(--p)); }
+
+        /* ── Timesheet ── */
+        .day-ok   { background:hsl(142 60% 45%/0.10)!important; box-shadow:inset 0 0 0 1.5px hsl(142 60% 45%/0.35); }
+        .day-warn { background:hsl(38  90% 55%/0.10)!important; box-shadow:inset 0 0 0 1.5px hsl(38  90% 55%/0.35); }
+        .day-err  { background:hsl(0   72% 55%/0.12)!important; box-shadow:inset 0 0 0 1.5px hsl(0 72% 55%/0.5); }
+        .today-col   { background:hsl(var(--p)/0.10)!important; box-shadow:inset 0 0 0 1.5px hsl(var(--p)/0.3); }
+        .weekend-col { background:hsl(var(--b2)/0.5); opacity:.45; pointer-events:none; }
+        .holiday-col { background:hsl(280 60% 50%/0.12)!important; box-shadow:inset 0 0 0 1.5px hsl(280 60% 50%/0.4); opacity:.7; }
+        .day-header-cell { cursor:pointer; border-radius:6px; padding:4px 6px; transition:background .15s; }
+        .day-header-cell:hover { background:hsl(var(--p)/0.2); }
+
+        /* totals rows at top */
+        #ts-main-foot tr td { background:hsl(var(--b2)/0.55)!important; }
+
+        /* pinned section separator */
+        .ts-pin-sep-row td { background:hsl(var(--b2)/0.8)!important; border-top:2px solid hsl(var(--b3)); }
+
+        /* pinned scroll container */
+        #ts-pin-scroll {
+            overflow-y: auto;
+            max-height: 220px;
+            border-left:  1px solid hsl(var(--b3)/0.5);
+            border-right: 1px solid hsl(var(--b3)/0.5);
+            border-bottom:1px solid hsl(var(--b3)/0.5);
+            border-radius: 0 0 6px 6px;
+        }
+        #ts-pin-scroll table { margin-top:0; }
+
+        /* project group header */
+        .ts-group-row td { background:hsl(var(--b2)/0.5)!important; padding-top:10px!important; padding-bottom:4px!important; }
+        .ts-group-label { font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:hsl(var(--bc)/0.55); }
+
+        /* pinned rows */
+        .pinned-row td { opacity:.78; }
+        .pinned-row:hover td { opacity:1; }
+
+        /* time entry note label in cell */
+        .tc-note { font-size:.55rem; color:hsl(var(--bc)/0.45); line-height:1.2; max-width:52px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:1px; }
+
+        /* err X: white on red bg */
+        .day-err .err-x { color:#fff; font-weight:900; text-shadow:0 0 4px #0006; }
+
+        /* dot+label state variant */
+        .state-dot-wrap { display:inline-flex; align-items:center; gap:4px; font-size:.7rem; white-space:nowrap; }
+        .state-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+
+        /* WE toggle */
+        .we-hidden .weekend-col { display:none; }
+
+        /* commit dots larger */
+        .commit-dot-lg { width:8px; height:8px; border-radius:50%; display:inline-block; flex-shrink:0; }
+
+        /* ── Week strip ── */
+        .week-card { cursor:pointer; border-radius:10px; padding:8px 12px; border:1px solid hsl(var(--b3)); transition:all .15s; min-width:110px; }
+        .week-card:hover { border-color:hsl(var(--p)/0.5); background:hsl(var(--p)/0.07); }
+        .week-card.active { border-color:hsl(var(--p)); background:hsl(var(--p)/0.12); }
+        .week-card.rend-ok   { border-color:hsl(142 60% 45%/0.6); background:hsl(142 60% 45%/0.08); }
+        .week-card.rend-warn { border-color:hsl(38 90% 55%/0.6);  background:hsl(38 90% 55%/0.08); }
+        .week-card.rend-err  { border-color:hsl(0 72% 55%/0.6);   background:hsl(0 72% 55%/0.08); }
+
+        /* ── Day timeline ── */
+        .timeline-container { position:relative; }
+        .timeline-hour { height:60px; border-top:1px solid hsl(var(--b3)/0.5); position:relative; }
+        .timeline-hour:first-child { border-top:none; }
+        .timeline-label { position:absolute; top:-9px; left:0; font-size:.65rem; color:hsl(var(--bc)/0.35); width:36px; text-align:right; }
+        .timeline-line  { position:absolute; top:0; left:44px; right:0; height:1px; background:hsl(var(--b3)/0.4); }
+        .timeline-now   { position:absolute; left:44px; right:0; height:2px; background:hsl(var(--p)); z-index:10; }
+        .timeline-now::before { content:''; position:absolute; left:-4px; top:-3px; width:8px; height:8px; border-radius:50%; background:hsl(var(--p)); }
+
+        /* ── Timeline events ── */
+        .tl-event { position:absolute; left:52px; right:4px; border-radius:6px; padding:3px 7px; font-size:.7rem; cursor:pointer; transition:filter .15s; overflow:hidden; }
+        .tl-event:hover { filter:brightness(1.15); }
+        .tl-event-meeting { background:hsl(205 90% 55%/0.20); border-left:3px solid #0ea5e9; color:#7dd3fc; }
+        .tl-event-commit  { background:hsl(245 60% 60%/0.20); border-left:3px solid #6366f1; color:#a5b4fc; }
+        .tl-event-svn     { background:hsl(38 90% 55%/0.20);  border-left:3px solid #f59e0b; color:#fcd34d; }
+        .tl-event-email-in  { background:hsl(152 60% 45%/0.20); border-left:3px solid #10b981; color:#6ee7b7; }
+        .tl-event-email-out { background:hsl(152 60% 45%/0.12); border-left:3px solid #059669; color:#6ee7b7; border-style:dashed; }
+        .tl-event-corr { outline:1.5px solid hsl(var(--p)/0.6); }
+
+        /* ── US card ── */
+        .us-card { border-radius:10px; padding:12px 14px; border:1px solid hsl(var(--b3)); background:hsl(var(--b1)); margin-bottom:10px; }
+        .us-card:hover { border-color:hsl(var(--p)/0.4); }
+        .us-signal { display:inline-flex; align-items:center; gap:3px; font-size:.65rem; padding:2px 6px; border-radius:20px; background:hsl(var(--b2)); }
+        .hours-bar-bg { height:6px; border-radius:3px; background:hsl(var(--b3)); overflow:hidden; }
+        .hours-bar-tp  { height:100%; border-radius:3px; background:hsl(var(--p)); }
+        .hours-bar-zuc { height:100%; border-radius:3px; background:hsl(142 60% 45%); margin-top:2px; }
+
+        /* ── Time cell widget ── */
+        .tc-wrap { display:inline-flex; align-items:center; gap:3px; }
+        .tc-btn {
+            opacity:0; width:17px; height:17px; border-radius:50%; padding:0;
+            border:1px solid hsl(var(--p)/0.5); color:hsl(var(--p));
+            font-size:13px; line-height:1; cursor:pointer; background:transparent;
+            display:flex; align-items:center; justify-content:center;
+            transition:opacity .12s, background .1s;
+            flex-shrink:0;
+        }
+        .tc-btn:hover { background:hsl(var(--p)/0.25); }
+        .tc-btn.invisible { pointer-events:none; opacity:0!important; }
+        .tc-wrap:hover .tc-btn:not(.invisible) { opacity:1; }
+        .tc-val {
+            cursor:pointer; min-width:22px; text-align:center;
+            border-radius:4px; padding:1px 2px;
+            transition:color .1s, background .1s;
+        }
+        .tc-val:hover { color:hsl(var(--p)); background:hsl(var(--p)/0.1); }
+        .tc-input {
+            width:38px; text-align:center;
+            background:hsl(var(--b2)); border:1px solid hsl(var(--p));
+            border-radius:4px; font-size:.75rem; padding:1px 3px;
+            outline:none; color:hsl(var(--p)); font-weight:600;
+        }
+        /* hide number spinners */
+        .tc-input::-webkit-inner-spin-button,
+        .tc-input::-webkit-outer-spin-button { -webkit-appearance:none; }
+        .tc-input[type=number] { -moz-appearance:textfield; }
+
+        /* ── AI Chat ── */
+        #ai-chat-panel { position:fixed; bottom:72px; right:16px; width:340px; max-height:480px; background:hsl(var(--b1)); border:1px solid hsl(var(--b3)); border-radius:16px; box-shadow:0 8px 32px #0008; display:flex; flex-direction:column; z-index:1000; transition:opacity .2s, transform .2s; }
+        #ai-chat-panel.hidden { opacity:0; pointer-events:none; transform:translateY(12px); display:flex!important; }
+        #ai-chat-msgs { flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:8px; }
+        .ai-msg-user { align-self:flex-end; background:hsl(var(--p)/0.18); border-radius:12px 12px 2px 12px; padding:6px 10px; font-size:.75rem; max-width:80%; }
+        .ai-msg-bot  { align-self:flex-start; background:hsl(var(--b2)); border-radius:12px 12px 12px 2px; padding:6px 10px; font-size:.75rem; max-width:85%; }
+        .ai-msg-sys  { align-self:center; font-size:.65rem; color:hsl(var(--bc)/0.4); font-style:italic; }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden bg-base-200">
+
+<!-- ═══════ SIDEBAR ═══════ -->
+<aside class="w-56 bg-base-100 flex flex-col border-r border-base-300 shrink-0">
+    <div class="p-4 border-b border-base-300">
+        <div class="flex items-center gap-2">
+            <div class="w-9 h-9 bg-primary rounded-xl flex items-center justify-center text-primary-content font-bold text-sm shadow">AP</div>
+            <div><div class="font-bold text-sm leading-tight">Activity Portal</div><div class="text-xs text-base-content/40">your-username · shinjigi</div></div>
+        </div>
+    </div>
+    <nav class="flex-1 p-2 overflow-y-auto">
+        <div class="text-xs text-base-content/30 font-semibold px-3 pt-3 pb-1 uppercase tracking-wider">Viste</div>
+        <ul class="menu menu-sm gap-0.5">
+            <li><a class="nav-link rounded-lg" data-view="dashboard">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/></svg>
+                Dashboard
+            </a></li>
+            <li><a class="nav-link rounded-lg" data-view="timesheet">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                Timesheet
+            </a></li>
+            <li><a class="nav-link active rounded-lg" data-view="day">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                Giorno
+            </a></li>
+            <li><a class="nav-link rounded-lg" data-view="activity">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                Activity
+            </a></li>
+            <li><a class="nav-link rounded-lg" data-view="teams">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+                Teams
+            </a></li>
+            <li><a class="nav-link rounded-lg" data-view="browser">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/></svg>
+                Browser
+            </a></li>
+        </ul>
+        <div class="text-xs text-base-content/30 font-semibold px-3 pt-4 pb-1 uppercase tracking-wider">Sorgenti</div>
+        <ul class="menu menu-sm gap-0.5">
+            <li><a class="rounded-lg opacity-60 hover:opacity-100 text-xs"><span class="commit-dot source-git"></span> Git (610)</a></li>
+            <li><a class="rounded-lg opacity-60 hover:opacity-100 text-xs"><span class="commit-dot source-svn"></span> SVN</a></li>
+            <li><a class="rounded-lg opacity-60 hover:opacity-100 text-xs"><span class="commit-dot source-teams"></span> Teams / Mail</a></li>
+        </ul>
+    </nav>
+    <div class="p-3 border-t border-base-300">
+        <div class="flex items-center gap-2">
+            <div class="avatar placeholder"><div class="bg-neutral text-neutral-content rounded-full w-7"><span class="text-xs">LD</span></div></div>
+            <div class="text-xs"><div class="font-medium">L. De Pinto</div><div class="text-base-content/40">Altroconsumo</div></div>
+        </div>
+    </div>
+</aside>
+
+<!-- ═══════ MAIN ═══════ -->
+<div class="flex-1 flex flex-col overflow-hidden">
+
+    <!-- TOP BAR -->
+    <header class="bg-base-100 border-b border-base-300 px-5 py-2.5 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-2">
+            <button class="btn btn-ghost btn-xs btn-square">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+            </button>
+            <span class="font-semibold text-sm">Settimana 9 – 15 Mar 2026</span>
+            <button class="btn btn-ghost btn-xs btn-square">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            </button>
+            <button class="btn btn-ghost btn-xs ml-1">Oggi</button>
+        </div>
+        <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 text-xs text-base-content/40">
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm" style="background:hsl(142 60% 45%/0.5)"></span>Rendicontato</span>
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm" style="background:hsl(38 90% 55%/0.5)"></span>Parziale</span>
+                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm" style="background:hsl(0 72% 55%/0.5)"></span>Mancante</span>
+            </div>
+            <div class="badge badge-primary badge-sm">Ven 13 Mar 2026</div>
+        </div>
+    </header>
+
+    <main class="flex-1 overflow-auto p-4">
+
+        <!-- ═══════ DASHBOARD ═══════ -->
+        <div id="view-dashboard" class="hidden">
+            <div class="grid grid-cols-4 gap-4 mb-4">
+                <div class="card bg-base-100 shadow-sm border border-base-300"><div class="card-body p-4">
+                    <div class="text-xs text-base-content/50 uppercase tracking-wide">Ore oggi</div>
+                    <div class="text-3xl font-bold text-primary mt-1">7<span class="text-lg">h</span> 30<span class="text-lg">m</span></div>
+                    <div class="text-xs text-base-content/40 mt-1">Ordinarie · Zucchetti</div>
+                </div></div>
+                <div class="card bg-base-100 shadow-sm border border-base-300"><div class="card-body p-4">
+                    <div class="text-xs text-base-content/50 uppercase tracking-wide">Commit oggi</div>
+                    <div class="text-3xl font-bold text-secondary mt-1">4</div>
+                    <div class="text-xs text-base-content/40 mt-1"><span class="commit-dot source-git mr-1"></span>3 Git · <span class="commit-dot source-svn mx-1"></span>1 SVN</div>
+                </div></div>
+                <div class="card bg-base-100 shadow-sm border border-base-300"><div class="card-body p-4">
+                    <div class="text-xs text-base-content/50 uppercase tracking-wide">Meeting oggi</div>
+                    <div class="text-3xl font-bold text-accent mt-1">3</div>
+                    <div class="text-xs text-base-content/40 mt-1">Teams · Calendar</div>
+                </div></div>
+                <div class="card bg-base-100 shadow-sm border border-base-300"><div class="card-body p-4">
+                    <div class="text-xs text-base-content/50 uppercase tracking-wide">Email</div>
+                    <div class="text-3xl font-bold text-info mt-1">12</div>
+                    <div class="text-xs text-base-content/40 mt-1">Ricevute · 4 inviate</div>
+                </div></div>
+            </div>
+            <div class="card bg-base-100 border border-base-300 shadow-sm p-5">
+                <p class="text-base-content/40 text-sm">← Vista <strong>Giorno</strong> per il focus giornaliero completo.</p>
+            </div>
+        </div>
+
+        <!-- ═══════ GIORNO (Day View) ═══════ -->
+        <div id="view-day">
+
+            <!-- Week strip -->
+            <div class="bg-base-100 border border-base-300 rounded-xl p-3 mb-4 flex items-center gap-2 overflow-x-auto">
+                <button class="btn btn-ghost btn-xs btn-square shrink-0">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                </button>
+                <div id="week-strip" class="flex gap-2 flex-1"></div>
+                <button class="btn btn-ghost btn-xs btn-square shrink-0">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                </button>
+            </div>
+
+            <!-- Day header bar -->
+            <div class="flex items-center gap-3 mb-4 flex-wrap">
+                <h2 class="text-lg font-bold">Venerdì 13 Mar 2026</h2>
+                <div class="badge badge-outline gap-1">🏠 Smart Working</div>
+                <div class="badge badge-warning badge-outline gap-1">⚠ Da rendicontare su Zucchetti</div>
+                <div class="ml-auto flex items-center gap-3 text-sm">
+                    <span class="text-base-content/50">Zucchetti: <strong class="text-success">7.5h</strong></span>
+                    <span class="text-base-content/30">|</span>
+                    <span class="text-base-content/50">TP: <strong class="text-primary">2.5h</strong></span>
+                    <span class="text-base-content/30">|</span>
+                    <span class="text-base-content/50">Delta: <strong class="text-error">−5h</strong></span>
+                    <button class="btn btn-xs btn-outline btn-warning ml-2">Verifica concordanza</button>
+                </div>
+            </div>
+
+            <!-- 3-column layout -->
+            <div class="grid gap-4" style="grid-template-columns: 260px minmax(0,1fr) 420px;">
+
+                <!-- COL 1 — Timeline -->
+                <div class="card bg-base-100 border border-base-300 shadow-sm">
+                    <div class="card-body p-3">
+                        <div class="text-xs font-bold text-base-content/50 uppercase mb-3 px-1">Timeline</div>
+                        <div class="relative timeline-container" id="timeline-container" style="height:660px;">
+                            <!-- hour rows + events injected by JS -->
+                        </div>
+                        <div class="flex flex-wrap gap-2 mt-3 pt-2 border-t border-base-300 text-xs text-base-content/40">
+                            <span class="flex items-center gap-1"><span style="width:3px;height:10px;background:#0ea5e9;border-radius:2px;display:inline-block"></span>Meeting</span>
+                            <span class="flex items-center gap-1"><span style="width:3px;height:10px;background:#6366f1;border-radius:2px;display:inline-block"></span>Git</span>
+                            <span class="flex items-center gap-1"><span style="width:3px;height:10px;background:#f59e0b;border-radius:2px;display:inline-block"></span>SVN</span>
+                            <span class="flex items-center gap-1"><span style="width:3px;height:10px;background:#10b981;border-radius:2px;display:inline-block"></span>Email</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- COL 2 — Work / TP cards (ridotta) -->
+                <div class="card bg-base-100 border border-base-300 shadow-sm overflow-y-auto" style="max-height:740px;">
+                    <div class="card-body p-3">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="text-xs font-bold text-base-content/50 uppercase">Lavoro · TP</div>
+                            <div class="text-xs text-base-content/30 italic">correlazione da subject</div>
+                        </div>
+                        <div id="us-cards-container"></div>
+                    </div>
+                </div>
+
+                <!-- COL 3 — 2×2 cards grid -->
+                <div class="grid grid-cols-2 gap-3 content-start">
+
+                    <!-- Email -->
+                    <div class="card bg-base-100 border border-base-300 shadow-sm">
+                        <div class="card-body p-3">
+                            <div class="text-xs font-bold text-base-content/50 uppercase mb-2">📧 Email</div>
+                            <div class="grid grid-cols-2 gap-1.5 text-xs mb-2">
+                                <div class="bg-base-200 rounded p-1.5 text-center"><div class="text-base-content/40 text-xs">Ricevute</div><div class="font-bold text-base">12</div></div>
+                                <div class="bg-base-200 rounded p-1.5 text-center"><div class="text-base-content/40 text-xs">Inviate</div><div class="font-bold text-base">4</div></div>
+                            </div>
+                            <div class="badge badge-error badge-xs mb-2">3 non lette</div>
+                            <div class="text-xs text-base-content/50 font-semibold mb-1">Per US</div>
+                            <div class="text-xs space-y-0.5">
+                                <div class="flex justify-between"><span class="truncate text-base-content/70">Deploy #2026</span><span class="font-bold text-primary shrink-0 ml-1">3</span></div>
+                                <div class="flex justify-between"><span class="truncate text-base-content/70">AssetVersioning</span><span class="font-bold text-primary shrink-0 ml-1">2</span></div>
+                                <div class="flex justify-between"><span class="truncate text-base-content/70">PC emails net.</span><span class="font-bold text-primary shrink-0 ml-1">1</span></div>
+                                <div class="flex justify-between text-base-content/30"><span class="truncate">Non correlate</span><span class="shrink-0 ml-1">6</span></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Teams -->
+                    <div class="card bg-base-100 border border-base-300 shadow-sm">
+                        <div class="card-body p-3">
+                            <div class="text-xs font-bold text-base-content/50 uppercase mb-2">💬 Teams</div>
+                            <div class="grid grid-cols-2 gap-1.5 text-xs mb-2">
+                                <div class="bg-base-200 rounded p-1.5 text-center"><div class="text-base-content/40 text-xs">Meeting</div><div class="font-bold text-base">3</div></div>
+                                <div class="bg-base-200 rounded p-1.5 text-center"><div class="text-base-content/40 text-xs">Messaggi</div><div class="font-bold text-base">47</div></div>
+                            </div>
+                            <div class="text-xs text-base-content/50 font-semibold mb-1">Meeting oggi</div>
+                            <div class="space-y-1 text-xs">
+                                <div class="flex items-center gap-1.5">
+                                    <div style="width:3px;height:22px;background:#0ea5e9;border-radius:2px;flex-shrink:0"></div>
+                                    <div><div class="font-medium leading-tight">Standup BAU ITA</div><div class="text-base-content/40">09:00 · 15 min</div></div>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <div style="width:3px;height:22px;background:#0ea5e9;border-radius:2px;flex-shrink:0"></div>
+                                    <div><div class="font-medium leading-tight">Code Review #326279</div><div class="text-base-content/40">15:00 · 45 min</div></div>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <div style="width:3px;height:22px;background:#0ea5e9;border-radius:2px;flex-shrink:0"></div>
+                                    <div><div class="font-medium leading-tight">Sprint Review</div><div class="text-base-content/40">16:30 · 30 min</div></div>
+                                </div>
+                            </div>
+                            <div class="text-xs text-base-content/30 mt-2">Tempo meeting: <strong class="text-base-content/50">1h 30m</strong></div>
+                        </div>
+                    </div>
+
+                    <!-- Browser -->
+                    <div class="card bg-base-100 border border-base-300 shadow-sm">
+                        <div class="card-body p-3">
+                            <div class="text-xs font-bold text-base-content/50 uppercase mb-2">🌐 Browser</div>
+                            <div class="grid grid-cols-2 gap-1.5 text-xs mb-2">
+                                <div class="bg-base-200 rounded p-1.5 text-center"><div class="text-base-content/40 text-xs">Visite</div><div class="font-bold text-base">142</div></div>
+                                <div class="bg-base-200 rounded p-1.5 text-center"><div class="text-base-content/40 text-xs">Domini</div><div class="font-bold text-base">23</div></div>
+                            </div>
+                            <div class="text-xs text-base-content/50 font-semibold mb-1">Top domini</div>
+                            <div class="space-y-1.5 text-xs">
+                                <div><div class="flex justify-between mb-0.5"><span class="font-mono truncate text-base-content/70">github.com</span><span class="shrink-0 ml-1">38</span></div><div class="bar" style="width:100%;height:3px"></div></div>
+                                <div><div class="flex justify-between mb-0.5"><span class="font-mono truncate text-base-content/70">dev.azure.com</span><span class="shrink-0 ml-1">24</span></div><div class="bar" style="width:63%;height:3px"></div></div>
+                                <div><div class="flex justify-between mb-0.5"><span class="font-mono truncate text-base-content/70">learn.microsoft.com</span><span class="shrink-0 ml-1">19</span></div><div class="bar" style="width:50%;height:3px"></div></div>
+                                <div><div class="flex justify-between mb-0.5"><span class="font-mono truncate text-base-content/70">tpondemand.com</span><span class="shrink-0 ml-1">15</span></div><div class="bar" style="width:39%;height:3px"></div></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Git / SVN -->
+                    <div class="card bg-base-100 border border-base-300 shadow-sm">
+                        <div class="card-body p-3">
+                            <div class="text-xs font-bold text-base-content/50 uppercase mb-2">💻 Git · SVN</div>
+                            <div class="grid grid-cols-2 gap-1.5 text-xs mb-2">
+                                <div class="bg-base-200 rounded p-1.5 text-center"><div class="text-base-content/40 text-xs">Git</div><div class="font-bold text-base" style="color:#6366f1">3</div></div>
+                                <div class="bg-base-200 rounded p-1.5 text-center"><div class="text-base-content/40 text-xs">SVN</div><div class="font-bold text-base" style="color:#f59e0b">1</div></div>
+                            </div>
+                            <div class="text-xs text-base-content/50 font-semibold mb-1">Commit oggi</div>
+                            <div class="space-y-1 text-xs">
+                                <div class="flex items-start gap-1.5">
+                                    <span class="commit-dot source-git mt-1 shrink-0"></span>
+                                    <span class="truncate text-base-content/70">[ALine] Fix SVN/Git author filtering</span>
+                                </div>
+                                <div class="flex items-start gap-1.5">
+                                    <span class="commit-dot source-git mt-1 shrink-0"></span>
+                                    <span class="truncate text-base-content/70">[LocalITA] Zucchetti scraper fix</span>
+                                </div>
+                                <div class="flex items-start gap-1.5">
+                                    <span class="commit-dot source-svn mt-1 shrink-0"></span>
+                                    <span class="truncate text-base-content/70">[my_ms_graph_api_collector][#324913] PC emails network - send module</span>
+                                </div>
+                                <div class="flex items-start gap-1.5">
+                                    <span class="commit-dot source-git mt-1 shrink-0"></span>
+                                    <span class="truncate text-base-content/70">[shinjigi] Analyzer LLM multi-backend</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════ TIMESHEET ═══════ -->
+        <div id="view-timesheet" class="hidden">
+            <div class="card bg-base-100 shadow-sm border border-base-300">
+                <div class="card-body p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-2">
+                            <div class="card-title text-sm">Timesheet settimanale · TargetProcess</div>
+                            <div class="badge badge-outline badge-xs">User Stories</div>
+                            <div class="badge badge-outline badge-xs">Tasks</div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <!-- Legend tooltip -->
+                            <div class="dropdown dropdown-end">
+                                <button tabindex="0" class="btn btn-ghost btn-xs btn-circle" title="Legenda">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" stroke-width="2"/><path stroke-linecap="round" stroke-width="2" d="M12 16v-4m0-4h.01"/></svg>
+                                </button>
+                                <div tabindex="0" class="dropdown-content z-10 card card-compact shadow bg-base-200 border border-base-300 p-3 w-64 text-xs">
+                                    <div class="space-y-1.5">
+                                        <div class="font-bold mb-1 text-base-content/70">Legenda</div>
+                                        <div class="flex gap-2"><span class="commit-dot-lg source-git mt-0.5"></span>Commit Git</div>
+                                        <div class="flex gap-2"><span class="commit-dot-lg source-svn mt-0.5"></span>Commit SVN</div>
+                                        <div class="flex gap-2"><span class="w-3 h-3 rounded-sm shrink-0" style="background:hsl(142 60% 45%/0.4)"></span>Rendicontato (Zuc ✓ + Nibol ✓)</div>
+                                        <div class="flex gap-2"><span class="w-3 h-3 rounded-sm shrink-0" style="background:hsl(38 90% 55%/0.4)"></span>Parziale (dati discordanti)</div>
+                                        <div class="flex gap-2"><span class="w-3 h-3 rounded-sm shrink-0" style="background:hsl(0 72% 55%/0.4)"></span>Mancante (Zucchetti vuoto)</div>
+                                        <div class="flex gap-2"><span class="w-3 h-3 rounded-sm shrink-0" style="background:hsl(280 60% 50%/0.4)"></span>Festività nazionale</div>
+                                        <div class="mt-1 pt-1 border-t border-base-300">Tot = <strong>settimana / totale US</strong></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- WE toggle -->
+                            <button id="we-toggle" class="btn btn-xs btn-ghost gap-1" onclick="toggleWE()" title="Mostra/nascondi weekend">
+                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                                +WE
+                            </button>
+                            <span class="text-xs text-base-content/30 italic" id="verifica-ts">Ultima verifica: —</span>
+                            <button class="btn btn-xs btn-outline btn-warning" onclick="runVerifica()">Verifica concordanza</button>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="table table-xs w-full" id="ts-main-table" style="table-layout:fixed;">
+                            <colgroup id="ts-main-colgroup"></colgroup>
+                            <thead id="ts-main-head"></thead>
+                            <!-- totals: above data rows -->
+                            <tbody id="ts-main-foot"></tbody>
+                            <tbody id="ts-main-body"></tbody>
+                            <tbody id="ts-pin-sep"></tbody>
+                        </table>
+                        <!-- pinned activities: own scroll container, colgroup mirrors main table -->
+                        <div id="ts-pin-scroll">
+                            <table class="table table-xs w-full" id="ts-pin-table" style="table-layout:fixed;">
+                                <colgroup id="ts-pin-colgroup"></colgroup>
+                                <tbody id="ts-pin-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-3 mt-3 pt-2 border-t border-base-300 text-xs text-base-content/30 italic">
+                        <span>Clicca intestazione giorno → vista dettaglio · Hover ore → ±0.5h · Click ore → input diretto</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ═══════ ACTIVITY ═══════ -->
+        <div id="view-activity" class="hidden">
+            <div class="grid grid-cols-3 gap-4">
+                <div class="col-span-2 card bg-base-100 shadow-sm border border-base-300"><div class="card-body p-4">
+                    <div class="card-title text-sm mb-3">Timeline commit</div>
+                    <div class="mb-4">
+                        <div class="text-xs font-bold text-base-content/50 uppercase mb-2">Venerdì 13 Mar · oggi</div>
+                        <div class="space-y-2">
+                            <div class="flex items-start gap-3 p-2 rounded-lg hover:bg-base-200 transition-colors"><div class="badge badge-sm mt-0.5" style="background:#6366f120;color:#6366f1">Git</div><div class="flex-1 min-w-0"><div class="text-xs font-semibold truncate">[shinjigi][#000000] Analyzer — multi-backend LLM support</div><div class="text-xs text-base-content/40">my_ms_graph_api_collector</div></div><div class="text-xs text-base-content/30 shrink-0">17:10</div></div>
+                            <div class="flex items-start gap-3 p-2 rounded-lg hover:bg-base-200 transition-colors"><div class="badge badge-sm mt-0.5" style="background:#f59e0b20;color:#f59e0b">SVN</div><div class="flex-1 min-w-0"><div class="text-xs font-semibold truncate">[my_ms_graph_api_collector][#324913] PC emails network - send module</div><div class="text-xs text-base-content/40">LocalBelgium</div></div><div class="text-xs text-base-content/30 shrink-0">16:05</div></div>
+                            <div class="flex items-start gap-3 p-2 rounded-lg hover:bg-base-200 transition-colors"><div class="badge badge-sm mt-0.5" style="background:#6366f120;color:#6366f1">Git</div><div class="flex-1 min-w-0"><div class="text-xs font-semibold truncate">[LocalITA][#323636] Zucchetti scraper — fix flaky month/year</div><div class="text-xs text-base-content/40">italy-applications</div></div><div class="text-xs text-base-content/30 shrink-0">14:22</div></div>
+                        </div>
+                    </div>
+                </div></div>
+                <div class="card bg-base-100 shadow-sm border border-base-300"><div class="card-body p-4">
+                    <div class="text-xs font-bold mb-3">Commit per repo</div>
+                    <div class="space-y-2 text-xs">
+                        <div><div class="flex justify-between mb-1"><span>italy-applications</span><span class="font-bold">312</span></div><div class="bar" style="width:100%"></div></div>
+                        <div><div class="flex justify-between mb-1"><span>LocalBelgium</span><span class="font-bold">187</span></div><div class="bar" style="width:60%"></div></div>
+                        <div><div class="flex justify-between mb-1"><span>my_ms_graph_api</span><span class="font-bold">61</span></div><div class="bar" style="width:20%"></div></div>
+                    </div>
+                </div></div>
+            </div>
+        </div>
+
+        <!-- ═══════ TEAMS ═══════ -->
+        <div id="view-teams" class="hidden">
+            <div class="grid grid-cols-3 gap-4">
+                <div class="card bg-base-100 shadow-sm border border-base-300"><div class="card-body p-4">
+                    <div class="card-title text-sm mb-3">Chat (657 totali)</div>
+                    <input type="text" placeholder="Cerca chat…" class="input input-bordered input-xs w-full mb-3">
+                    <div class="space-y-1" id="chat-list"></div>
+                </div></div>
+                <div class="col-span-2 card bg-base-100 shadow-sm border border-base-300"><div class="card-body p-4">
+                    <div class="card-title text-sm mb-1">Standup BAU ITA</div>
+                    <div class="text-xs text-base-content/40 mb-4">Meeting · 146 messaggi questa settimana</div>
+                    <div class="space-y-3 max-h-96 overflow-y-auto">
+                        <div class="chat chat-start"><div class="chat-header text-xs">Marco R. <time class="text-xs opacity-50">09:02</time></div><div class="chat-bubble chat-bubble-primary text-xs">Buongiorno! Oggi lavoro su #326279.</div></div>
+                        <div class="chat chat-end"><div class="chat-header text-xs">L. De Pinto <time class="text-xs opacity-50">09:06</time></div><div class="chat-bubble chat-bubble-secondary text-xs">Ok, io continuo il Graph API collector. PR in review stasera.</div></div>
+                    </div>
+                </div></div>
+            </div>
+        </div>
+
+        <!-- ═══════ BROWSER ═══════ -->
+        <div id="view-browser" class="hidden">
+            <div class="grid grid-cols-2 gap-4">
+                <div class="card bg-base-100 shadow-sm border border-base-300"><div class="card-body p-4">
+                    <div class="card-title text-sm mb-3">Top domini · 142 visite</div>
+                    <div class="space-y-3 text-xs" id="browser-domains"></div>
+                </div></div>
+                <div class="card bg-base-100 shadow-sm border border-base-300"><div class="card-body p-4">
+                    <div class="card-title text-sm mb-3">Attività oraria</div>
+                    <div class="flex items-end gap-1 h-28" id="hourly-bars"></div>
+                    <div class="flex justify-between text-xs text-base-content/30 mt-1"><span>08:00</span><span>12:00</span><span>17:00</span></div>
+                </div></div>
+            </div>
+        </div>
+
+    </main>
+</div>
+
+<!-- ═══════ EMAIL DETAIL MODAL ═══════ -->
+<dialog id="email-modal" class="modal modal-bottom sm:modal-middle">
+    <div class="modal-box max-w-xl">
+        <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onclick="document.getElementById('email-modal').close()">✕</button>
+        <div class="flex items-start gap-2 mb-1">
+            <div id="email-dir-badge"></div>
+            <h3 class="font-bold text-sm flex-1" id="email-subject"></h3>
+        </div>
+        <div class="text-xs text-base-content/40 mb-1" id="email-meta"></div>
+        <div id="email-corr-badge" class="mb-3"></div>
+        <div class="divider my-2"></div>
+        <div class="text-sm leading-relaxed whitespace-pre-line bg-base-200 rounded-lg p-4 max-h-64 overflow-y-auto" id="email-body"></div>
+        <div class="modal-action mt-3">
+            <button class="btn btn-sm" onclick="document.getElementById('email-modal').close()">Chiudi</button>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+<!-- ═══════ PIN SEARCH MODAL ═══════ -->
+<dialog id="pin-search-modal" class="modal">
+    <div class="modal-box max-w-md">
+        <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" onclick="document.getElementById('pin-search-modal').close()">✕</button>
+        <h3 class="font-bold text-sm mb-3">Aggiungi US ricorrente</h3>
+        <input type="text" placeholder="Cerca per nome o ID TP…" class="input input-bordered input-sm w-full mb-3">
+        <div class="space-y-1 text-xs">
+            <div class="flex items-center justify-between p-2 hover:bg-base-200 rounded-lg"><div><div class="font-semibold">English Course - AltreAule 2025</div><div class="text-base-content/40">BAU - Team ITA Web</div></div><button class="btn btn-ghost btn-xs">+ Pin</button></div>
+            <div class="flex items-center justify-between p-2 hover:bg-base-200 rounded-lg"><div><div class="font-semibold">Business support #2026</div><div class="text-base-content/40">BAU - Team ITA Web</div></div><button class="btn btn-ghost btn-xs">+ Pin</button></div>
+        </div>
+    </div>
+    <form method="dialog" class="modal-backdrop"><button>close</button></form>
+</dialog>
+
+<!-- ═══════ AI FAB ═══════ -->
+<button id="ai-fab" onclick="toggleAiChat()" class="fixed bottom-4 right-4 btn btn-primary btn-circle shadow-lg z-50" title="AI Assistant">
+    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-3 3-3-3z"/></svg>
+</button>
+
+<!-- ═══════ AI CHAT PANEL ═══════ -->
+<div id="ai-chat-panel" class="hidden">
+    <div class="flex items-center justify-between px-4 py-3 border-b border-base-300 shrink-0">
+        <div class="flex items-center gap-2">
+            <div class="w-6 h-6 bg-primary rounded-full flex items-center justify-center">
+                <svg class="w-3 h-3 text-primary-content" fill="currentColor" viewBox="0 0 20 20"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/></svg>
+            </div>
+            <span class="text-xs font-bold">AI Assistant</span>
+            <div class="badge badge-xs badge-outline">MCP</div>
+        </div>
+        <button class="btn btn-ghost btn-xs btn-circle" onclick="toggleAiChat()">✕</button>
+    </div>
+    <div id="ai-chat-msgs">
+        <div class="ai-msg-sys">Sessione avviata · 13 Mar 2026</div>
+        <div class="ai-msg-bot">Ciao! Puoi invocare comandi MCP, analizzare dati o eseguire operazioni.<br><br>Esempi: <code>/mcp teams list</code>, <code>/git log today</code>, <code>/zucchetti status</code></div>
+    </div>
+    <div class="px-3 py-2 border-t border-base-300 flex gap-1 flex-wrap shrink-0">
+        <button class="btn btn-xs btn-ghost" onclick="sendQuick('/mcp teams list')">/mcp teams</button>
+        <button class="btn btn-xs btn-ghost" onclick="sendQuick('/git log today')">/git log</button>
+        <button class="btn btn-xs btn-ghost" onclick="sendQuick('/zucchetti status')">/zucchetti</button>
+    </div>
+    <div class="px-3 pb-3 pt-1 shrink-0 flex gap-2">
+        <input id="ai-input" type="text" placeholder="Scrivi un comando…" class="input input-bordered input-xs flex-1" onkeydown="if(event.key==='Enter')sendAiMsg()">
+        <button class="btn btn-primary btn-xs btn-square" onclick="sendAiMsg()">
+            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+        </button>
+    </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════
+     SCRIPT
+═══════════════════════════════════════════════════ -->
+<script>
+// ── DATA ──────────────────────────────────────────
+
+const DAYS = [
+    { label:'Lun', date:'1 Giu',  rend:'ok',   zucHours:8,   nibol:'🏠 SW',     holiday:false },
+    { label:'Mar', date:'2 Giu',  rend:'ok',   zucHours:0,   nibol:null,         holiday:true, holidayName:'🇮🇹 Festa della Repubblica' },
+    { label:'Mer', date:'3 Giu',  rend:'warn', zucHours:7.5, nibol:'🏢 Ufficio', holiday:false },
+    { label:'Gio', date:'4 Giu',  rend:'err',  zucHours:0,   nibol:'🏢 Ufficio', holiday:false },
+    { label:'Ven', date:'5 Giu',  rend:null,   zucHours:7.5, nibol:'🏠 SW',     holiday:false },
+    { label:'Sab', date:'6 Giu',  rend:null,   zucHours:0,   nibol:null,         holiday:false },
+    { label:'Dom', date:'7 Giu',  rend:null,   zucHours:0,   nibol:null,         holiday:false },
+];
+
+// totAllTime: total hours logged ever on this US
+const TS_ACTIVE = [
+    { project:'BAU - Team ITA Web', us:'Staff company meetings #2026',      tpId:326100, state:'Inception',     badgeStyle:'badge', totAllTime:47,  hours:[0,0,0.5,0,0,0,0],   git:[0,0,1,0,0,0,0], svn:[0,0,0,0,0,0,0], notes:[null,null,'Standup BAU ITA',null,null,null,null] },
+    { project:'BAU - Team ITA Web', us:'Deploy process #2026',              tpId:326279, state:'Inception',     badgeStyle:'badge', totAllTime:112, hours:[0,0,0,0,1,0,0],     git:[0,0,0,1,1,0,0], svn:[0,0,0,0,0,0,0], notes:[null,null,null,null,'Pipeline ACC fix',null,null] },
+    { project:'BAU - Team ITA Web', us:'AssetVersioning updates',           tpId:326215, state:'Dev/Unit test', badgeStyle:'dot',   totAllTime:89,  hours:[1,0,1,0,0.5,0,0],   git:[1,0,1,0,0,0,0], svn:[0,0,0,0,0,0,0], notes:['auth config',null,'asset migr.',null,'batch fix',null,null] },
+    { project:'BAU - Team ITA Web', us:'PC emails network TP #2026',        tpId:324913, state:'Inception',     badgeStyle:'dot',   totAllTime:203, hours:[1,0,2.5,1,1,0,0],   git:[0,0,0,0,0,0,0], svn:[0,0,1,0,0,0,0], notes:['graph auth',null,'filter API + paginaz.',null,'send module',null,null] },
+    { project:'BAU - Team ITA Web', us:'SnapTest #2026',                    tpId:326301, state:'Inception',     badgeStyle:'badge', totAllTime:31,  hours:[0,0,0,1,0.5,0,0],   git:[0,0,0,0,0,0,0], svn:[0,0,0,0,0,0,0], notes:[null,null,null,'analisi scenari',null,null,null] },
+    { project:'BAU - Team ITA Web', us:'Incident #2026',                    tpId:326200, state:'Inception',     badgeStyle:'badge', totAllTime:18,  hours:[0.5,0,0,0.5,0,0,0], git:[0,0,0,0,0,0,0], svn:[0,0,0,0,0,0,0], notes:['hotfix prod',null,null,'triage',null,null,null] },
+    { project:'Sitecore upgrade',   us:'SC - Upgrade LocalRuntime ITA Web', tpId:326183, state:'Testing',       badgeStyle:'dot',   totAllTime:55,  hours:[0,0,0,0,0,0,0],     git:[1,0,2,1,1,0,0], svn:[0,0,0,1,0,0,0], rem:0.2 },
+];
+
+const TS_PINNED = [
+    { project:'BAU - Team ITA Web',  us:'English Course - AltreAule 2025',          tpId:325800, state:'Dev/Unit test', badgeStyle:'dot',   totAllTime:24 },
+    { project:'BAU - Team ITA Web',  us:'Business support / Other teams #2026',     tpId:326110, state:'Inception',     badgeStyle:'badge', totAllTime:67 },
+    { project:'BAU - Team ITA Web',  us:'Sitecore Refactors and Updates #2026',     tpId:326155, state:'Inception',     badgeStyle:'badge', totAllTime:8,  rem:0.2 },
+    { project:'BAU - Team ITA Web',  us:'Sprint ceremonies & planning #2026',       tpId:326080, state:'Inception',     badgeStyle:'dot',   totAllTime:32 },
+    { project:'BAU - Team ITA Web',  us:'Code review & PR activity #2026',          tpId:326090, state:'Inception',     badgeStyle:'dot',   totAllTime:41 },
+    { project:'BAU - Team ITA Web',  us:'Documentation & Confluence updates #2026', tpId:325950, state:'Inception',     badgeStyle:'badge', totAllTime:15 },
+    { project:'BAU - Team ITA Web',  us:'DevOps / CI-CD maintenance #2026',         tpId:326050, state:'Inception',     badgeStyle:'dot',   totAllTime:28 },
+    { project:'BAU - Team ITA Web',  us:'Tech debt & minor bugfixes #2026',         tpId:326060, state:'Dev/Unit test', badgeStyle:'dot',   totAllTime:19 },
+    { project:'Sitecore upgrade',    us:'SC - ALine upgrade prep & validation',     tpId:326190, state:'Inception',     badgeStyle:'dot',   totAllTime:12 },
+    { project:'Sitecore upgrade',    us:'SC - SXA component refactor',             tpId:326195, state:'Dev/Unit test', badgeStyle:'dot',   totAllTime:34 },
+    { project:'ALine Pricing',       us:'Pricing widget — performance fixes',       tpId:325900, state:'Testing',       badgeStyle:'dot',   totAllTime:21 },
+    { project:'ALine Pricing',       us:'Weekly price newsletter #2026',            tpId:326375, state:'Inception',     badgeStyle:'badge', totAllTime:9  },
+];
+
+// Timeline events for today (Friday 13 Mar)
+// top = (hour - 8) * 60 + (minutes) pixels from top
+// height = duration in minutes (capped for display)
+const TL_EVENTS = [
+    { type:'email-in',  time:'08:45', label:'Re: Deploy process #2026 — test su ACC',        top: 45,  h:18, emailId:0, corrUs:'Deploy process #2026' },
+    { type:'meeting',   time:'09:00', label:'Standup BAU ITA',                                top: 60,  h:15 },
+    { type:'email-out', time:'09:20', label:'Re: Deploy process #2026 — risolto, riprovo',   top: 80,  h:18, emailId:1, corrUs:'Deploy process #2026' },
+    { type:'commit',    time:'10:14', label:'[ALine] Fix SVN/Git author filtering',           top:134,  h:18 },
+    { type:'email-in',  time:'10:30', label:'AssetVersioning — errore su staging',            top:150,  h:18, emailId:2, corrUs:'AssetVersioning updates' },
+    { type:'email-in',  time:'11:15', label:'FW: PC emails network — aggiornamento sprint',  top:195,  h:18, emailId:3, corrUs:'PC emails network TP #2026' },
+    { type:'email-in',  time:'11:40', label:'Reminder: Sprint review alle 16:30',            top:220,  h:18, emailId:4, corrUs:null },
+    { type:'email-out', time:'13:30', label:'AssetVersioning — fix deployato su staging',    top:330,  h:18, emailId:5, corrUs:'AssetVersioning updates' },
+    { type:'email-in',  time:'14:00', label:'Re: Deploy process #2026 — ambiente ok ✓',      top:360,  h:18, emailId:6, corrUs:'Deploy process #2026' },
+    { type:'commit',    time:'14:22', label:'[LocalITA] Zucchetti scraper fix',               top:382,  h:18 },
+    { type:'meeting',   time:'15:00', label:'Code Review #326279',                            top:420,  h:45 },
+    { type:'svn',       time:'16:05', label:'[my_ms_graph_api_collector][#324913] PC emails network - send module', top:485, h:18 },
+    { type:'meeting',   time:'16:30', label:'Sprint Review',                                  top:510,  h:30 },
+    { type:'email-in',  time:'16:50', label:'Recap Sprint Review — action items',             top:530,  h:18, emailId:7, corrUs:null },
+    { type:'commit',    time:'17:10', label:'[shinjigi] Analyzer — multi-backend LLM',        top:550,  h:18 },
+];
+
+const EMAILS = [
+    { dir:'in',  from:'giulia.f@euroconsumers.org',  to:'me',                                  subject:'Re: Deploy process #2026 — test su ACC fallito',        time:'08:45', body:'Ciao Lorenzo,\n\nho riprovato il deploy su ACC ma continua a dare 500 sul modulo pricing. Ho guardato i log e sembra un problema di configurazione del connection string nel KeyVault.\n\nPuoi verificare? Il ticket su TP è #326279.\n\nGrazie,\nGiulia' },
+    { dir:'out', from:'me',                           to:'giulia.f@euroconsumers.org',           subject:'Re: Deploy process #2026 — risolto, riprovo',           time:'09:20', body:'Ciao Giulia,\n\nho aggiornato il connection string su KeyVault e rilanciato il pipeline. Dovrebbe funzionare ora, ti faccio sapere appena il deploy va a buon fine.\n\nLorenzo' },
+    { dir:'in',  from:'marco.r@euroconsumers.org',   to:'me',                                   subject:'AssetVersioning — errore su staging',                    time:'10:30', body:'Ciao,\n\nc\'è un errore su staging per AssetVersioning. Il processo di migrazione assets si blocca al 34% con OutOfMemoryException.\n\nStack trace allegato. Riesci a darci un\'occhiata oggi?\n\nMarco' },
+    { dir:'in',  from:'pm@euroconsumers.org',         to:'team-ita@euroconsumers.org',           subject:'FW: PC emails network — aggiornamento sprint',          time:'11:15', body:'Team,\n\ninoltro aggiornamento dal Product Owner su PC emails network TP #2026:\n- Scope ridotto: solo modulo invio, non ricezione\n- Deadline confermata fine sprint\n- Priorità alta\n\nFavor di aggiornare le stime su TP.\n\nGrazie' },
+    { dir:'in',  from:'calendar@microsoft.com',       to:'me',                                   subject:'Reminder: Sprint review alle 16:30',                    time:'11:40', body:'Promemoria: Sprint Review è programmato per oggi alle 16:30.\n\nPartecipanti: team BAU ITA Web + PO + SM\nDurata: 30 minuti\nLink Teams: https://teams.microsoft.com/...' },
+    { dir:'out', from:'me',                           to:'marco.r@euroconsumers.org',            subject:'AssetVersioning — fix deployato su staging',            time:'13:30', body:'Marco,\n\nho trovato il problema: il batch size della migrazione era troppo alto per l\'ambiente di staging (512MB heap limit).\n\nHo ridotto il batch size a 100 items e il processo completa correttamente. Fix deployato su staging, puoi verificare.\n\nLorenzo' },
+    { dir:'in',  from:'giulia.f@euroconsumers.org',  to:'me',                                   subject:'Re: Deploy process #2026 — ambiente ok ✓',              time:'14:00', body:'Lorenzo,\n\nconfermato! Il deploy su ACC è andato a buon fine, pricing funziona correttamente.\n\nProcedo con i test di regressione e aggiorno il ticket TP.\n\nGrazie mille!\nGiulia' },
+    { dir:'in',  from:'scrummaster@euroconsumers.org',to:'team-ita@euroconsumers.org',           subject:'Recap Sprint Review — action items',                    time:'16:50', body:'Ciao a tutti,\n\ndi seguito il recap della Sprint Review:\n\nCompleted:\n- Deploy process #2026 ✓\n- AssetVersioning fix ✓\n\nAction items:\n- Lorenzo: aggiornare ore TP entro lunedì\n- Marco: chiudere PR #448 prima del weekend\n- Giulia: documentare test su Confluence\n\nProssima sprint planning: lunedì 16 Mar ore 9:30' },
+];
+
+// US cards for today
+const US_TODAY = [
+    {
+        us:'Deploy process #2026', tpId:326279, state:'Inception',
+        tpHours:1, zucHours:7.5, zucPercent:14,
+        emails:3, commits:1, meetings:1,
+        color:'#6366f1',
+        note:'Pipeline ACC fix — KeyVault connection string aggiornato, deploy ripristinato.',
+    },
+    {
+        us:'AssetVersioning updates', tpId:326215, state:'Dev/Unit test',
+        tpHours:0.5, zucHours:7.5, zucPercent:7,
+        emails:2, commits:1, meetings:0,
+        color:'#8b5cf6',
+        note:'batch size ridotto a 100 items su staging — OOM risolto, migrazione assets completata.',
+    },
+];
+
+// ── NAVIGATION ────────────────────────────────────
+
+document.querySelectorAll('.nav-link').forEach(link => {
+    link.addEventListener('click', () => {
+        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+        const target = link.dataset.view;
+        document.querySelectorAll('[id^="view-"]').forEach(v => {
+            v.classList.toggle('hidden', v.id !== `view-${target}`);
+        });
+    });
+});
+
+// ── WEEK STRIP ────────────────────────────────────
+
+function buildWeekStrip() {
+    const strip = document.getElementById('week-strip');
+    strip.innerHTML = '';
+    DAYS.forEach((d, i) => {
+        if (i >= 5) return; // skip weekend in strip
+        const rendCls = d.rend === 'ok' ? 'rend-ok' : d.rend === 'warn' ? 'rend-warn' : d.rend === 'err' ? 'rend-err' : '';
+        const activeCls = i === 4 ? 'active' : '';
+        const rendIcon = d.rend === 'ok' ? '<span class="text-success text-xs">✓</span>' : d.rend === 'warn' ? '<span class="text-warning text-xs">⚠</span>' : d.rend === 'err' ? '<span class="text-error text-xs">✗</span>' : '<span class="text-base-content/20 text-xs">·</span>';
+        const tpSum = TS_ACTIVE.reduce((acc, r) => acc + (r.hours[i] || 0), 0);
+        strip.innerHTML += `
+        <div class="week-card ${rendCls} ${activeCls} flex-1" onclick="navigateDay(${i})">
+            <div class="flex items-center justify-between mb-1">
+                <span class="text-xs font-bold ${i===4?'text-primary':''}">${d.label} ${d.date}</span>
+                ${rendIcon}
+            </div>
+            <div class="text-xs text-base-content/50">
+                <span class="text-success font-medium">${d.zucHours}h</span> Zuc
+                <span class="mx-1 text-base-content/20">·</span>
+                <span class="text-primary font-medium">${tpSum}h</span> TP
+            </div>
+            <div class="text-xs text-base-content/30 mt-0.5">${d.nibol || '—'}</div>
+        </div>`;
+    });
+}
+
+function navigateDay(idx) {
+    // In the real implementation this would load day data for idx
+    // For the prototype, just activate the day view
+    document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+    document.querySelector('[data-view="day"]').classList.add('active');
+    document.querySelectorAll('[id^="view-"]').forEach(v => v.classList.toggle('hidden', v.id !== 'view-day'));
+    // Update week strip active state
+    document.querySelectorAll('.week-card').forEach((c, i) => c.classList.toggle('active', i === idx));
+}
+
+// ── TIMELINE ─────────────────────────────────────
+
+function buildTimeline() {
+    const container = document.getElementById('timeline-container');
+    container.innerHTML = '';
+
+    // Hour lines
+    for (let h = 8; h <= 18; h++) {
+        const row = document.createElement('div');
+        row.className = 'timeline-hour';
+        row.style.top = `${(h - 8) * 60}px`;
+        row.style.position = 'absolute';
+        row.style.left = 0;
+        row.style.right = 0;
+        row.style.height = '60px';
+        row.style.borderTop = '1px solid hsl(var(--b3)/0.4)';
+        row.innerHTML = `<span class="timeline-label">${h}:00</span>`;
+        container.appendChild(row);
+    }
+
+    // Now indicator (~17:20)
+    const nowLine = document.createElement('div');
+    nowLine.className = 'timeline-now';
+    nowLine.style.top = `${(17 - 8) * 60 + 20}px`;
+    container.appendChild(nowLine);
+
+    // Events
+    TL_EVENTS.forEach(ev => {
+        const el = document.createElement('div');
+        const typeMap = {
+            'meeting'  : 'tl-event-meeting',
+            'commit'   : 'tl-event-commit',
+            'svn'      : 'tl-event-svn',
+            'email-in' : 'tl-event-email-in',
+            'email-out': 'tl-event-email-out',
+        };
+        el.className = `tl-event ${typeMap[ev.type] || 'tl-event-commit'} ${ev.corrUs ? 'tl-event-corr' : ''}`;
+        el.style.top    = `${ev.top}px`;
+        el.style.height = `${Math.max(ev.h, 16)}px`;
+
+        const icon = ev.type === 'meeting'    ? '📅' :
+                     ev.type === 'commit'     ? '💻' :
+                     ev.type === 'svn'        ? '💾' :
+                     ev.type === 'email-in'   ? '📧' : '📤';
+
+        el.innerHTML = `<span class="font-medium">${ev.time}</span> ${icon} <span class="truncate">${ev.label}</span>`;
+
+        if (ev.emailId !== undefined) {
+            el.style.cursor = 'pointer';
+            el.addEventListener('click', () => openEmail(ev.emailId));
+        }
+
+        // Correlation tooltip
+        if (ev.corrUs) {
+            el.title = `Correlato → ${ev.corrUs}`;
+        }
+
+        container.appendChild(el);
+    });
+}
+
+// ── EMAIL MODAL ───────────────────────────────────
+
+function openEmail(id) {
+    const e = EMAILS[id];
+    if (!e) return;
+    document.getElementById('email-subject').textContent = e.subject;
+    document.getElementById('email-meta').textContent = `${e.dir === 'in' ? 'Da' : 'A'}: ${e.dir === 'in' ? e.from : e.to} · ${e.time}`;
+    document.getElementById('email-dir-badge').innerHTML = e.dir === 'in'
+        ? '<span class="badge badge-xs badge-success mr-1">↓ Ricevuta</span>'
+        : '<span class="badge badge-xs badge-info mr-1">↑ Inviata</span>';
+
+    // Find correlation
+    const tl = TL_EVENTS.find(ev => ev.emailId === id);
+    document.getElementById('email-corr-badge').innerHTML = tl?.corrUs
+        ? `<span class="badge badge-xs badge-primary gap-1">→ US: ${tl.corrUs}</span>`
+        : '<span class="text-xs text-base-content/30 italic">Nessuna correlazione rilevata</span>';
+
+    document.getElementById('email-body').textContent = e.body;
+    document.getElementById('email-modal').showModal();
+}
+
+// ── US CARDS ─────────────────────────────────────
+
+function buildUsCards() {
+    const container = document.getElementById('us-cards-container');
+    const DC = s => ({ 'Inception':'#94a3b8', 'Dev/Unit test':'#6366f1', 'Testing':'#f59e0b' }[s] || '#94a3b8');
+    let html = '';
+
+    US_TODAY.forEach(us => {
+        const tpPct    = us.zucHours > 0 ? Math.min(100, Math.round((us.tpHours / us.zucHours) * 100)) : 0;
+        const delta    = +(us.zucHours - us.tpHours).toFixed(1);
+        const deltaCls = delta <= 0 ? 'text-success' : 'text-error';
+        const deltaLbl = delta <= 0 ? '<span class="font-bold">✓</span>' : `Δ −${delta}h`;
+        const noteRaw  = (us.note || '').replace(/"/g, '&quot;');
+        const noteHtml = us.note
+            ? `📝 ${us.note}`
+            : '<span class="text-base-content/30 italic">+ Aggiungi nota…</span>';
+        html += `
+        <div class="us-card" data-tp-id="${us.tpId}" data-zuc-hours="${us.zucHours}">
+            <div class="flex items-start justify-between gap-2 mb-2">
+                <a href="https://your-org.tpondemand.com/entity/${us.tpId}" target="_blank"
+                   class="text-sm font-semibold hover:underline" style="color:${us.color}">${us.us}</a>
+                <span class="state-dot-wrap text-xs shrink-0">
+                    <span class="state-dot" style="background:${DC(us.state)}"></span>${us.state}
+                </span>
+            </div>
+            <div class="mb-2">
+                <div class="flex justify-between items-center text-xs text-base-content/50 mb-1">
+                    <span class="flex items-center gap-1 font-medium">TP: ${timeCellHtml(us.tpHours, 'font-bold text-primary text-xs')}</span>
+                    <span class="day-delta ${deltaCls}">${deltaLbl}</span>
+                    <span>Zuc: <strong class="text-success">${us.zucHours}h</strong></span>
+                </div>
+                <div class="hours-bar-bg"><div class="hours-bar-tp" style="width:${tpPct}%"></div></div>
+            </div>
+            <div class="flex flex-wrap gap-1 mb-1">
+                ${us.emails   ? `<span class="us-signal"><span class="commit-dot source-mail" style="width:5px;height:5px"></span>${us.emails} email</span>` : ''}
+                ${us.commits  ? `<span class="us-signal"><span class="commit-dot source-git"  style="width:5px;height:5px"></span>${us.commits} commit</span>` : ''}
+                ${us.meetings ? `<span class="us-signal">📅 ${us.meetings} meeting</span>` : ''}
+                <a href="https://your-org.tpondemand.com/entity/${us.tpId}" target="_blank"
+                   class="us-signal text-primary hover:underline ml-auto">→ TP #${us.tpId}</a>
+            </div>
+            <div class="note-edit-wrap mt-1 pt-1.5 border-t border-base-300 text-xs text-base-content/55 leading-snug cursor-pointer hover:text-base-content/80 transition-colors"
+                 data-note="${noteRaw}" onclick="editNote(this)">${noteHtml}</div>
+        </div>`;
+    });
+
+    // Quick-log section: all US not already in US_TODAY
+    const allQuick = getQuickSorted([
+        ...TS_ACTIVE.filter(r => !US_TODAY.some(u => u.tpId === r.tpId)),
+        ...TS_PINNED,
+    ]);
+
+    const sortIcon = f => quickSort.field === f ? (quickSort.dir === 1 ? ' ↑' : ' ↓') : '';
+    const sortBtn  = (f, lbl) =>
+        `<button class="hover:text-base-content/70 transition-colors px-1 ${quickSort.field===f?'text-primary font-semibold':''}"
+                 onclick="sortQuick('${f}')" title="Ordina per ${lbl}">${lbl}${sortIcon(f)}</button>`;
+
+    html += `
+    <div class="divider text-xs text-base-content/30 my-2">Log rapido · ${allQuick.length} US</div>
+    <div class="flex items-center gap-0.5 px-2 pb-1 text-base-content/35 text-xs select-none border-b border-base-300/40 mb-1">
+        <span class="flex-1 text-base-content/25">US</span>
+        ${sortBtn('state','Stato')}
+        <span class="text-base-content/20">·</span>
+        ${sortBtn('ore','Ore')}
+        <span class="text-base-content/20">·</span>
+        ${sortBtn('apertura','Apertura')}
+        <span class="text-base-content/20">·</span>
+        ${sortBtn('chiusura','Chiusura')}
+    </div>
+    <div class="space-y-0.5">`;
+
+    allQuick.forEach(r => {
+        html += `
+        <div class="flex items-center gap-2 py-1 px-2 rounded-lg hover:bg-base-200/60 transition-colors group" data-tp-id="${r.tpId}">
+            <span class="state-dot shrink-0" style="background:${DC(r.state)}"></span>
+            <a href="https://your-org.tpondemand.com/entity/${r.tpId}" target="_blank"
+               class="text-xs flex-1 truncate text-base-content/65 hover:underline hover:text-primary transition-colors"
+               title="${r.us}">${r.us}</a>
+            <span class="text-base-content/30 text-xs shrink-0 tabular-nums">${r.totAllTime}h</span>
+            <button class="btn btn-ghost btn-xs btn-square text-base-content/35 hover:text-primary hover:bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onclick="addToWorkToday(${r.tpId})" title="Aggiungi a Lavoro TP">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
+            </button>
+        </div>`;
+    });
+
+    html += `</div>`;
+    container.innerHTML = html;
+}
+
+function editNote(el) {
+    const cur   = el.dataset.note || '';
+    const input = document.createElement('input');
+    input.type        = 'text';
+    input.value       = cur;
+    input.className   = 'input input-bordered input-xs w-full text-xs';
+    input.placeholder = 'Nota per oggi…';
+    el.innerHTML = '';
+    el.appendChild(input);
+    input.focus();
+    input.select();
+    const save = () => {
+        const val = input.value.trim();
+        el.dataset.note = val;
+        el.innerHTML = val
+            ? `📝 ${val}`
+            : '<span class="text-base-content/30 italic">+ Aggiungi nota…</span>';
+    };
+    input.addEventListener('blur', save);
+    input.addEventListener('keydown', e => {
+        if (e.key === 'Enter')  input.blur();
+        if (e.key === 'Escape') { input.value = cur; input.blur(); }
+    });
+}
+
+// ── TIMESHEET ────────────────────────────────────
+
+function rendClass(r) {
+    return r==='ok'?'day-ok':r==='warn'?'day-warn':r==='err'?'day-err':'';
+}
+
+function stateHtml(state) {
+    const abbr     = { 'Inception':'Inception', 'Dev/Unit test':'Dev', 'Testing':'Test' }[state] || state;
+    const dotColor = { 'Inception':'#94a3b8',   'Dev/Unit test':'#6366f1', 'Testing':'#f59e0b' }[state] || '#94a3b8';
+    return `<span class="state-dot-wrap"><span class="state-dot" style="background:${dotColor}"></span>${abbr}</span>`;
+}
+
+function buildTsHead(id) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    let cells = '';
+    DAYS.forEach((d, i) => {
+        if (i === 6) return; // Sun merged into WE cell
+        if (i === 5) {
+            cells += `<th class="text-center text-xs weekend-col we-col" style="min-width:46px">
+                <span class="flex flex-col items-center opacity-55">
+                    <span class="font-bold">WE</span>
+                    <span class="font-normal" style="font-size:.6rem">Sab · Dom</span>
+                </span>
+            </th>`;
+            return;
+        }
+        if (d.holiday) {
+            cells += `<th class="text-center text-xs holiday-col" style="min-width:52px">
+                <span class="flex flex-col items-center gap-0.5 opacity-80">
+                    <span>${d.label}</span>
+                    <span class="font-normal text-xs">${d.date}</span>
+                    <span style="font-size:.6rem;color:hsl(280 60% 75%)" title="${d.holidayName}">🇮🇹 Festività</span>
+                </span>
+            </th>`;
+            return;
+        }
+        const rc = rendClass(d.rend);
+        const isToday = i === 4;
+        const icon = d.rend==='ok'?'✓':d.rend==='warn'?'⚠':d.rend==='err'?'✗':'';
+        const iconCls = d.rend==='ok'?'text-success':d.rend==='warn'?'text-warning':d.rend==='err'?'text-error opacity-80':'';
+        cells += `<th class="text-center text-xs ${isToday?'today-col':''} ${rc}" style="min-width:52px">
+            <span class="day-header-cell flex flex-col items-center gap-0.5" onclick="navigateDay(${i})">
+                <span class="${isToday?'text-primary font-bold':''}">${d.label}</span>
+                <span class="font-normal opacity-60 text-xs">${d.date}</span>
+                ${icon?`<span class="text-xs font-bold ${iconCls}">${icon}</span>`:'<span class="opacity-0 text-xs">·</span>'}
+            </span>
+        </th>`;
+    });
+    el.innerHTML = `<tr class="text-xs">
+        <th class="w-48">User Story</th>
+        <th class="w-20">Stato</th>
+        ${cells}
+        <th class="text-center w-16 text-xs">Tot</th>
+        <th class="text-center w-10 text-xs opacity-60">Rem</th>
+    </tr>`;
+}
+
+function buildTsRows(bodyId, rows, pinned) {
+    const el = document.getElementById(bodyId);
+    if (!el) return;
+    el.innerHTML = '';
+    let lastProject = null;
+    // colspan = 2 fixed + 5 weekdays + 1 holiday + 1 WE + 2 (tot+rem) = 11
+    const groupColspan = 11;
+    rows.forEach(row => {
+        // Group header when project changes
+        if (row.project !== lastProject) {
+            lastProject = row.project;
+            el.innerHTML += `<tr class="ts-group-row"><td colspan="${groupColspan}">
+                <span class="ts-group-label">${row.project}</span>
+            </td></tr>`;
+        }
+        const weekTotal = row.hours ? row.hours.reduce((a,b)=>a+b,0) : 0;
+        const totLabel  = row.totAllTime != null
+            ? `<span class="text-success font-bold">${weekTotal}</span><span class="text-base-content/35 text-xs">/${row.totAllTime}h</span>`
+            : (weekTotal > 0 ? `<span class="text-success font-bold">${weekTotal}</span>` : `<span class="text-base-content/25">—</span>`);
+        const cellParts = [];
+        DAYS.forEach((d, i) => {
+            if (i === 6) return; // Sun merged into WE cell
+            if (i === 5) {
+                // WE combined: sum Sat+Sun
+                const hWE   = (row.hours?.[5] || 0) + (row.hours?.[6] || 0);
+                const gitWE = (row.git?.[5]   || 0) + (row.git?.[6]   || 0);
+                const svnWE = (row.svn?.[5]   || 0) + (row.svn?.[6]   || 0);
+                const dots  = [
+                    gitWE ? `<span class="commit-dot-lg source-git"></span>` : '',
+                    svnWE ? `<span class="commit-dot-lg source-svn"></span>` : '',
+                ].join('');
+                const widget = pinned
+                    ? `<button class="tc-btn tc-plus" style="opacity:.35" onclick="tcAdjust(this,0.5)" title="Aggiungi ore">+</button>`
+                    : `<span class="text-base-content/25 text-xs">${hWE > 0 ? hWE : '—'}</span>`;
+                cellParts.push(`<td class="text-center weekend-col we-col"><div class="flex flex-col items-center gap-0.5">${widget}<div class="flex gap-1 mt-0.5">${dots}</div></div></td>`);
+                return;
+            }
+            if (d.holiday) {
+                cellParts.push(`<td class="text-center holiday-col"><span class="text-xs" style="color:hsl(280 60% 70%)">🇮🇹</span></td>`);
+                return;
+            }
+            const isToday = i === 4;
+            const h       = row.hours ? row.hours[i] : 0;
+            const hasGit  = row.git?.[i];
+            const hasSvn  = row.svn?.[i];
+            const rc      = rendClass(d.rend);
+            const colCls  = `${isToday?'today-col':''} ${rc}`;
+            const extraValCls = `font-bold text-xs ${isToday?'text-primary':''}`;
+            const widget  = pinned
+                ? `<button class="tc-btn tc-plus" style="opacity:.5" onclick="tcAdjust(this,0.5)" title="Aggiungi ore">+</button>`
+                : timeCellHtml(h, extraValCls);
+            const dots = [
+                hasGit ? `<span class="commit-dot-lg source-git"></span>` : '',
+                hasSvn ? `<span class="commit-dot-lg source-svn"></span>` : '',
+            ].join('');
+            const note    = row.notes?.[i];
+            const noteHtml = note
+                ? `<div class="tc-note" title="${note}">${note.length > 9 ? note.substring(0, 8)+'…' : note}</div>`
+                : '';
+            cellParts.push(`<td class="text-center ${colCls}"><div class="flex flex-col items-center gap-0">${widget}${noteHtml}<div class="flex gap-1 mt-0.5">${dots}</div></div></td>`);
+        });
+        const remVal = row.rem != null
+            ? `<span class="text-warning text-xs">${row.rem}</span>`
+            : `<span class="text-base-content/25 text-xs">—</span>`;
+        const tpLink = row.tpId
+            ? `<a href="https://your-org.tpondemand.com/entity/${row.tpId}" target="_blank" class="hover:underline hover:text-primary transition-colors">${row.us}</a>`
+            : row.us;
+        el.innerHTML += `<tr class="hover text-xs ${pinned?'pinned-row':''}" data-tp-id="${row.tpId||''}">
+            <td class="font-medium pl-3">${tpLink}</td>
+            <td>${stateHtml(row.state)}</td>
+            ${cellParts.join('')}
+            <td class="text-center text-xs">${totLabel}</td>
+            <td class="text-center text-xs">${remVal}</td>
+        </tr>`;
+    });
+}
+
+function buildTsFoot() {
+    const el = document.getElementById('ts-main-foot');
+    if (!el) return;
+
+    const mkCell = (d, i, content, extraCls='') => {
+        if (d.holiday) return `<td class="text-center holiday-col text-xs" style="color:hsl(280 60% 70%)">🇮🇹</td>`;
+        const rc = rendClass(d.rend);
+        return `<td class="text-center text-xs font-bold ${i===4?'today-col':''} ${rc} ${extraCls}">${content}</td>`;
+    };
+
+    const buildRow = (fn) => {
+        let cells = '';
+        DAYS.forEach((d, i) => {
+            if (i === 6) return; // Sun merged into WE
+            if (i === 5) {
+                cells += `<td class="text-center weekend-col we-col text-xs opacity-35">—</td>`;
+                return;
+            }
+            cells += fn(d, i);
+        });
+        return cells;
+    };
+
+    const tpCells    = buildRow((d, i) => {
+        const sum = d.holiday ? '' : TS_ACTIVE.reduce((acc,r)=>(acc+(r.hours[i]||0)),0);
+        return mkCell(d, i, sum||'—', i===4?'text-primary':'');
+    });
+    const zucCells   = buildRow((d, i) => {
+        if (d.holiday) return `<td class="text-center holiday-col text-xs" style="color:hsl(280 60% 70%)">🇮🇹</td>`;
+        const val = d.zucHours > 0
+            ? d.zucHours
+            : `<span class="err-x font-black text-sm">✗</span>`;
+        return mkCell(d, i, val, d.zucHours > 0 ? 'text-success' : 'text-error');
+    });
+    const deltaCells = buildRow((d, i) => {
+        if (d.holiday) return `<td class="text-center holiday-col text-xs" style="color:hsl(280 60% 70%)">—</td>`;
+        const tp    = TS_ACTIVE.reduce((acc,r)=>(acc+(r.hours[i]||0)),0);
+        const zuc   = d.zucHours || 0;
+        const delta = zuc - tp;
+        const cls   = delta === 0 ? 'text-success' : delta > 0 ? 'text-error' : 'text-base-content/40';
+        const val   = delta === 0 ? '<span class="text-success font-black">✓</span>' : delta > 0 ? `−${delta}h` : '—';
+        return mkCell(d, i, val, cls);
+    });
+
+    el.innerHTML = `
+        <tr class="text-xs">
+            <td colspan="2" class="text-right pr-3 text-base-content/50 text-xs font-semibold">Ore TP</td>
+            ${tpCells}
+            <td class="text-center font-bold text-primary text-xs">14.5</td><td></td>
+        </tr>
+        <tr class="text-xs">
+            <td colspan="2" class="text-right pr-3 text-base-content/50 text-xs font-semibold">Zucchetti</td>
+            ${zucCells}
+            <td class="text-center font-bold text-success text-xs">31h</td><td></td>
+        </tr>
+        <tr class="text-xs border-b-2 border-base-300">
+            <td colspan="2" class="text-right pr-3 text-base-content/50 text-xs font-semibold">Delta</td>
+            ${deltaCells}
+            <td class="text-center font-bold text-error text-xs">−16.5h</td><td></td>
+        </tr>`;
+}
+
+function buildTsPinSep() {
+    const el = document.getElementById('ts-pin-sep');
+    if (!el) return;
+    // colspan = 2 fixed cols + 5 weekday cols + 1 holiday col + 1 WE col + 2 (tot, rem) = 11
+    el.innerHTML = `<tr class="ts-pin-sep-row">
+        <td colspan="11" class="px-3 py-2">
+            <div class="flex items-center gap-2">
+                <svg class="w-3.5 h-3.5 text-warning shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/></svg>
+                <span class="text-xs font-bold text-warning/80 uppercase tracking-wide">Attività ricorrenti — da rendicontare</span>
+                <button class="btn btn-ghost btn-xs gap-1 text-xs"
+                        onclick="document.getElementById('pin-search-modal').showModal()">
+                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                    + Aggiungi
+                </button>
+            </div>
+        </td>
+    </tr>`;
+}
+
+// Populates a <colgroup> element with column widths matching the timesheet layout.
+// Must be called after DAYS is defined.
+function buildColgroup(id) {
+    const cg = document.getElementById(id);
+    if (!cg) return;
+    let html = '<col style="width:192px"><col style="width:80px">';
+    DAYS.forEach((d, i) => {
+        if (i === 6) return; // Sun merged into WE
+        if (i === 5) { html += '<col class="weekend-col we-col" style="width:46px">'; return; }
+        html += '<col style="width:52px">';
+    });
+    html += '<col style="width:64px"><col style="width:40px">';
+    cg.innerHTML = html;
+}
+
+let weVisible = true; // WE column visible by default (merged single column)
+function toggleWE() {
+    weVisible = !weVisible;
+    document.querySelectorAll('#ts-main-table, #ts-pin-table').forEach(t =>
+        t.classList.toggle('we-hidden', !weVisible)
+    );
+    document.getElementById('we-toggle').classList.toggle('btn-active', weVisible);
+}
+
+function runVerifica() {
+    const now = new Date();
+    const t = `${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
+    document.querySelector('.card-body .flex.items-center.gap-2 .text-xs.text-base-content\\/30')
+        && (document.querySelector('[onclick="runVerifica()"]').previousElementSibling.textContent = `Ultima verifica: oggi ${t}`);
+    // Re-render foot to simulate update
+    buildTsFoot();
+}
+
+// ── AI CHAT ───────────────────────────────────────
+
+const AI_RESPONSES = {
+    '/mcp teams list':   'MCP · Teams → 657 chat.\nAttive oggi: Standup BAU (09:00), Code Review (15:00), Sprint Review (16:30).',
+    '/git log today':    'Git · 3 commit oggi:\n• [shinjigi] Analyzer LLM 17:10\n• [LocalITA] Zucchetti fix 14:22\n• [ALine] Author filter 10:14',
+    '/zucchetti status': 'Zucchetti · Settimana 9-15 Mar:\n✓ Lun  ✓ Mar  ⚠ Mer  ✗ Gio  … Ven\n⚠ Gio 12: non compilato!',
+};
+let aiOpen = false;
+function toggleAiChat() {
+    aiOpen = !aiOpen;
+    document.getElementById('ai-chat-panel').classList.toggle('hidden', !aiOpen);
+}
+function sendQuick(cmd) { document.getElementById('ai-input').value = cmd; sendAiMsg(); }
+function sendAiMsg() {
+    const input = document.getElementById('ai-input');
+    const msg = input.value.trim(); if (!msg) return;
+    appendAiMsg(msg, 'user'); input.value = '';
+    setTimeout(() => {
+        const resp = AI_RESPONSES[msg] || `Comando: "${msg}"\n[MCP non connesso in questa demo]`;
+        appendAiMsg(resp, 'bot');
+    }, 380);
+}
+function appendAiMsg(text, type) {
+    const msgs = document.getElementById('ai-chat-msgs');
+    const div = document.createElement('div');
+    div.className = type === 'user' ? 'ai-msg-user' : 'ai-msg-bot';
+    div.style.whiteSpace = 'pre-line';
+    div.textContent = text;
+    msgs.appendChild(div);
+    msgs.scrollTop = msgs.scrollHeight;
+}
+
+// ── BROWSER / TEAMS MISC ─────────────────────────
+
+const domains = [
+    {domain:'github.com',visits:38,pct:100},{domain:'dev.azure.com',visits:24,pct:63},
+    {domain:'learn.microsoft.com',visits:19,pct:50},{domain:'tpondemand.com',visits:15,pct:39},
+    {domain:'wiki.conseur.org',visits:12,pct:32},
+];
+const domEl = document.getElementById('browser-domains');
+if (domEl) domains.forEach(d => {
+    domEl.innerHTML += `<div><div class="flex justify-between mb-1"><span class="font-mono">${d.domain}</span><span class="font-bold">${d.visits}</span></div><div class="bar" style="width:${d.pct}%"></div></div>`;
+});
+const hourlyData = [0,0,2,8,15,12,18,22,14,10,16,8,20,24,18,12,8,4];
+const maxH = Math.max(...hourlyData);
+const barEl = document.getElementById('hourly-bars');
+if (barEl) hourlyData.forEach((v,i) => {
+    const h = maxH>0?Math.round((v/maxH)*100):0;
+    barEl.innerHTML += `<div class="flex-1 flex flex-col items-end"><div class="w-full rounded-sm" style="height:${h}%;background:${i===9?'hsl(var(--p))':'hsl(var(--p)/0.35)'}"></div></div>`;
+});
+const chatList = document.getElementById('chat-list');
+if (chatList) [
+    {name:'Standup BAU ITA',type:'meeting',last:'09:09',active:true},
+    {name:'Code Review #326279',type:'meeting',last:'15:48',active:false},
+    {name:'Marco R.',type:'person',last:'14:10',active:false},
+].forEach(c => {
+    chatList.innerHTML += `<div class="flex items-center gap-2 p-2 rounded-lg cursor-pointer hover:bg-base-200 ${c.active?'bg-base-200':''} transition-colors"><div class="avatar placeholder shrink-0"><div class="bg-neutral rounded-full w-7"><span class="text-xs">${c.name.substring(0,2).toUpperCase()}</span></div></div><div class="flex-1 min-w-0"><div class="text-xs font-semibold truncate">${c.name}</div><div class="text-xs text-base-content/40">${c.type}</div></div><div class="text-xs text-base-content/30 shrink-0">${c.last}</div></div>`;
+});
+
+// ── TIME CELL WIDGET ─────────────────────────
+
+function timeCellHtml(value, extraValCls = '') {
+    const canMinus = value > 0;
+    const display  = value > 0 ? value : '—';
+    return `<div class="tc-wrap">
+        <button class="tc-btn tc-minus ${canMinus ? '' : 'invisible'}" onclick="tcAdjust(this,-0.5)" tabindex="-1">−</button>
+        <span class="tc-val ${extraValCls}" onclick="tcEdit(this)" data-val="${value}">${display}</span>
+        <button class="tc-btn tc-plus" onclick="tcAdjust(this,0.5)" tabindex="-1">+</button>
+    </div>`;
+}
+
+function tcAdjust(btn, delta) {
+    const wrap   = btn.closest('.tc-wrap');
+    const span   = wrap.querySelector('.tc-val');
+    const curVal = parseFloat(span.dataset.val) || 0;
+    tcCommit(wrap, Math.max(0, +(curVal + delta).toFixed(1)));
+}
+
+function tcEdit(span) {
+    const wrap = span.closest('.tc-wrap');
+    const cur  = parseFloat(span.dataset.val) || 0;
+    const input = document.createElement('input');
+    input.type      = 'number';
+    input.step      = '0.5';
+    input.min       = '0';
+    input.value     = cur > 0 ? cur : '';
+    input.className = 'tc-input';
+    input.placeholder = '0';
+    span.replaceWith(input);
+    input.focus();
+    input.select();
+    input.addEventListener('blur',    () => tcSaveInput(input, wrap));
+    input.addEventListener('keydown', e  => {
+        if (e.key === 'Enter')  { input.blur(); }
+        if (e.key === 'Escape') { tcSaveInput(input, wrap, cur); }
+    });
+}
+
+function tcSaveInput(input, wrap, forceVal) {
+    const newVal = forceVal !== undefined
+        ? forceVal
+        : Math.max(0, +(parseFloat(input.value) || 0).toFixed(1));
+    const span = document.createElement('span');
+    span.className = input._spanCls || 'tc-val';
+    span.dataset.val = newVal;
+    span.textContent = newVal > 0 ? newVal : '—';
+    span.onclick = function() { tcEdit(this); };
+    input.replaceWith(span);
+    tcCommit(wrap, newVal, span);
+}
+
+function tcCommit(wrap, newVal, existingSpan) {
+    const span = existingSpan || wrap.querySelector('.tc-val');
+    if (span) {
+        span.dataset.val = newVal;
+        span.textContent = newVal > 0 ? newVal : '—';
+    }
+    const minus = wrap.querySelector('.tc-minus');
+    if (minus) minus.classList.toggle('invisible', newVal <= 0);
+
+    // Live update delta + bar when inside a Day view US card
+    const card = wrap.closest('.us-card');
+    if (card) {
+        const zuc = parseFloat(card.dataset.zucHours || 0);
+        const d   = +(zuc - newVal).toFixed(1);
+        const deltaEl = card.querySelector('.day-delta');
+        if (deltaEl) {
+            if (d <= 0) {
+                deltaEl.className   = 'day-delta text-success';
+                deltaEl.innerHTML   = '<span class="font-bold">✓</span>';
+            } else {
+                deltaEl.className   = 'day-delta text-error';
+                deltaEl.textContent = `Δ −${d}h`;
+            }
+        }
+        const barEl = card.querySelector('.hours-bar-tp');
+        if (barEl && zuc > 0) barEl.style.width = `${Math.min(100, Math.round((newVal / zuc) * 100))}%`;
+    }
+    // TODO: POST to TP API — tpId available from closest [data-tp-id]
+    console.log('tcCommit', newVal, wrap.closest('[data-tp-id]')?.dataset.tpId);
+}
+
+// ── QUICK-LOG SORT ────────────────────────────────
+
+let quickSort = { field: 'state', dir: 1 };
+
+const STATE_ORDER = { 'Inception': 0, 'Dev/Unit test': 1, 'Testing': 2 };
+
+function sortQuick(field) {
+    quickSort.dir = quickSort.field === field ? quickSort.dir * -1 : 1;
+    quickSort.field = field;
+    buildUsCards();
+}
+
+function getQuickSorted(items) {
+    return [...items].sort((a, b) => {
+        let va, vb;
+        switch (quickSort.field) {
+            case 'state':
+                va = STATE_ORDER[a.state] ?? 99; vb = STATE_ORDER[b.state] ?? 99; break;
+            case 'ore':
+                va = a.totAllTime || 0; vb = b.totAllTime || 0; break;
+            case 'apertura':
+                va = a.tpId; vb = b.tpId; break;
+            case 'chiusura':
+                // rem present (closing soon) = low value; no rem = high value
+                va = a.rem != null ? a.rem : 999; vb = b.rem != null ? b.rem : 999; break;
+            default:
+                va = vb = 0;
+        }
+        return (va === vb ? 0 : va < vb ? -1 : 1) * quickSort.dir;
+    });
+}
+
+function addToWorkToday(tpId) {
+    if (US_TODAY.some(u => u.tpId === tpId)) return;
+    const src = [...TS_ACTIVE, ...TS_PINNED].find(r => r.tpId === tpId);
+    if (!src) return;
+    const todayZuc = DAYS[4].zucHours || 0;
+    const DC = s => ({ 'Inception':'#94a3b8', 'Dev/Unit test':'#6366f1', 'Testing':'#f59e0b' }[s] || '#94a3b8');
+    US_TODAY.push({
+        us: src.us, tpId: src.tpId, state: src.state,
+        tpHours: 0, zucHours: todayZuc,
+        emails: 0, commits: 0, meetings: 0,
+        color: DC(src.state), note: '',
+    });
+    buildUsCards();
+}
+
+// ── INIT ─────────────────────────────────────────
+
+buildWeekStrip();
+buildTimeline();
+buildUsCards();
+buildColgroup('ts-main-colgroup');
+buildColgroup('ts-pin-colgroup');
+buildTsHead('ts-main-head');
+buildTsFoot();
+buildTsRows('ts-main-body', TS_ACTIVE, false);
+buildTsPinSep();
+buildTsRows('ts-pin-body', TS_PINNED, true);
+</script>
+</body>
+</html>
