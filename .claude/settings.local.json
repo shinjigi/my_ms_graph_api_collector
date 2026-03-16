@@ -25,7 +25,9 @@
       "Bash(cd \"C:\\\\SVN\\\\_GH\\\\_shinjigi_WIN\\\\my_ms_graph_api_collector\" && node_modules/.bin/tsx src/analysis/claudeAnalyzer.ts --date=2026-03-10 --force 2>&1)",
       "Bash(cd \"C:\\\\SVN\\\\_GH\\\\_shinjigi_WIN\\\\my_ms_graph_api_collector\" && CLAUDE_API_KEY=\"\" node_modules/.bin/tsx src/analysis/claudeAnalyzer.ts --date=2026-03-10 --force 2>&1)",
       "Bash(cd \"C:\\\\SVN\\\\_GH\\\\_shinjigi_WIN\\\\my_ms_graph_api_collector\" && CLAUDE_API_KEY=\"\" CLAUDECODE=\"\" node_modules/.bin/tsx src/analysis/claudeAnalyzer.ts --date=2026-03-10 --force 2>&1)",
-      "Bash(start \"C:/SVN/_GH/_shinjigi_WIN/my_ms_graph_api_collector/portal/index.html\")"
+      "Bash(start \"C:/SVN/_GH/_shinjigi_WIN/my_ms_graph_api_collector/portal/index.html\")",
+      "Bash(cd web:*)",
+      "Bash(git add:*)"
     ]
   }
 }
