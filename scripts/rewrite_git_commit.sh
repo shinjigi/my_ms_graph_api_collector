@@ -1,15 +1,25 @@
 #!/bin/bash
 
 # ==============================================================================
-# SCRIPT PER LA RISCRITTURA DELLA CRONOLOGIA GIT
+# SCRIPT PER LA RISCRITTURA DELLA CRONOLOGIA GIT (V2 - Robust Version)
 # ==============================================================================
-# Questo script trasformerà tutti i messaggi dei commit nel formato richiesto,
-# impostando contemporaneamente l'autore corretto e preservando le date originali.
+# Trasforma i messaggi dei commit, imposta l'autore e preserva le date originali.
 #
-# ATTENZIONE: Eseguire questo script all'interno di Git Bash.
-# Si consiglia di creare un backup del ramo prima di procedere:
-# git branch backup_pre_rewrite
+# REQUISITO: La cartella di lavoro deve essere PULITA (niente modifiche pendenti).
+# Se hai modifiche pendenti, esegui: git stash
 # ==============================================================================
+
+# 1. Squelch del warning di filter-branch
+export FILTER_BRANCH_SQUELCH_WARNING=1
+
+# 2. Verifica se il repository è pulito
+if [ -n "$(git status --porcelain)" ]; then
+  echo "ERRORE: Hai modifiche non salvate (unstaged/staged changes)."
+  echo "Esegui 'git stash' o 'git commit' prima di lanciare questo script."
+  exit 1
+fi
+
+echo "Avvio riscrittura della cronologia..."
 
 git filter-branch -f --msg-filter '
     # Definiamo il nuovo prefisso richiesto
@@ -17,13 +27,12 @@ git filter-branch -f --msg-filter '
     
     # Pulizia del messaggio originale:
     # Rimuoviamo i vecchi tag [shinjigi], i prefissi "feat:", "Docs -", ecc.
-    # Usiamo sed con espressioni regolari estese per isolare il contenuto reale.
     CLEAN_MSG=$(cat | sed -E "s/^(\[shinjigi\]\[#[0-9]+\] (PC emails network TP #[0-9]+ - )?|feat: |Docs — |Docs - )//")
     
     # Restituiamo il messaggio finale standardizzato
     echo "${NEW_PREFIX}${CLEAN_MSG}"
 ' --env-filter '
-    # Impostazione dell'identità dell'autore e del committer richiesta
+    # Impostazione dell identità dell autore e del committer richiesta
     CORRECT_NAME="Luigi de Pinto"
     CORRECT_EMAIL="ldepinto@italy.conseur.org"
     
@@ -38,9 +47,11 @@ git filter-branch -f --msg-filter '
     export GIT_COMMITTER_DATE="$GIT_AUTHOR_DATE"
 ' --tag-name-filter cat -- --all
 
+echo "Operazione completata con successo."
+
 # ==============================================================================
 # NOTE POST-ESECUZIONE:
-# 1. Se hai già pushato i commit sul server, dovrai fare: git push --force
-# 2. Per pulire i backup temporanei creati da Git: 
-#    git update-ref -d refs/original/refs/heads/main
+# 1. Per applicare le modifiche al server: git push --force
+# 2. Se hai usato stash prima: git stash pop
+# 3. Per pulire i riferimenti temporanei: git update-ref -d refs/original/refs/heads/main
 # ==============================================================================
