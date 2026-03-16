@@ -21,7 +21,8 @@
         .day-warn { background:hsl(38  90% 55%/0.10)!important; box-shadow:inset 0 0 0 1.5px hsl(38  90% 55%/0.35); }
         .day-err  { background:hsl(0   72% 55%/0.12)!important; box-shadow:inset 0 0 0 1.5px hsl(0 72% 55%/0.5); }
         .today-col   { background:hsl(var(--p)/0.10)!important; box-shadow:inset 0 0 0 1.5px hsl(var(--p)/0.3); }
-        .weekend-col { background:hsl(var(--b2)/0.5); opacity:.45; pointer-events:none; }
+        .weekend-col { background:hsl(var(--b2)/0.5); opacity:.45; }
+        .weekend-col .tc-wrap { pointer-events:all; opacity:.8; }
         .holiday-col { background:hsl(280 60% 50%/0.12)!important; box-shadow:inset 0 0 0 1.5px hsl(280 60% 50%/0.4); opacity:.7; }
         .day-header-cell { cursor:pointer; border-radius:6px; padding:4px 6px; transition:background .15s; }
         .day-header-cell:hover { background:hsl(var(--p)/0.2); }
@@ -45,20 +46,36 @@
 
         /* project group header */
         .ts-group-row td { background:hsl(var(--b2)/0.5)!important; padding-top:10px!important; padding-bottom:4px!important; }
-        .ts-group-label { font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:hsl(var(--bc)/0.55); }
+        .ts-group-label { font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:hsl(var(--bc)/0.55); }
 
         /* pinned rows */
         .pinned-row td { opacity:.78; }
         .pinned-row:hover td { opacity:1; }
 
-        /* time entry note label in cell */
-        .tc-note { font-size:.55rem; color:hsl(var(--bc)/0.45); line-height:1.2; max-width:52px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; margin-top:1px; }
+        /* ── Timesheet note label + inline edit ── */
+        .tc-note {
+            font-size:.70rem; color:hsl(var(--bc)/0.45); line-height:1.2;
+            max-width:52px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+            margin-top:1px; cursor:pointer; min-height:10px; position:relative;
+        }
+        .tc-note.editing { overflow:visible; white-space:normal; z-index:200; }
+        .tc-note.empty::after { content:'·'; opacity:0; font-size:.7rem; transition:opacity .15s; }
+        td:hover .tc-note.empty::after { opacity:0.3; }
+        .tc-note:not(.empty):hover { text-decoration:underline dotted; }
+        .tc-note-input {
+            position:absolute; left:50%; transform:translateX(-50%); top:-2px;
+            width:150px; z-index:200;
+            background:hsl(var(--b2)); border:1px solid hsl(var(--p));
+            border-radius:5px; box-shadow:0 3px 10px #0006;
+            font-size:.72rem; padding:3px 7px; outline:none; font-weight:400;
+            color:#fff; caret-color:hsl(var(--p));
+        }
 
         /* err X: white on red bg */
         .day-err .err-x { color:#fff; font-weight:900; text-shadow:0 0 4px #0006; }
 
         /* dot+label state variant */
-        .state-dot-wrap { display:inline-flex; align-items:center; gap:4px; font-size:.7rem; white-space:nowrap; }
+        .state-dot-wrap { display:inline-flex; align-items:center; gap:4px; font-size:.75rem; white-space:nowrap; }
         .state-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
 
         /* WE toggle */
@@ -79,13 +96,13 @@
         .timeline-container { position:relative; }
         .timeline-hour { height:60px; border-top:1px solid hsl(var(--b3)/0.5); position:relative; }
         .timeline-hour:first-child { border-top:none; }
-        .timeline-label { position:absolute; top:-9px; left:0; font-size:.65rem; color:hsl(var(--bc)/0.35); width:36px; text-align:right; }
+        .timeline-label { position:absolute; top:-9px; left:0; font-size:.75rem; color:hsl(var(--bc)/0.35); width:36px; text-align:right; }
         .timeline-line  { position:absolute; top:0; left:44px; right:0; height:1px; background:hsl(var(--b3)/0.4); }
         .timeline-now   { position:absolute; left:44px; right:0; height:2px; background:hsl(var(--p)); z-index:10; }
         .timeline-now::before { content:''; position:absolute; left:-4px; top:-3px; width:8px; height:8px; border-radius:50%; background:hsl(var(--p)); }
 
         /* ── Timeline events ── */
-        .tl-event { position:absolute; left:52px; right:4px; border-radius:6px; padding:3px 7px; font-size:.7rem; cursor:pointer; transition:filter .15s; overflow:hidden; }
+        .tl-event { position:absolute; left:52px; right:4px; border-radius:6px; padding:3px 7px; font-size:.75rem; cursor:pointer; transition:filter .15s; overflow:hidden; }
         .tl-event:hover { filter:brightness(1.15); }
         .tl-event-meeting { background:hsl(205 90% 55%/0.20); border-left:3px solid #0ea5e9; color:#7dd3fc; }
         .tl-event-commit  { background:hsl(245 60% 60%/0.20); border-left:3px solid #6366f1; color:#a5b4fc; }
@@ -95,9 +112,10 @@
         .tl-event-corr { outline:1.5px solid hsl(var(--p)/0.6); }
 
         /* ── US card ── */
-        .us-card { border-radius:10px; padding:12px 14px; border:1px solid hsl(var(--b3)); background:hsl(var(--b1)); margin-bottom:10px; }
+        .us-card { border-radius:10px; padding:12px 14px; border:1px solid hsl(var(--b3)); background:hsl(var(--b1)); margin-bottom:10px; transition:box-shadow .2s, border-color .2s; }
         .us-card:hover { border-color:hsl(var(--p)/0.4); }
-        .us-signal { display:inline-flex; align-items:center; gap:3px; font-size:.65rem; padding:2px 6px; border-radius:20px; background:hsl(var(--b2)); }
+        .us-card.highlight { box-shadow:0 0 0 2px hsl(var(--p)); border-color:hsl(var(--p)); }
+        .us-signal { display:inline-flex; align-items:center; gap:3px; font-size:.75rem; padding:2px 6px; border-radius:20px; background:hsl(var(--b2)); }
         .hours-bar-bg { height:6px; border-radius:3px; background:hsl(var(--b3)); overflow:hidden; }
         .hours-bar-tp  { height:100%; border-radius:3px; background:hsl(var(--p)); }
         .hours-bar-zuc { height:100%; border-radius:3px; background:hsl(142 60% 45%); margin-top:2px; }
@@ -105,14 +123,14 @@
         /* ── Time cell widget ── */
         .tc-wrap { display:inline-flex; align-items:center; gap:3px; }
         .tc-btn {
-            opacity:0; width:17px; height:17px; border-radius:50%; padding:0;
+            opacity:0.5; width:17px; height:17px; border-radius:50%; padding:0;
             border:1px solid hsl(var(--p)/0.5); color:hsl(var(--p));
             font-size:13px; line-height:1; cursor:pointer; background:transparent;
             display:flex; align-items:center; justify-content:center;
             transition:opacity .12s, background .1s;
             flex-shrink:0;
         }
-        .tc-btn:hover { background:hsl(var(--p)/0.25); }
+        .tc-btn:hover { background:hsl(var(--p)/0.25); opacity:1; }
         .tc-btn.invisible { pointer-events:none; opacity:0!important; }
         .tc-wrap:hover .tc-btn:not(.invisible) { opacity:1; }
         .tc-val {
@@ -132,13 +150,33 @@
         .tc-input::-webkit-outer-spin-button { -webkit-appearance:none; }
         .tc-input[type=number] { -moz-appearance:textfield; }
 
+        /* ── Day picker ── */
+        #day-picker-btns { scrollbar-width:thin; scrollbar-color:hsl(var(--b3)) transparent; }
+        #day-picker-btns::-webkit-scrollbar { height:3px; }
+        #day-picker-btns::-webkit-scrollbar-thumb { background:hsl(var(--b3)); border-radius:2px; }
+        .day-btn {
+            min-width:32px; padding:3px 2px; border-radius:7px; flex-shrink:0;
+            display:flex; flex-direction:column; align-items:center; gap:1px;
+            cursor:pointer; border:1px solid transparent; background:transparent;
+            color:hsl(var(--bc)); transition:background .12s, border-color .12s;
+        }
+        .day-btn:hover { background:hsl(var(--p)/0.12); }
+        .day-num  { font-size:.8rem;  font-weight:700; line-height:1.1; }
+        .day-abbr { font-size:.55rem; line-height:1; opacity:.5; }
+        .day-btn-today .day-num { color:hsl(var(--p)); }
+        .day-btn-today { background:hsl(var(--p)/0.18); border-color:hsl(var(--p)/0.55); }
+        .day-btn-selected:not(.day-btn-today) { background:hsl(var(--p)/0.28); border-color:hsl(var(--p)); }
+        .day-btn-weekend { opacity:.38; }
+        .day-btn-holiday { background:hsl(280 60% 50%/0.14); border-color:hsl(280 60% 50%/0.35); }
+        .day-btn-holiday .day-num { color:hsl(280 60% 72%); }
+
         /* ── AI Chat ── */
         #ai-chat-panel { position:fixed; bottom:72px; right:16px; width:340px; max-height:480px; background:hsl(var(--b1)); border:1px solid hsl(var(--b3)); border-radius:16px; box-shadow:0 8px 32px #0008; display:flex; flex-direction:column; z-index:1000; transition:opacity .2s, transform .2s; }
         #ai-chat-panel.hidden { opacity:0; pointer-events:none; transform:translateY(12px); display:flex!important; }
         #ai-chat-msgs { flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:8px; }
         .ai-msg-user { align-self:flex-end; background:hsl(var(--p)/0.18); border-radius:12px 12px 2px 12px; padding:6px 10px; font-size:.75rem; max-width:80%; }
         .ai-msg-bot  { align-self:flex-start; background:hsl(var(--b2)); border-radius:12px 12px 12px 2px; padding:6px 10px; font-size:.75rem; max-width:85%; }
-        .ai-msg-sys  { align-self:center; font-size:.65rem; color:hsl(var(--bc)/0.4); font-style:italic; }
+        .ai-msg-sys  { align-self:center; font-size:.70rem; color:hsl(var(--bc)/0.4); font-style:italic; }
     </style>
 </head>
 <body class="flex h-screen overflow-hidden bg-base-200">
@@ -154,17 +192,13 @@
     <nav class="flex-1 p-2 overflow-y-auto">
         <div class="text-xs text-base-content/30 font-semibold px-3 pt-3 pb-1 uppercase tracking-wider">Viste</div>
         <ul class="menu menu-sm gap-0.5">
-            <li><a class="nav-link rounded-lg" data-view="dashboard">
+            <li><a class="nav-link active rounded-lg" data-view="dashboard">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/></svg>
                 Dashboard
             </a></li>
             <li><a class="nav-link rounded-lg" data-view="timesheet">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                 Timesheet
-            </a></li>
-            <li><a class="nav-link active rounded-lg" data-view="day">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                Giorno
             </a></li>
             <li><a class="nav-link rounded-lg" data-view="activity">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
@@ -197,64 +231,75 @@
 <!-- ═══════ MAIN ═══════ -->
 <div class="flex-1 flex flex-col overflow-hidden">
 
-    <!-- TOP BAR -->
-    <header class="bg-base-100 border-b border-base-300 px-5 py-2.5 flex items-center justify-between shrink-0">
-        <div class="flex items-center gap-2">
-            <button class="btn btn-ghost btn-xs btn-square">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-            </button>
-            <span class="font-semibold text-sm">Settimana 9 – 15 Mar 2026</span>
-            <button class="btn btn-ghost btn-xs btn-square">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
-            </button>
-            <button class="btn btn-ghost btn-xs ml-1">Oggi</button>
-        </div>
-        <div class="flex items-center gap-3">
-            <div class="flex items-center gap-2 text-xs text-base-content/40">
-                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm" style="background:hsl(142 60% 45%/0.5)"></span>Rendicontato</span>
-                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm" style="background:hsl(38 90% 55%/0.5)"></span>Parziale</span>
-                <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-sm" style="background:hsl(0 72% 55%/0.5)"></span>Mancante</span>
-            </div>
-            <div class="badge badge-primary badge-sm">Ven 13 Mar 2026</div>
+    <!-- TOP BAR — day picker -->
+    <header class="bg-base-100 border-b border-base-300 px-3 py-2 flex items-center gap-2 shrink-0">
+        <!-- Month nav -->
+        <button onclick="pickerPrevMonth()" class="btn btn-ghost btn-xs btn-square shrink-0" title="Mese precedente">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        </button>
+        <span id="picker-month-label" class="text-sm font-semibold min-w-[7rem] text-center shrink-0 select-none">Marzo 2026</span>
+        <button onclick="pickerNextMonth()" class="btn btn-ghost btn-xs btn-square shrink-0" title="Mese successivo">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <button onclick="selectPickerToday()" class="btn btn-ghost btn-xs shrink-0">Oggi</button>
+        <!-- Day buttons — scrollable -->
+        <div id="day-picker-btns" class="flex gap-0.5 overflow-x-auto flex-1 py-0.5"></div>
+        <!-- Legend -->
+        <div class="flex items-center gap-2 text-xs text-base-content/35 shrink-0 pl-2 border-l border-base-300">
+            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm" style="background:hsl(142 60% 45%/0.5)"></span>Rend.</span>
+            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm" style="background:hsl(38 90% 55%/0.5)"></span>Parz.</span>
+            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm" style="background:hsl(0 72% 55%/0.5)"></span>Mancante</span>
+            <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-sm" style="background:hsl(280 60% 50%/0.4)"></span>Festività</span>
         </div>
     </header>
 
     <main class="flex-1 overflow-auto p-4">
 
-        <!-- ═══════ DASHBOARD ═══════ -->
-        <div id="view-dashboard" class="hidden">
-            <div class="grid grid-cols-4 gap-4 mb-4">
-                <div class="card bg-base-100 shadow-sm border border-base-300"><div class="card-body p-4">
-                    <div class="text-xs text-base-content/50 uppercase tracking-wide">Ore oggi</div>
-                    <div class="text-3xl font-bold text-primary mt-1">7<span class="text-lg">h</span> 30<span class="text-lg">m</span></div>
-                    <div class="text-xs text-base-content/40 mt-1">Ordinarie · Zucchetti</div>
-                </div></div>
-                <div class="card bg-base-100 shadow-sm border border-base-300"><div class="card-body p-4">
-                    <div class="text-xs text-base-content/50 uppercase tracking-wide">Commit oggi</div>
-                    <div class="text-3xl font-bold text-secondary mt-1">4</div>
-                    <div class="text-xs text-base-content/40 mt-1"><span class="commit-dot source-git mr-1"></span>3 Git · <span class="commit-dot source-svn mx-1"></span>1 SVN</div>
-                </div></div>
-                <div class="card bg-base-100 shadow-sm border border-base-300"><div class="card-body p-4">
-                    <div class="text-xs text-base-content/50 uppercase tracking-wide">Meeting oggi</div>
-                    <div class="text-3xl font-bold text-accent mt-1">3</div>
-                    <div class="text-xs text-base-content/40 mt-1">Teams · Calendar</div>
-                </div></div>
-                <div class="card bg-base-100 shadow-sm border border-base-300"><div class="card-body p-4">
-                    <div class="text-xs text-base-content/50 uppercase tracking-wide">Email</div>
-                    <div class="text-3xl font-bold text-info mt-1">12</div>
-                    <div class="text-xs text-base-content/40 mt-1">Ricevute · 4 inviate</div>
-                </div></div>
-            </div>
-            <div class="card bg-base-100 border border-base-300 shadow-sm p-5">
-                <p class="text-base-content/40 text-sm">← Vista <strong>Giorno</strong> per il focus giornaliero completo.</p>
-            </div>
-        </div>
+        <!-- ═══════ DASHBOARD + GIORNO ═══════ -->
+        <div id="view-dashboard">
 
-        <!-- ═══════ GIORNO (Day View) ═══════ -->
-        <div id="view-day">
+            <!-- Stats strip -->
+            <div class="grid grid-cols-6 gap-2 mb-4">
+                <div class="card bg-base-100 shadow-sm border border-base-300"><div class="card-body p-3">
+                    <div class="text-xs text-base-content/50 uppercase tracking-wide">Ore Zuc</div>
+                    <div class="text-xl font-bold text-success mt-0.5">7<span class="text-sm">h</span> 30<span class="text-sm">m</span></div>
+                    <div class="text-xs text-base-content/40 mt-0.5">Ordinarie · Zucchetti</div>
+                </div></div>
+                <div class="card bg-base-100 shadow-sm border border-base-300"><div class="card-body p-3">
+                    <div class="text-xs text-base-content/50 uppercase tracking-wide">Ore TP</div>
+                    <div class="text-xl font-bold text-primary mt-0.5" id="stat-ore-tp">2.5<span class="text-sm">h</span></div>
+                    <div class="text-xs text-base-content/40 mt-0.5">Loggate · TargetProcess</div>
+                </div></div>
+                <div class="card bg-base-100 shadow-sm border border-base-300"><div class="card-body p-3">
+                    <div class="text-xs text-base-content/50 uppercase tracking-wide">Rendicontazione</div>
+                    <div class="flex items-baseline gap-1 mt-0.5">
+                        <span class="text-xl font-bold text-primary" id="stat-rend-tp">2.5</span>
+                        <span class="text-xs text-base-content/40">/ <span id="stat-rend-zuc">7.5</span>h</span>
+                    </div>
+                    <div class="h-1.5 rounded-full mt-1 overflow-hidden bg-base-300">
+                        <div id="stat-rend-bar" class="h-full rounded-full transition-all duration-300 bg-primary" style="width:33%"></div>
+                    </div>
+                    <div class="text-xs font-bold mt-0.5 text-error" id="stat-rend-lbl">−5h da loggare</div>
+                </div></div>
+                <div class="card bg-base-100 shadow-sm border border-base-300"><div class="card-body p-3">
+                    <div class="text-xs text-base-content/50 uppercase tracking-wide">Commit</div>
+                    <div class="text-xl font-bold text-secondary mt-0.5">4</div>
+                    <div class="text-xs text-base-content/40 mt-0.5"><span class="commit-dot source-git mr-1"></span>3 Git · <span class="commit-dot source-svn mx-1"></span>1 SVN</div>
+                </div></div>
+                <div class="card bg-base-100 shadow-sm border border-base-300"><div class="card-body p-3">
+                    <div class="text-xs text-base-content/50 uppercase tracking-wide">Meeting</div>
+                    <div class="text-xl font-bold text-accent mt-0.5">3</div>
+                    <div class="text-xs text-base-content/40 mt-0.5">Teams · Calendar</div>
+                </div></div>
+                <div class="card bg-base-100 shadow-sm border border-base-300"><div class="card-body p-3">
+                    <div class="text-xs text-base-content/50 uppercase tracking-wide">Email</div>
+                    <div class="text-xl font-bold text-info mt-0.5">12</div>
+                    <div class="text-xs text-base-content/40 mt-0.5">Ricevute · 4 inviate</div>
+                </div></div>
+            </div>
 
             <!-- Week strip -->
-            <div class="bg-base-100 border border-base-300 rounded-xl p-3 mb-4 flex items-center gap-2 overflow-x-auto">
+            <div class="bg-base-100 border border-base-300 rounded-xl p-3 mb-3 flex items-center gap-2 overflow-x-auto">
                 <button class="btn btn-ghost btn-xs btn-square shrink-0">
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                 </button>
@@ -265,31 +310,24 @@
             </div>
 
             <!-- Day header bar -->
-            <div class="flex items-center gap-3 mb-4 flex-wrap">
-                <h2 class="text-lg font-bold">Venerdì 13 Mar 2026</h2>
-                <div class="badge badge-outline gap-1">🏠 Smart Working</div>
-                <div class="badge badge-warning badge-outline gap-1">⚠ Da rendicontare su Zucchetti</div>
-                <div class="ml-auto flex items-center gap-3 text-sm">
-                    <span class="text-base-content/50">Zucchetti: <strong class="text-success">7.5h</strong></span>
-                    <span class="text-base-content/30">|</span>
-                    <span class="text-base-content/50">TP: <strong class="text-primary">2.5h</strong></span>
-                    <span class="text-base-content/30">|</span>
-                    <span class="text-base-content/50">Delta: <strong class="text-error">−5h</strong></span>
-                    <button class="btn btn-xs btn-outline btn-warning ml-2">Verifica concordanza</button>
-                </div>
+            <div class="flex items-center gap-3 mb-3 flex-wrap">
+                <h2 class="text-base font-bold">Venerdì 13 Mar 2026</h2>
+                <div class="badge badge-outline badge-sm gap-1">🏠 Smart Working</div>
+                <div class="badge badge-warning badge-outline badge-sm gap-1">⚠ Da rendicontare</div>
+                <button class="btn btn-xs btn-outline btn-warning ml-auto">Verifica</button>
             </div>
 
-            <!-- 3-column layout -->
-            <div class="grid gap-4" style="grid-template-columns: 260px minmax(0,1fr) 420px;">
+            <!-- 3-column layout: timeline | lavoro TP (narrower) | signals (wider) -->
+            <div class="grid gap-3 items-start" style="grid-template-columns: 240px minmax(0,2fr) minmax(0,3fr);">
 
                 <!-- COL 1 — Timeline -->
                 <div class="card bg-base-100 border border-base-300 shadow-sm">
                     <div class="card-body p-3">
-                        <div class="text-xs font-bold text-base-content/50 uppercase mb-3 px-1">Timeline</div>
-                        <div class="relative timeline-container" id="timeline-container" style="height:660px;">
+                        <div class="text-xs font-bold text-base-content/50 uppercase mb-2 px-1">Timeline</div>
+                        <div class="relative timeline-container" id="timeline-container" style="height:600px;">
                             <!-- hour rows + events injected by JS -->
                         </div>
-                        <div class="flex flex-wrap gap-2 mt-3 pt-2 border-t border-base-300 text-xs text-base-content/40">
+                        <div class="flex flex-wrap gap-2 mt-2 pt-2 border-t border-base-300 text-xs text-base-content/40">
                             <span class="flex items-center gap-1"><span style="width:3px;height:10px;background:#0ea5e9;border-radius:2px;display:inline-block"></span>Meeting</span>
                             <span class="flex items-center gap-1"><span style="width:3px;height:10px;background:#6366f1;border-radius:2px;display:inline-block"></span>Git</span>
                             <span class="flex items-center gap-1"><span style="width:3px;height:10px;background:#f59e0b;border-radius:2px;display:inline-block"></span>SVN</span>
@@ -298,10 +336,10 @@
                     </div>
                 </div>
 
-                <!-- COL 2 — Work / TP cards (ridotta) -->
-                <div class="card bg-base-100 border border-base-300 shadow-sm overflow-y-auto" style="max-height:740px;">
+                <!-- COL 2 — Work / TP + log rapido -->
+                <div class="card bg-base-100 border border-base-300 shadow-sm overflow-y-auto" style="max-height:660px;">
                     <div class="card-body p-3">
-                        <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center justify-between mb-2">
                             <div class="text-xs font-bold text-base-content/50 uppercase">Lavoro · TP</div>
                             <div class="text-xs text-base-content/30 italic">correlazione da subject</div>
                         </div>
@@ -309,7 +347,7 @@
                     </div>
                 </div>
 
-                <!-- COL 3 — 2×2 cards grid -->
+                <!-- COL 3 — 2×2 signals grid -->
                 <div class="grid grid-cols-2 gap-3 content-start">
 
                     <!-- Email -->
@@ -361,17 +399,25 @@
                     <!-- Browser -->
                     <div class="card bg-base-100 border border-base-300 shadow-sm">
                         <div class="card-body p-3">
-                            <div class="text-xs font-bold text-base-content/50 uppercase mb-2">🌐 Browser</div>
-                            <div class="grid grid-cols-2 gap-1.5 text-xs mb-2">
-                                <div class="bg-base-200 rounded p-1.5 text-center"><div class="text-base-content/40 text-xs">Visite</div><div class="font-bold text-base">142</div></div>
-                                <div class="bg-base-200 rounded p-1.5 text-center"><div class="text-base-content/40 text-xs">Domini</div><div class="font-bold text-base">23</div></div>
+                            <div class="flex items-center justify-between cursor-pointer select-none" onclick="toggleBrowser()">
+                                <div class="text-xs font-bold text-base-content/50 uppercase">🌐 Browser</div>
+                                <div class="flex items-center gap-1.5 text-xs text-base-content/35">
+                                    <span>142 visite · 23 domini</span>
+                                    <svg id="browser-chevron" class="w-3 h-3 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                </div>
                             </div>
-                            <div class="text-xs text-base-content/50 font-semibold mb-1">Top domini</div>
-                            <div class="space-y-1.5 text-xs">
-                                <div><div class="flex justify-between mb-0.5"><span class="font-mono truncate text-base-content/70">github.com</span><span class="shrink-0 ml-1">38</span></div><div class="bar" style="width:100%;height:3px"></div></div>
-                                <div><div class="flex justify-between mb-0.5"><span class="font-mono truncate text-base-content/70">dev.azure.com</span><span class="shrink-0 ml-1">24</span></div><div class="bar" style="width:63%;height:3px"></div></div>
-                                <div><div class="flex justify-between mb-0.5"><span class="font-mono truncate text-base-content/70">learn.microsoft.com</span><span class="shrink-0 ml-1">19</span></div><div class="bar" style="width:50%;height:3px"></div></div>
-                                <div><div class="flex justify-between mb-0.5"><span class="font-mono truncate text-base-content/70">tpondemand.com</span><span class="shrink-0 ml-1">15</span></div><div class="bar" style="width:39%;height:3px"></div></div>
+                            <div id="browser-detail" class="hidden">
+                                <div class="grid grid-cols-2 gap-1.5 text-xs mb-2 mt-2">
+                                    <div class="bg-base-200 rounded p-1.5 text-center"><div class="text-base-content/40 text-xs">Visite</div><div class="font-bold text-base">142</div></div>
+                                    <div class="bg-base-200 rounded p-1.5 text-center"><div class="text-base-content/40 text-xs">Domini</div><div class="font-bold text-base">23</div></div>
+                                </div>
+                                <div class="text-xs text-base-content/50 font-semibold mb-1">Top domini</div>
+                                <div class="space-y-1.5 text-xs">
+                                    <div><div class="flex justify-between mb-0.5"><span class="font-mono truncate text-base-content/70">github.com</span><span class="shrink-0 ml-1">38</span></div><div class="bar" style="width:100%;height:3px"></div></div>
+                                    <div><div class="flex justify-between mb-0.5"><span class="font-mono truncate text-base-content/70">dev.azure.com</span><span class="shrink-0 ml-1">24</span></div><div class="bar" style="width:63%;height:3px"></div></div>
+                                    <div><div class="flex justify-between mb-0.5"><span class="font-mono truncate text-base-content/70">learn.microsoft.com</span><span class="shrink-0 ml-1">19</span></div><div class="bar" style="width:50%;height:3px"></div></div>
+                                    <div><div class="flex justify-between mb-0.5"><span class="font-mono truncate text-base-content/70">tpondemand.com</span><span class="shrink-0 ml-1">15</span></div><div class="bar" style="width:39%;height:3px"></div></div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -396,7 +442,7 @@
                                 </div>
                                 <div class="flex items-start gap-1.5">
                                     <span class="commit-dot source-svn mt-1 shrink-0"></span>
-                                    <span class="truncate text-base-content/70">[my_ms_graph_api_collector][#324913] PC emails network - send module</span>
+                                    <span class="truncate text-base-content/70">[my_ms_graph_api_collector][#324913] PC emails network</span>
                                 </div>
                                 <div class="flex items-start gap-1.5">
                                     <span class="commit-dot source-git mt-1 shrink-0"></span>
@@ -449,7 +495,7 @@
                         </div>
                     </div>
                     <div class="overflow-x-auto">
-                        <table class="table table-xs w-full" id="ts-main-table" style="table-layout:fixed;">
+                        <table class="table table-xs w-full" id="ts-main-table">
                             <colgroup id="ts-main-colgroup"></colgroup>
                             <thead id="ts-main-head"></thead>
                             <!-- totals: above data rows -->
@@ -693,6 +739,172 @@ const US_TODAY = [
     },
 ];
 
+// ── GLOBALS ──────────────────────────────────────
+
+let quickFilterSignals = false; // log rapido filter: only US with signals today
+let quickSearch        = '';    // log rapido text filter
+let browserExpanded    = false;
+
+function getSelectedDayIdx() {
+    const dow = pickerSelected.getDay(); // 0=Sun
+    if (dow === 0 || dow === 6) return -1;
+    return dow - 1; // Mon=0 … Fri=4
+}
+
+function getRowSignalsForDay(row, dayIdx) {
+    if (dayIdx < 0) return { git:0, svn:0, emails:0, total:0 };
+    const git   = row.git?.[dayIdx]  || 0;
+    const svn   = row.svn?.[dayIdx]  || 0;
+    const usWords = row.us.toLowerCase().split(/[\s#]+/).filter(w => w.length > 3);
+    const emails  = TL_EVENTS.filter(ev =>
+        ev.corrUs && usWords.some(w => ev.corrUs.toLowerCase().includes(w))
+    ).length;
+    return { git, svn, emails, total: git + svn + emails };
+}
+
+function updateStatStrip() {
+    let total = 0;
+    document.querySelectorAll('#us-cards-container .us-card .tc-val').forEach(s => {
+        total += parseFloat(s.dataset.val) || 0;
+    });
+    total = +total.toFixed(1);
+    const zuc = 7.5; // prototype fixed: selected day Zucchetti hours
+    const pct   = zuc > 0 ? Math.min(100, Math.round(total / zuc * 100)) : 0;
+    const delta = +(zuc - total).toFixed(1);
+
+    const tpEl  = document.getElementById('stat-ore-tp');
+    const rtpEl = document.getElementById('stat-rend-tp');
+    const barEl = document.getElementById('stat-rend-bar');
+    const lblEl = document.getElementById('stat-rend-lbl');
+
+    if (tpEl)  tpEl.innerHTML = `${total}<span class="text-sm">h</span>`;
+    if (rtpEl) rtpEl.textContent = total;
+    if (barEl) {
+        barEl.style.width = `${pct}%`;
+        barEl.className   = `h-full rounded-full transition-all duration-300 ${pct >= 100 ? 'bg-success' : 'bg-primary'}`;
+    }
+    if (lblEl) {
+        if (delta <= 0) {
+            lblEl.className   = 'text-xs font-bold mt-0.5 text-success';
+            lblEl.textContent = '✓ Rendicontato';
+        } else {
+            lblEl.className   = 'text-xs font-bold mt-0.5 text-error';
+            lblEl.textContent = `−${delta}h da loggare`;
+        }
+    }
+}
+
+function toggleBrowser() {
+    browserExpanded = !browserExpanded;
+    const detail  = document.getElementById('browser-detail');
+    const chevron = document.getElementById('browser-chevron');
+    if (detail)  detail.classList.toggle('hidden', !browserExpanded);
+    if (chevron) chevron.classList.toggle('rotate-180', browserExpanded);
+}
+
+// ── DAY PICKER ───────────────────────────────────
+
+const HOLIDAYS_IT = [
+    {m:0,  d:1,  name:'Capodanno'},
+    {m:0,  d:6,  name:'Epifania'},
+    {m:3,  d:5,  name:'Pasqua 2026'},
+    {m:3,  d:6,  name:"Lunedì dell'Angelo"},
+    {m:3,  d:25, name:'Festa della Liberazione'},
+    {m:4,  d:1,  name:'Festa del Lavoro'},
+    {m:5,  d:2,  name:'Festa della Repubblica'},
+    {m:7,  d:15, name:'Ferragosto'},
+    {m:10, d:1,  name:'Ognissanti'},
+    {m:11, d:8,  name:'Immacolata'},
+    {m:11, d:25, name:'Natale'},
+    {m:11, d:26, name:'Santo Stefano'},
+];
+
+const MONTH_IT  = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno',
+                   'Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+const DAYABB_IT = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
+
+const PICKER_TODAY = new Date(2026, 2, 16); // real today in the prototype
+let pickerSelected = new Date(2026, 2, 13); // currently viewed day
+let pickerMonth    = new Date(2026, 2, 1);  // displayed month
+
+function isPickerHoliday(d) {
+    return HOLIDAYS_IT.some(h => h.m === d.getMonth() && h.d === d.getDate());
+}
+function getPickerHolidayName(d) {
+    return (HOLIDAYS_IT.find(h => h.m === d.getMonth() && h.d === d.getDate()) || {}).name || '';
+}
+
+function buildDayPicker() {
+    const container  = document.getElementById('day-picker-btns');
+    const monthLabel = document.getElementById('picker-month-label');
+    if (!container || !monthLabel) return;
+
+    monthLabel.textContent = `${MONTH_IT[pickerMonth.getMonth()]} ${pickerMonth.getFullYear()}`;
+
+    const yr = pickerMonth.getFullYear();
+    const mo = pickerMonth.getMonth();
+    const daysInMonth = new Date(yr, mo + 1, 0).getDate();
+    let html = '';
+    for (let d = 1; d <= daysInMonth; d++) {
+        const date      = new Date(yr, mo, d);
+        const dow       = date.getDay();
+        const weekend   = dow === 0 || dow === 6;
+        const holiday   = isPickerHoliday(date);
+        const isToday   = date.toDateString() === PICKER_TODAY.toDateString();
+        const isSelected = date.toDateString() === pickerSelected.toDateString();
+        const title     = holiday ? getPickerHolidayName(date) : '';
+
+        let cls = 'day-btn';
+        if (isToday)              cls += ' day-btn-today';
+        if (isSelected && !isToday) cls += ' day-btn-selected';
+        if (weekend)              cls += ' day-btn-weekend';
+        if (holiday)              cls += ' day-btn-holiday';
+
+        html += `<button class="${cls}" onclick="selectPickerDay(${yr},${mo},${d})" title="${title}">
+            <span class="day-num">${d}</span>
+            <span class="day-abbr">${DAYABB_IT[dow]}</span>
+        </button>`;
+    }
+    container.innerHTML = html;
+
+    // Scroll selected (or today) into view
+    requestAnimationFrame(() => {
+        const target = container.querySelector('.day-btn-selected, .day-btn-today');
+        if (target) target.scrollIntoView({ behavior:'smooth', block:'nearest', inline:'center' });
+    });
+}
+
+function selectPickerDay(yr, mo, d) {
+    pickerSelected = new Date(yr, mo, d);
+    buildDayPicker();
+    buildWeekStrip();
+    // Update the day header label inside Dashboard
+    const h2 = document.querySelector('#view-dashboard h2');
+    if (h2) {
+        h2.textContent = pickerSelected.toLocaleDateString('it-IT', {
+            weekday:'long', day:'numeric', month:'short', year:'numeric'
+        });
+    }
+    // Activate dashboard view
+    navigateDay(-1);
+}
+
+function selectPickerToday() {
+    pickerSelected = new Date(PICKER_TODAY);
+    pickerMonth    = new Date(PICKER_TODAY.getFullYear(), PICKER_TODAY.getMonth(), 1);
+    buildDayPicker();
+}
+
+function pickerPrevMonth() {
+    pickerMonth = new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() - 1, 1);
+    buildDayPicker();
+}
+
+function pickerNextMonth() {
+    pickerMonth = new Date(pickerMonth.getFullYear(), pickerMonth.getMonth() + 1, 1);
+    buildDayPicker();
+}
+
 // ── NAVIGATION ────────────────────────────────────
 
 document.querySelectorAll('.nav-link').forEach(link => {
@@ -703,6 +915,7 @@ document.querySelectorAll('.nav-link').forEach(link => {
         document.querySelectorAll('[id^="view-"]').forEach(v => {
             v.classList.toggle('hidden', v.id !== `view-${target}`);
         });
+        if (target === 'timesheet') requestAnimationFrame(syncPinTableCols);
     });
 });
 
@@ -711,16 +924,39 @@ document.querySelectorAll('.nav-link').forEach(link => {
 function buildWeekStrip() {
     const strip = document.getElementById('week-strip');
     strip.innerHTML = '';
+
+    // Find Monday of the week containing pickerSelected
+    const dow    = pickerSelected.getDay();
+    const monday = new Date(pickerSelected);
+    monday.setDate(pickerSelected.getDate() - (dow === 0 ? 6 : dow - 1));
+
     DAYS.forEach((d, i) => {
-        if (i >= 5) return; // skip weekend in strip
-        const rendCls = d.rend === 'ok' ? 'rend-ok' : d.rend === 'warn' ? 'rend-warn' : d.rend === 'err' ? 'rend-err' : '';
-        const activeCls = i === 4 ? 'active' : '';
-        const rendIcon = d.rend === 'ok' ? '<span class="text-success text-xs">✓</span>' : d.rend === 'warn' ? '<span class="text-warning text-xs">⚠</span>' : d.rend === 'err' ? '<span class="text-error text-xs">✗</span>' : '<span class="text-base-content/20 text-xs">·</span>';
+        if (i >= 5) return; // no weekend cards
+        const date     = new Date(monday);
+        date.setDate(monday.getDate() + i);
+        const dayNum   = date.getDate();
+        const monAbbr  = date.toLocaleDateString('it-IT', { month: 'short' });
+        const dateLabel = `${dayNum} ${monAbbr.charAt(0).toUpperCase() + monAbbr.slice(1,3)}`;
+        const isSelected = date.toDateString() === pickerSelected.toDateString();
+        const isToday    = date.toDateString() === PICKER_TODAY.toDateString();
+
+        const rendCls  = d.rend === 'ok' ? 'rend-ok' : d.rend === 'warn' ? 'rend-warn' : d.rend === 'err' ? 'rend-err' : '';
+        const activeCls = isSelected ? 'active' : '';
+        const rendIcon  = d.rend === 'ok'
+            ? '<span class="text-success text-xs">✓</span>'
+            : d.rend === 'warn'
+                ? '<span class="text-warning text-xs">⚠</span>'
+                : d.rend === 'err'
+                    ? '<span class="text-error text-xs">✗</span>'
+                    : '<span class="text-base-content/20 text-xs">·</span>';
         const tpSum = TS_ACTIVE.reduce((acc, r) => acc + (r.hours[i] || 0), 0);
+        const todayRing = isToday ? 'outline outline-2 outline-offset-1 outline-primary/60' : '';
+
         strip.innerHTML += `
-        <div class="week-card ${rendCls} ${activeCls} flex-1" onclick="navigateDay(${i})">
+        <div class="week-card ${rendCls} ${activeCls} ${todayRing} flex-1"
+             onclick="selectPickerDay(${date.getFullYear()},${date.getMonth()},${date.getDate()})">
             <div class="flex items-center justify-between mb-1">
-                <span class="text-xs font-bold ${i===4?'text-primary':''}">${d.label} ${d.date}</span>
+                <span class="text-xs font-bold ${isSelected?'text-primary':''}">${dateLabel}</span>
                 ${rendIcon}
             </div>
             <div class="text-xs text-base-content/50">
@@ -734,13 +970,12 @@ function buildWeekStrip() {
 }
 
 function navigateDay(idx) {
-    // In the real implementation this would load day data for idx
-    // For the prototype, just activate the day view
     document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
-    document.querySelector('[data-view="day"]').classList.add('active');
-    document.querySelectorAll('[id^="view-"]').forEach(v => v.classList.toggle('hidden', v.id !== 'view-day'));
-    // Update week strip active state
-    document.querySelectorAll('.week-card').forEach((c, i) => c.classList.toggle('active', i === idx));
+    document.querySelector('[data-view="dashboard"]').classList.add('active');
+    document.querySelectorAll('[id^="view-"]').forEach(v => v.classList.toggle('hidden', v.id !== 'view-dashboard'));
+    if (idx >= 0) {
+        document.querySelectorAll('.week-card').forEach((c, i) => c.classList.toggle('active', i === idx));
+    }
 }
 
 // ── TIMELINE ─────────────────────────────────────
@@ -749,29 +984,39 @@ function buildTimeline() {
     const container = document.getElementById('timeline-container');
     container.innerHTML = '';
 
+    // Dynamic time range: 45 min before first event, 45 min after last
+    function evMins(ev) { const [h,m]=ev.time.split(':').map(Number); return h*60+m; }
+    const starts  = TL_EVENTS.map(evMins);
+    const ends    = TL_EVENTS.map((ev,i) => starts[i] + (ev.h || 18));
+    const startMin = Math.floor((Math.min(...starts) - 45) / 60) * 60;
+    const endMin   = Math.ceil((Math.max(...ends)   + 45) / 60) * 60;
+    const startHour = startMin / 60;
+    const endHour   = endMin   / 60;
+    const totalPx   = (endHour - startHour) * 60;
+
+    container.style.height = `${totalPx}px`;
+
     // Hour lines
-    for (let h = 8; h <= 18; h++) {
+    for (let h = startHour; h <= endHour; h++) {
         const row = document.createElement('div');
         row.className = 'timeline-hour';
-        row.style.top = `${(h - 8) * 60}px`;
-        row.style.position = 'absolute';
-        row.style.left = 0;
-        row.style.right = 0;
-        row.style.height = '60px';
-        row.style.borderTop = '1px solid hsl(var(--b3)/0.4)';
+        row.style.cssText = `position:absolute;left:0;right:0;height:60px;top:${(h-startHour)*60}px;border-top:1px solid hsl(var(--b3)/0.4)`;
         row.innerHTML = `<span class="timeline-label">${h}:00</span>`;
         container.appendChild(row);
     }
 
-    // Now indicator (~17:20)
-    const nowLine = document.createElement('div');
-    nowLine.className = 'timeline-now';
-    nowLine.style.top = `${(17 - 8) * 60 + 20}px`;
-    container.appendChild(nowLine);
+    // Now indicator (17:20 in prototype)
+    const nowMins = 17 * 60 + 20;
+    if (nowMins >= startMin && nowMins <= endMin) {
+        const nowLine = document.createElement('div');
+        nowLine.className = 'timeline-now';
+        nowLine.style.top = `${nowMins - startMin}px`;
+        container.appendChild(nowLine);
+    }
 
     // Events
     TL_EVENTS.forEach(ev => {
-        const el = document.createElement('div');
+        const el  = document.createElement('div');
         const typeMap = {
             'meeting'  : 'tl-event-meeting',
             'commit'   : 'tl-event-commit',
@@ -779,8 +1024,8 @@ function buildTimeline() {
             'email-in' : 'tl-event-email-in',
             'email-out': 'tl-event-email-out',
         };
-        el.className = `tl-event ${typeMap[ev.type] || 'tl-event-commit'} ${ev.corrUs ? 'tl-event-corr' : ''}`;
-        el.style.top    = `${ev.top}px`;
+        el.className    = `tl-event ${typeMap[ev.type] || 'tl-event-commit'} ${ev.corrUs ? 'tl-event-corr' : ''}`;
+        el.style.top    = `${evMins(ev) - startMin}px`;
         el.style.height = `${Math.max(ev.h, 16)}px`;
 
         const icon = ev.type === 'meeting'    ? '📅' :
@@ -795,11 +1040,18 @@ function buildTimeline() {
             el.addEventListener('click', () => openEmail(ev.emailId));
         }
 
-        // Correlation tooltip
         if (ev.corrUs) {
             el.title = `Correlato → ${ev.corrUs}`;
+            el.addEventListener('pointerenter', () => {
+                document.querySelectorAll('.us-card').forEach(c => {
+                    const titleEl = c.querySelector('a');
+                    if (titleEl && titleEl.textContent.includes(ev.corrUs)) c.classList.add('highlight');
+                });
+            });
+            el.addEventListener('pointerleave', () => {
+                document.querySelectorAll('.us-card').forEach(c => c.classList.remove('highlight'));
+            });
         }
-
         container.appendChild(el);
     });
 }
@@ -833,76 +1085,87 @@ function buildUsCards() {
     let html = '';
 
     US_TODAY.forEach(us => {
-        const tpPct    = us.zucHours > 0 ? Math.min(100, Math.round((us.tpHours / us.zucHours) * 100)) : 0;
-        const delta    = +(us.zucHours - us.tpHours).toFixed(1);
-        const deltaCls = delta <= 0 ? 'text-success' : 'text-error';
-        const deltaLbl = delta <= 0 ? '<span class="font-bold">✓</span>' : `Δ −${delta}h`;
         const noteRaw  = (us.note || '').replace(/"/g, '&quot;');
         const noteHtml = us.note
             ? `📝 ${us.note}`
             : '<span class="text-base-content/30 italic">+ Aggiungi nota…</span>';
         html += `
-        <div class="us-card" data-tp-id="${us.tpId}" data-zuc-hours="${us.zucHours}">
-            <div class="flex items-start justify-between gap-2 mb-2">
+        <div class="us-card py-2 px-3" data-tp-id="${us.tpId}" data-zuc-hours="${us.zucHours}">
+            <div class="flex items-center gap-2 mb-1.5">
+                <span class="state-dot shrink-0" style="background:${DC(us.state)}"></span>
                 <a href="https://your-org.tpondemand.com/entity/${us.tpId}" target="_blank"
-                   class="text-sm font-semibold hover:underline" style="color:${us.color}">${us.us}</a>
-                <span class="state-dot-wrap text-xs shrink-0">
-                    <span class="state-dot" style="background:${DC(us.state)}"></span>${us.state}
-                </span>
+                   class="text-sm font-semibold hover:underline flex-1 truncate" style="color:${us.color}">${us.us}</a>
+                <span class="text-xs text-base-content/35 shrink-0 whitespace-nowrap">${us.state}</span>
             </div>
-            <div class="mb-2">
-                <div class="flex justify-between items-center text-xs text-base-content/50 mb-1">
-                    <span class="flex items-center gap-1 font-medium">TP: ${timeCellHtml(us.tpHours, 'font-bold text-primary text-xs')}</span>
-                    <span class="day-delta ${deltaCls}">${deltaLbl}</span>
-                    <span>Zuc: <strong class="text-success">${us.zucHours}h</strong></span>
-                </div>
-                <div class="hours-bar-bg"><div class="hours-bar-tp" style="width:${tpPct}%"></div></div>
-            </div>
-            <div class="flex flex-wrap gap-1 mb-1">
+            <div class="flex items-center gap-2 flex-wrap">
+                <span class="text-xs text-base-content/40 font-medium shrink-0">TP:</span>
+                ${timeCellHtml(us.tpHours, 'font-bold text-primary text-xs')}
                 ${us.emails   ? `<span class="us-signal"><span class="commit-dot source-mail" style="width:5px;height:5px"></span>${us.emails} email</span>` : ''}
                 ${us.commits  ? `<span class="us-signal"><span class="commit-dot source-git"  style="width:5px;height:5px"></span>${us.commits} commit</span>` : ''}
                 ${us.meetings ? `<span class="us-signal">📅 ${us.meetings} meeting</span>` : ''}
                 <a href="https://your-org.tpondemand.com/entity/${us.tpId}" target="_blank"
-                   class="us-signal text-primary hover:underline ml-auto">→ TP #${us.tpId}</a>
+                   class="us-signal text-primary hover:underline ml-auto shrink-0">→ TP #${us.tpId}</a>
             </div>
-            <div class="note-edit-wrap mt-1 pt-1.5 border-t border-base-300 text-xs text-base-content/55 leading-snug cursor-pointer hover:text-base-content/80 transition-colors"
+            <div class="note-edit-wrap mt-1.5 pt-1.5 border-t border-base-300/50 text-xs text-base-content/55 leading-snug cursor-pointer hover:text-base-content/80 transition-colors"
                  data-note="${noteRaw}" onclick="editNote(this)">${noteHtml}</div>
         </div>`;
     });
 
     // Quick-log section: all US not already in US_TODAY
-    const allQuick = getQuickSorted([
+    const dayIdx   = getSelectedDayIdx();
+    const allQuickRaw = [
         ...TS_ACTIVE.filter(r => !US_TODAY.some(u => u.tpId === r.tpId)),
         ...TS_PINNED,
-    ]);
+    ].map(r => ({ ...r, _sig: getRowSignalsForDay(r, dayIdx) }));
+
+    const needle   = quickSearch.trim().toLowerCase();
+    const filtered = quickFilterSignals ? allQuickRaw.filter(r => r._sig.total > 0) : allQuickRaw;
+    const searched = needle ? filtered.filter(r => r.us.toLowerCase().includes(needle) || String(r.tpId).includes(needle)) : filtered;
+    const allQuick = getQuickSorted(searched);
+    const totalWithSig = allQuickRaw.filter(r => r._sig.total > 0).length;
 
     const sortIcon = f => quickSort.field === f ? (quickSort.dir === 1 ? ' ↑' : ' ↓') : '';
     const sortBtn  = (f, lbl) =>
         `<button class="hover:text-base-content/70 transition-colors px-1 ${quickSort.field===f?'text-primary font-semibold':''}"
                  onclick="sortQuick('${f}')" title="Ordina per ${lbl}">${lbl}${sortIcon(f)}</button>`;
 
+    const filterActive = quickFilterSignals;
     html += `
-    <div class="divider text-xs text-base-content/30 my-2">Log rapido · ${allQuick.length} US</div>
-    <div class="flex items-center gap-0.5 px-2 pb-1 text-base-content/35 text-xs select-none border-b border-base-300/40 mb-1">
-        <span class="flex-1 text-base-content/25">US</span>
+    <div class="divider text-xs text-base-content/30 my-2">Log rapido · ${allQuick.length}${needle || filterActive ? ' (filtrato)' : ` / ${allQuickRaw.length}`} US</div>
+    <div class="flex items-center gap-1 px-1 pb-1 text-base-content/35 text-xs select-none border-b border-base-300/40 mb-1">
+        <button class="btn btn-xs gap-1 shrink-0 ${filterActive ? 'btn-primary' : 'btn-ghost opacity-50'}"
+                onclick="quickFilterSignals=!quickFilterSignals;buildUsCards()" title="Solo US con segnali oggi">
+            <svg class="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z"/></svg>
+            ${totalWithSig}
+        </button>
+        <input id="ql-search" type="text" placeholder="Cerca US o ID…"
+               class="input input-xs flex-1 min-w-0 h-6 text-xs"
+               value="${quickSearch.replace(/"/g,'&quot;')}"
+               oninput="quickSearch=this.value;buildUsCards()">
+        ${needle ? `<button class="btn btn-ghost btn-xs btn-square shrink-0 opacity-50 hover:opacity-100" onclick="quickSearch='';buildUsCards()" title="Cancella ricerca">✕</button>` : ''}
         ${sortBtn('state','Stato')}
         <span class="text-base-content/20">·</span>
         ${sortBtn('ore','Ore')}
-        <span class="text-base-content/20">·</span>
-        ${sortBtn('apertura','Apertura')}
         <span class="text-base-content/20">·</span>
         ${sortBtn('chiusura','Chiusura')}
     </div>
     <div class="space-y-0.5">`;
 
     allQuick.forEach(r => {
+        const sig  = r._sig;
+        const sigBadges = [
+            sig.emails > 0 ? `<span class="text-base-content/40 text-xs">📧${sig.emails}</span>` : '',
+            sig.git    > 0 ? `<span class="text-base-content/40 text-xs" style="color:#6366f1aa">💻${sig.git}</span>` : '',
+            sig.svn    > 0 ? `<span class="text-base-content/40 text-xs" style="color:#f59e0baa">💾${sig.svn}</span>` : '',
+        ].filter(Boolean).join('');
         html += `
-        <div class="flex items-center gap-2 py-1 px-2 rounded-lg hover:bg-base-200/60 transition-colors group" data-tp-id="${r.tpId}">
+        <div class="flex items-center gap-2 py-1 px-2 rounded-lg hover:bg-base-200/60 transition-colors group ${sig.total>0?'':'opacity-60'}" data-tp-id="${r.tpId}">
             <span class="state-dot shrink-0" style="background:${DC(r.state)}"></span>
             <a href="https://your-org.tpondemand.com/entity/${r.tpId}" target="_blank"
-               class="text-xs flex-1 truncate text-base-content/65 hover:underline hover:text-primary transition-colors"
+               class="text-xs flex-1 truncate ${sig.total>0?'text-base-content/80':'text-base-content/50'} hover:underline hover:text-primary transition-colors"
                title="${r.us}">${r.us}</a>
-            <span class="text-base-content/30 text-xs shrink-0 tabular-nums">${r.totAllTime}h</span>
+            ${sigBadges ? `<span class="flex items-center gap-0.5 shrink-0">${sigBadges}</span>` : ''}
+            <span class="text-base-content/25 text-xs shrink-0 tabular-nums">${r.totAllTime}h</span>
             <button class="btn btn-ghost btn-xs btn-square text-base-content/35 hover:text-primary hover:bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity"
                     onclick="addToWorkToday(${r.tpId})" title="Aggiungi a Lavoro TP">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
@@ -912,6 +1175,32 @@ function buildUsCards() {
 
     html += `</div>`;
     container.innerHTML = html;
+
+    // Restore focus on search input if it was active
+    if (quickSearch !== '') {
+        const si = container.querySelector('#ql-search');
+        if (si) { si.focus(); si.setSelectionRange(si.value.length, si.value.length); }
+    }
+
+    // Attach hover events to US cards to highlight timeline
+    container.querySelectorAll('.us-card').forEach(card => {
+        const titleEl = card.querySelector('a');
+        if (titleEl) {
+            const title = titleEl.textContent;
+            card.addEventListener('pointerenter', () => {
+                document.querySelectorAll('.tl-event-corr').forEach(evEl => {
+                    if (evEl.title.includes(title)) {
+                        evEl.style.boxShadow = '0 0 0 2px hsl(var(--p))';
+                    }
+                });
+            });
+            card.addEventListener('pointerleave', () => {
+                document.querySelectorAll('.tl-event-corr').forEach(evEl => {
+                    evEl.style.boxShadow = '';
+                });
+            });
+        }
+    });
 }
 
 function editNote(el) {
@@ -931,6 +1220,34 @@ function editNote(el) {
         el.innerHTML = val
             ? `📝 ${val}`
             : '<span class="text-base-content/30 italic">+ Aggiungi nota…</span>';
+    };
+    input.addEventListener('blur', save);
+    input.addEventListener('keydown', e => {
+        if (e.key === 'Enter')  input.blur();
+        if (e.key === 'Escape') { input.value = cur; input.blur(); }
+    });
+}
+
+function editTsNote(el) {
+    if (el.querySelector('input')) return; // already editing
+    const cur = el.dataset.note || '';
+    const input = document.createElement('input');
+    input.type        = 'text';
+    input.value       = cur;
+    input.className   = 'tc-note-input';
+    input.placeholder = 'Nota…';
+    el.classList.add('editing');   // removes overflow:hidden so the floating input is visible
+    el.innerHTML = '';
+    el.appendChild(input);
+    input.focus();
+    input.select();
+    const save = () => {
+        const val = input.value.trim();
+        el.dataset.note = val;
+        el.classList.remove('editing');
+        el.classList.toggle('empty', !val);
+        el.innerHTML = val ? (val.length > 9 ? val.substring(0, 8) + '…' : val) : '';
+        el.title     = val || 'Aggiungi nota…';
     };
     input.addEventListener('blur', save);
     input.addEventListener('keydown', e => {
@@ -1028,9 +1345,7 @@ function buildTsRows(bodyId, rows, pinned) {
                     gitWE ? `<span class="commit-dot-lg source-git"></span>` : '',
                     svnWE ? `<span class="commit-dot-lg source-svn"></span>` : '',
                 ].join('');
-                const widget = pinned
-                    ? `<button class="tc-btn tc-plus" style="opacity:.35" onclick="tcAdjust(this,0.5)" title="Aggiungi ore">+</button>`
-                    : `<span class="text-base-content/25 text-xs">${hWE > 0 ? hWE : '—'}</span>`;
+                const widget = timeCellHtml(hWE, 'font-bold text-xs opacity-60');
                 cellParts.push(`<td class="text-center weekend-col we-col"><div class="flex flex-col items-center gap-0.5">${widget}<div class="flex gap-1 mt-0.5">${dots}</div></div></td>`);
                 return;
             }
@@ -1045,17 +1360,17 @@ function buildTsRows(bodyId, rows, pinned) {
             const rc      = rendClass(d.rend);
             const colCls  = `${isToday?'today-col':''} ${rc}`;
             const extraValCls = `font-bold text-xs ${isToday?'text-primary':''}`;
-            const widget  = pinned
-                ? `<button class="tc-btn tc-plus" style="opacity:.5" onclick="tcAdjust(this,0.5)" title="Aggiungi ore">+</button>`
-                : timeCellHtml(h, extraValCls);
+            const widget  = timeCellHtml(h, extraValCls);
             const dots = [
                 hasGit ? `<span class="commit-dot-lg source-git"></span>` : '',
                 hasSvn ? `<span class="commit-dot-lg source-svn"></span>` : '',
             ].join('');
-            const note    = row.notes?.[i];
-            const noteHtml = note
-                ? `<div class="tc-note" title="${note}">${note.length > 9 ? note.substring(0, 8)+'…' : note}</div>`
-                : '';
+            const note     = row.notes?.[i] || '';
+            const noteDisp = note.length > 9 ? note.substring(0, 8) + '…' : note;
+            const noteHtml = `<div class="tc-note${note ? '' : ' empty'}"
+                data-note="${note.replace(/"/g, '&quot;')}"
+                onclick="editTsNote(this)"
+                title="${note || 'Aggiungi nota…'}">${noteDisp}</div>`;
             cellParts.push(`<td class="text-center ${colCls}"><div class="flex flex-col items-center gap-0">${widget}${noteHtml}<div class="flex gap-1 mt-0.5">${dots}</div></div></td>`);
         });
         const remVal = row.rem != null
@@ -1160,14 +1475,25 @@ function buildTsPinSep() {
 function buildColgroup(id) {
     const cg = document.getElementById(id);
     if (!cg) return;
-    let html = '<col style="width:192px"><col style="width:80px">';
+    let html = '<col style="width:auto; min-width:240px"><col style="width:80px">';
     DAYS.forEach((d, i) => {
         if (i === 6) return; // Sun merged into WE
-        if (i === 5) { html += '<col class="weekend-col we-col" style="width:46px">'; return; }
-        html += '<col style="width:52px">';
+        if (i === 5) { html += '<col class="weekend-col we-col" style="width:56px">'; return; }
+        html += '<col style="width:64px">';
     });
     html += '<col style="width:64px"><col style="width:40px">';
     cg.innerHTML = html;
+}
+
+// Syncs pin-table column widths to the actual rendered widths of the main-table header.
+// Called after render and on resize to keep both tables pixel-aligned.
+function syncPinTableCols() {
+    const ths  = document.querySelectorAll('#ts-main-head th');
+    const cols = document.querySelectorAll('#ts-pin-colgroup col');
+    if (!ths.length || !cols.length) return;
+    ths.forEach((th, i) => {
+        if (cols[i]) cols[i].style.width = th.offsetWidth + 'px';
+    });
 }
 
 let weVisible = true; // WE column visible by default (merged single column)
@@ -1270,19 +1596,38 @@ function tcEdit(span) {
     const wrap = span.closest('.tc-wrap');
     const cur  = parseFloat(span.dataset.val) || 0;
     const input = document.createElement('input');
-    input.type      = 'number';
-    input.step      = '0.5';
-    input.min       = '0';
-    input.value     = cur > 0 ? cur : '';
-    input.className = 'tc-input';
+    input.type        = 'number';
+    input.step        = '0.5';
+    input.min         = '0';
+    input.value       = cur > 0 ? cur : '';
+    input.className   = 'tc-input';
     input.placeholder = '0';
+    input._spanCls    = span.className; // preserve for restore
     span.replaceWith(input);
     input.focus();
     input.select();
-    input.addEventListener('blur',    () => tcSaveInput(input, wrap));
-    input.addEventListener('keydown', e  => {
-        if (e.key === 'Enter')  { input.blur(); }
-        if (e.key === 'Escape') { tcSaveInput(input, wrap, cur); }
+    input.addEventListener('blur', () => tcSaveInput(input, wrap));
+    input.addEventListener('keydown', e => {
+        if (e.key === 'Enter')  { input.blur(); return; }
+        if (e.key === 'Escape') { tcSaveInput(input, wrap, cur); return; }
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            // Collect all editable tc-val spans in both timesheet tables
+            const allVals = Array.from(document.querySelectorAll(
+                '#ts-main-table .tc-val, #ts-pin-table .tc-val'
+            ));
+            // The input replaced the span; identify position by DOM order of wraps
+            const allWraps = Array.from(document.querySelectorAll(
+                '#ts-main-table .tc-wrap, #ts-pin-table .tc-wrap'
+            ));
+            const idx     = allWraps.indexOf(wrap);
+            const nextIdx = e.shiftKey ? idx - 1 : idx + 1;
+            tcSaveInput(input, wrap); // save first, then navigate
+            if (nextIdx >= 0 && nextIdx < allWraps.length) {
+                const nextVal = allWraps[nextIdx].querySelector('.tc-val');
+                if (nextVal) setTimeout(() => tcEdit(nextVal), 0);
+            }
+        }
     });
 }
 
@@ -1328,6 +1673,7 @@ function tcCommit(wrap, newVal, existingSpan) {
     }
     // TODO: POST to TP API — tpId available from closest [data-tp-id]
     console.log('tcCommit', newVal, wrap.closest('[data-tp-id]')?.dataset.tpId);
+    updateStatStrip();
 }
 
 // ── QUICK-LOG SORT ────────────────────────────────
@@ -1379,9 +1725,11 @@ function addToWorkToday(tpId) {
 
 // ── INIT ─────────────────────────────────────────
 
+buildDayPicker();
 buildWeekStrip();
 buildTimeline();
 buildUsCards();
+updateStatStrip();
 buildColgroup('ts-main-colgroup');
 buildColgroup('ts-pin-colgroup');
 buildTsHead('ts-main-head');
@@ -1389,6 +1737,7 @@ buildTsFoot();
 buildTsRows('ts-main-body', TS_ACTIVE, false);
 buildTsPinSep();
 buildTsRows('ts-pin-body', TS_PINNED, true);
+window.addEventListener('resize', syncPinTableCols);
 </script>
 </body>
 </html>
