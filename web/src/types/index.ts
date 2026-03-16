@@ -78,3 +78,74 @@ export interface ProposalWithSignals {
     proposal: DayProposal;
     signals:  AggregatedDay | null;
 }
+
+// --- Activity Portal types ---
+
+export interface Holiday {
+    m:    number;
+    d:    number;
+    name: string;
+}
+
+export interface Day {
+    label:       string;
+    date:        string;
+    rend:        'ok' | 'warn' | 'err' | null;
+    zucHours:    number;
+    nibol:       string | null;
+    holiday:     boolean;
+    holidayName?: string;
+}
+
+export interface TsRow {
+    project:    string;
+    us:         string;
+    tpId:       number;
+    state:      string;
+    totAllTime: number;
+    hours?:     number[];
+    git?:       number[];
+    svn?:       number[];
+    notes?:     (string | null)[];
+    rem?:       number;
+}
+
+export interface UsCard {
+    us:         string;
+    tpId:       number;
+    state:      string;
+    tpHours:    number;
+    zucHours:   number;
+    zucPercent?: number;
+    emails:     number;
+    commits:    number;
+    meetings:   number;
+    color:      string;
+    note:       string;
+}
+
+export interface TlEvent {
+    type:     string;
+    time:     string;
+    label:    string;
+    top:      number;
+    h:        number;
+    emailId?: number;
+    corrUs?:  string;
+}
+
+export interface Email {
+    dir:     'in' | 'out';
+    from:    string;
+    to:      string;
+    subject: string;
+    time:    string;
+    body:    string;
+}
+
+export type ActiveView = 'dashboard' | 'timesheet' | 'activity' | 'teams' | 'browser';
+
+export interface QuickSortState {
+    field: 'state' | 'ore' | 'chiusura';
+    dir:   1 | -1;
+}
