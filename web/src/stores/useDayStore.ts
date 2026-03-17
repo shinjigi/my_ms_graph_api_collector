@@ -1,6 +1,6 @@
 import { defineStore }          from 'pinia';
 import { ref, computed, watch } from 'vue';
-import { US_TODAY_DEFAULT, TS_ACTIVE, TS_PINNED, TL_EVENTS, EMAILS, WORKDAY_HOURS } from '../mock/data';
+import { US_TODAY_DEFAULT, TL_EVENTS, EMAILS, WORKDAY_HOURS } from '../mock/data';
 import { usePickerStore }       from './usePickerStore';
 import { useTimesheetStore }    from './useTimesheetStore';
 import { loadJson, stateColor } from '../utils';
@@ -23,8 +23,9 @@ export const useDayStore = defineStore('day', () => {
     }
 
     const quickLog = computed<QuickLogItem[]>(() => {
+        const ts = useTimesheetStore();
         const inToday = new Set(usToday.value.map(u => u.tpId));
-        return [...TS_ACTIVE, ...TS_PINNED]
+        return [...ts.active, ...ts.pinned]
             .filter(r => !inToday.has(r.tpId))
             .map(r => ({
                 us: r.us, tpId: r.tpId, state: r.state,
@@ -38,7 +39,8 @@ export const useDayStore = defineStore('day', () => {
 
     function addToWorkToday(tpId: number) {
         if (usToday.value.some(u => u.tpId === tpId)) return;
-        const src = [...TS_ACTIVE, ...TS_PINNED].find(r => r.tpId === tpId);
+        const ts = useTimesheetStore();
+        const src = [...ts.active, ...ts.pinned].find(r => r.tpId === tpId);
         if (!src) return;
         usToday.value.push({
             us: src.us, tpId: src.tpId, state: src.state,
