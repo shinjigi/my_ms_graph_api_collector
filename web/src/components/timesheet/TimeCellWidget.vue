@@ -29,14 +29,22 @@ import { ref, nextTick } from 'vue';
 const props = defineProps<{
     modelValue:   number;
     extraValCls?: string;
+    /** Current day total delta (zuc − tp). When |dayDelta| < 0.5 and it
+     *  shares the sign of the step, the button moves by dayDelta instead
+     *  of the fixed 0.5 to land exactly on zero without overshooting. */
+    dayDelta?:    number;
 }>();
 const emit = defineEmits<{ update: [val: number] }>();
 
 const editing  = ref(false);
 const inputRef = ref<HTMLInputElement | null>(null);
 
-function adjust(delta: number) {
-    emit('update', Math.max(0, +(props.modelValue + delta).toFixed(1)));
+function adjust(step: number) {
+    const d = props.dayDelta ?? 0;
+    const actual = (d !== 0 && Math.abs(d) < Math.abs(step) && Math.sign(step) === Math.sign(d))
+        ? d
+        : step;
+    emit('update', Math.max(0, +(props.modelValue + actual).toFixed(1)));
 }
 
 async function startEdit() {

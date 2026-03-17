@@ -34,6 +34,7 @@
                     <TimeCellWidget
                         :model-value="ts.getHours(row.tpId, i)"
                         :extra-val-cls="`font-bold text-xs ${i === 4 ? 'text-primary' : ''}`"
+                        :day-delta="ts.totalsRow.delta[i]"
                         @update="val => ts.setHours(row.tpId, i, val)"
                     />
                     <TsNoteCell :tpId="row.tpId" :day-idx="i" />
@@ -60,14 +61,16 @@
 <script setup lang="ts">
 import { computed }          from 'vue';
 import { useTimesheetStore } from '../../stores/useTimesheetStore';
+import { usePickerStore }    from '../../stores/usePickerStore';
 import type { TsRow, Day }   from '../../types';
 import TimeCellWidget        from './TimeCellWidget.vue';
 import TsNoteCell            from './TsNoteCell.vue';
 
 const props = defineProps<{ row: TsRow; isPinned: boolean }>();
 
-const ts   = useTimesheetStore();
-const days = computed(() => ts.days);
+const ts     = useTimesheetStore();
+const picker = usePickerStore();
+const days   = computed(() => ts.days);
 
 const tpLink   = `https://euroconsumers.tpondemand.com/entity/${props.row.tpId}`;
 const dotColor = computed(() =>
@@ -85,12 +88,18 @@ const weekTotal = computed(() =>
 
 function cellCls(d: Day, i: number): string[] {
     if (i === 5) return ['weekend-col', 'we-col'];
-    if (d.holiday) return ['holiday-col'];
     const cls: string[] = [];
-    if (i === 4) cls.push('today-col');
-    if (d.rend === 'ok')   cls.push('day-ok');
-    if (d.rend === 'warn') cls.push('day-warn');
-    if (d.rend === 'err')  cls.push('day-err');
+    if (d.holiday) {
+        cls.push('holiday-col');
+    } else {
+        const r = ts.rendPerDay[i] ?? null;
+        if (r === 'ok')   cls.push('day-ok');
+        if (r === 'warn') cls.push('day-warn');
+        if (r === 'err')  cls.push('day-err');
+    }
+    // outline-based indicators — do not override background/box-shadow
+    if (i === picker.todayDayIdx)    cls.push('today-col');
+    if (i === picker.selectedDayIdx) cls.push('selected-col');
     return cls;
 }
 </script>

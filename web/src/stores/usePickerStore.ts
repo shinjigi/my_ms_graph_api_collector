@@ -13,7 +13,11 @@ interface PickerDay {
     holidayName:string;
 }
 
-const PICKER_TODAY = new Date(2026, 2, 16);
+function todayMidnight(): Date {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+}
 
 function loadPersisted(): { selectedDay: string; month: string } | null {
     try {
@@ -27,12 +31,12 @@ function loadPersisted(): { selectedDay: string; month: string } | null {
 export const usePickerStore = defineStore('picker', () => {
     const persisted = loadPersisted();
 
-    const pickerToday    = ref<Date>(PICKER_TODAY);
+    const pickerToday    = ref<Date>(todayMidnight());
     const pickerSelected = ref<Date>(
-        persisted?.selectedDay ? new Date(persisted.selectedDay) : new Date(2026, 2, 13)
+        persisted?.selectedDay ? new Date(persisted.selectedDay) : todayMidnight()
     );
     const pickerMonth    = ref<Date>(
-        persisted?.month ? new Date(persisted.month) : new Date(2026, 2, 1)
+        persisted?.month ? new Date(persisted.month) : new Date(pickerToday.value.getFullYear(), pickerToday.value.getMonth(), 1)
     );
 
     function persist() {
@@ -69,11 +73,25 @@ export const usePickerStore = defineStore('picker', () => {
         return result;
     });
 
-    // 0=Mon … 4=Fri, -1=weekend
+    // 0=Mon … 4=Fri, -1=weekend/not-in-week
     const selectedDayIdx = computed<number>(() => {
         const dow = pickerSelected.value.getDay();
         if (dow === 0 || dow === 6) return -1;
         return dow - 1;
+    });
+
+    // Column index (0-4) of pickerToday in the currently displayed week, or -1.
+    const todayDayIdx = computed<number>(() => {
+        const sel = pickerSelected.value;
+        const dow = sel.getDay();
+        const monday = new Date(sel);
+        monday.setDate(sel.getDate() - (dow === 0 ? 6 : dow - 1));
+        for (let i = 0; i < 5; i++) {
+            const d = new Date(monday);
+            d.setDate(monday.getDate() + i);
+            if (d.toDateString() === pickerToday.value.toDateString()) return i;
+        }
+        return -1;
     });
 
     function selectDay(yr: number, mo: number, d: number) {
@@ -102,7 +120,7 @@ export const usePickerStore = defineStore('picker', () => {
 
     return {
         pickerToday, pickerSelected, pickerMonth,
-        monthLabel, daysInMonth, selectedDayIdx,
+        monthLabel, daysInMonth, selectedDayIdx, todayDayIdx,
         selectDay, prevMonth, nextMonth, goToday,
     };
 });
