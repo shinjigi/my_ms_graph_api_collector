@@ -1,84 +1,3 @@
-export interface ProposalEntry {
-    taskId:        number | null;
-    entityType:    'UserStory' | 'Task' | 'Bug' | 'recurring';
-    taskName:      string;
-    inferredHours: number;
-    confidence:    'high' | 'medium' | 'low';
-    reasoning:     string;
-    approved:      boolean;
-    submitted?:    boolean;
-}
-
-export interface DayProposal {
-    date:        string;
-    oreTarget:   number;
-    totalHours:  number;
-    entries:     ProposalEntry[];
-    generatedAt: string;
-}
-
-export interface CalendarEvent {
-    id:        string;
-    subject:   string;
-    start:     { dateTime: string; timeZone: string };
-    end:       { dateTime: string; timeZone: string };
-    organizer: { emailAddress: { name: string; address: string } } | null;
-    attendees: Array<{ emailAddress: { name: string; address: string } }>;
-    webLink:   string;
-}
-
-export interface TeamsMessage {
-    id:              string;
-    chatType:        string;
-    chatTopic:       string | null;
-    createdDateTime: string;
-    from:            unknown;
-    body:            { contentType: string; content: string };
-    messageType:     string;
-}
-
-export interface GitCommit {
-    hash:    string;
-    author:  string;
-    date:    string;
-    message: string;
-    repo:    string;
-}
-
-export interface SvnCommit {
-    revision: string;
-    author:   string;
-    date:     string;
-    message:  string;
-}
-
-export interface AggregatedDay {
-    date:       string;
-    isWorkday:  boolean;
-    oreTarget:  number;
-    location:   'office' | 'smart' | 'mixed' | 'unknown';
-    calendar:   CalendarEvent[];
-    teams:      TeamsMessage[];
-    gitCommits: GitCommit[];
-    svnCommits: SvnCommit[];
-    emails:     unknown[];
-}
-
-export interface TpOpenItem {
-    id:          number;
-    name:        string;
-    entityType:  'UserStory' | 'Task' | 'Bug';
-    stateName:   string;
-    timeSpent:   number;
-    projectName: string;
-    parentName:  string | null;
-}
-
-export interface ProposalWithSignals {
-    proposal: DayProposal;
-    signals:  AggregatedDay | null;
-}
-
 // --- Activity Portal types ---
 
 export interface Holiday {
@@ -96,6 +15,8 @@ export interface Day {
     holiday:     boolean;
     holidayName?: string;
 }
+
+export type TsRowState = 'Inception' | 'Dev/Unit test' | 'Testing';
 
 export interface TsRow {
     project:    string;
@@ -124,8 +45,10 @@ export interface UsCard {
     note:       string;
 }
 
+export type TlEventType = 'meeting' | 'commit' | 'svn' | 'email-in' | 'email-out';
+
 export interface TlEvent {
-    type:     string;
+    type:     TlEventType;
     time:     string;
     label:    string;
     top:      number;
@@ -148,4 +71,16 @@ export type ActiveView = 'dashboard' | 'timesheet' | 'activity' | 'teams' | 'bro
 export interface QuickSortState {
     field: 'state' | 'ore' | 'chiusura';
     dir:   1 | -1;
+}
+
+export interface BrowserDomain {
+    domain:  string;
+    visits:  number;
+    pct:     number;
+}
+
+/** UsCard enriched with timesheet-level fields for the quick-log list. */
+export interface QuickLogItem extends UsCard {
+    totAllTime: number;
+    rem?:       number;
 }

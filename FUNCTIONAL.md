@@ -166,51 +166,96 @@ classDiagram
 
 ---
 
-## Web UI
+## Web UI — Activity Portal
+
+The frontend is a Vue 3 + Pinia single-page app (`web/`) serving as the daily activity hub.
+All state is reactive and persisted to `localStorage`; no page reload is needed between actions.
+
+### Views
+
+| View | Purpose |
+|---|---|
+| **Dashboard** | Day summary: KPI strip, week strip, timeline, US cards + quick log, signals grid |
+| **Timesheet** | Weekly TP timesheet with inline hour editing and Zucchetti comparison |
+| **Activity** | Raw activity browser (git, SVN, email, Teams) |
+| **Teams** | Teams message explorer |
+| **Browser** | Browser history explorer (collapsible) |
+
+### Navigation and day selection
+
+```mermaid
+flowchart LR
+    SIDEBAR[AppSidebar\n5 view links]
+    HEADER[DayPickerHeader\nmonth ◀ ▶ · day buttons]
+    PICKER[usePickerStore\npickerSelected\npickerMonth]
+    DASH[Dashboard\nupdates live]
+    TS[Timesheet\nupdates live]
+
+    SIDEBAR -->|setView| DASH
+    SIDEBAR -->|setView| TS
+    HEADER -->|selectDay| PICKER
+    TS -->|click column header| PICKER
+    PICKER --> DASH
+    PICKER --> TS
+```
+
+Day picker buttons distinguish three states visually:
+- **Today (not selected)**: empty primary ring + dot indicator
+- **Selected (not today)**: filled primary pill
+- **Today + selected**: filled pill + dot
+
+### Timesheet quick-fill
+
+The timesheet toolbar provides one-click day population across all active TP tasks:
+
+| Button | Hours distributed | Behaviour |
+|---|---|---|
+| SW 7:42 | 7.7 h | Proportional by `totAllTime` weight; last task absorbs rounding |
+| ½ SW | 3.85 h | Same distribution |
+| Ferie | 0 h | Clears all active tasks for the day |
+| ½ Ferie | 3.85 h | Same as ½ SW from TP perspective |
+
+Standard workday: **7 h 42 min (7.7 h)**. Half day: **3 h 51 min (3.85 h)**.
+Defined as `WORKDAY_HOURS` / `HALF_WORKDAY_HOURS` in `web/src/mock/data.ts`.
+
+### Smart ±increment
+
+The `TimeCellWidget` `+`/`−` buttons normally step by 0.5 h. When the day's remaining
+delta (`zucHours − tpHours`) satisfies `0 < |delta| < 0.5` and shares the button's sign,
+the step is replaced by `delta` so the cell lands exactly on zero without overshooting.
+
+### Timesheet column colour semantics
+
+| Class | Trigger | Visual |
+|---|---|---|
+| `day-ok` | delta == 0 | Green tint + green ring |
+| `day-warn` | tp > 0 but delta ≠ 0 | Amber tint + amber ring |
+| `day-err` | tp == 0, zuc > 0 | Red tint + red ring |
+| `holiday-col` | `Day.holiday == true` | Purple tint + purple ring |
+| `today-col` | column == today in week | Primary outline (non-destructive) |
+| `selected-col` | column == pickerSelected | Stronger primary outline (non-destructive) |
+
+`today-col` and `selected-col` use CSS `outline` so they never override `background`
+or `box-shadow` from rend / holiday states.
 
 ### Submit workflow
 
 ```mermaid
 stateDiagram-v2
-    [*] --> SelectDay: open UI
-    SelectDay --> Review: choose date
-    Review --> Adjust: hours wrong\nor task missing
-    Adjust --> Review: re-check balance
-    Review --> Submit: balance == 0.0\nentries approved
+    [*] --> Dashboard: open UI
+    Dashboard --> Timesheet: switch view
+    Timesheet --> QuickFill: click SW/Ferie button
+    QuickFill --> Timesheet: hours distributed
+    Timesheet --> Adjust: edit individual cells ±0.5h
+    Adjust --> Timesheet: delta updates live
+    Timesheet --> Verifica: click Verifica button
+    Dashboard --> Submit: approve from US card
     Submit --> Done: POST /api/submit/:date
-    Done --> SelectDay: next day
+    Done --> Dashboard: next day
     Done --> Hooks: optional
     Hooks --> ZucchettiUpdate: update location
     Hooks --> NibolBook: book/check-in desk
 ```
-
-### Three-column layout
-
-```mermaid
-flowchart LR
-    subgraph Left["CalendarPanel"]
-        EV[Events]
-        TM[Teams msgs]
-        GC[Git commits]
-        SC[SVN commits]
-    end
-    subgraph Center["AnalysisCard"]
-        DS[Date selector]
-        EL[Entry list\nhours per task]
-        BAL[Balance indicator]
-        SUB[Submit button]
-    end
-    subgraph Right["TaskPanel"]
-        OI[Open TP items]
-        SR[Search]
-    end
-    Left -.->|context signals| Center
-    Right -.->|drag to assign| Center
-```
-
-### Balance constraint
-
-Submission is blocked until `totalHours == oreTarget`. The user adjusts entries inline until the balance shows `0.0`.
 
 ---
 

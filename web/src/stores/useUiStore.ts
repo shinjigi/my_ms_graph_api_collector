@@ -1,15 +1,7 @@
 import { defineStore }          from 'pinia';
 import { ref, watch }           from 'vue';
 import type { ActiveView, QuickSortState } from '../types';
-
-function loadJson<T>(key: string, fallback: T): T {
-    try {
-        const raw = localStorage.getItem(key);
-        return raw ? JSON.parse(raw) : fallback;
-    } catch {
-        return fallback;
-    }
-}
+import { loadJson }             from '../utils';
 
 const persisted = loadJson<{ weVisible: boolean; quickSort: QuickSortState }>('portal_ui', {
     weVisible:  true,

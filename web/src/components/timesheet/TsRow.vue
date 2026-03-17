@@ -1,7 +1,7 @@
 <template>
     <tr class="hover text-xs" :class="{ 'pinned-row': isPinned }">
         <td class="font-medium pl-3">
-            <a :href="tpLink" target="_blank" class="hover:underline hover:text-primary transition-colors">{{ row.us }}</a>
+            <a :href="rowTpLink" target="_blank" class="hover:underline hover:text-primary transition-colors">{{ row.us }}</a>
         </td>
         <td>
             <span class="state-dot-wrap">
@@ -62,8 +62,9 @@
 import { computed }          from 'vue';
 import { useTimesheetStore } from '../../stores/useTimesheetStore';
 import { usePickerStore }    from '../../stores/usePickerStore';
+import { stateColor, tpLink as makeTpLink } from '../../utils';
 import type { TsRow, Day }   from '../../types';
-import TimeCellWidget        from './TimeCellWidget.vue';
+import TimeCellWidget        from '../TimeCellWidget.vue';
 import TsNoteCell            from './TsNoteCell.vue';
 
 const props = defineProps<{ row: TsRow; isPinned: boolean }>();
@@ -72,10 +73,8 @@ const ts     = useTimesheetStore();
 const picker = usePickerStore();
 const days   = computed(() => ts.days);
 
-const tpLink   = `https://your-org.tpondemand.com/entity/${props.row.tpId}`;
-const dotColor = computed(() =>
-    ({ 'Inception':'#94a3b8', 'Dev/Unit test':'#6366f1', 'Testing':'#f59e0b' }[props.row.state] ?? '#94a3b8')
-);
+const rowTpLink = makeTpLink(props.row.tpId);
+const dotColor  = computed(() => stateColor(props.row.state));
 const stateAbbr = computed(() =>
     ({ 'Inception':'Inception', 'Dev/Unit test':'Dev', 'Testing':'Test' }[props.row.state] ?? props.row.state)
 );

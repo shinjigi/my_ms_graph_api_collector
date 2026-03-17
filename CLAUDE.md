@@ -31,7 +31,7 @@ index.js  →  graphClient.js (auth + Graph client)
 
 ### Setup helper
 
-`scripts/bootstrap-env.ps1` — PowerShell script that uses Azure CLI to generate `.env` from an App Registration Object ID. See `docs/azure-guide.md` for Azure portal setup and SSL/proxy troubleshooting.
+`scripts/bootstrap-env.ps1` — PowerShell script that uses Azure CLI to generate `.env` from an App Registration Object ID. See `    /azure-guide.md` for Azure portal setup and SSL/proxy troubleshooting.
 
 ## npm Registry
 
