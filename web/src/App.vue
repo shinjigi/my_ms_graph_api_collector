@@ -4,60 +4,7 @@
         <div class="flex-1 flex flex-col overflow-hidden">
             <DayPickerHeader />
             <main class="flex-1 overflow-auto p-4">
-
-                <!-- Dashboard -->
-                <div v-show="ui.activeView === 'dashboard'">
-                    <StatStrip />
-                    <WeekStrip />
-                    <!-- Day header -->
-                    <div class="flex items-center gap-3 mb-3 flex-wrap">
-                        <h2 class="text-base font-bold">{{ dayLabel }}</h2>
-                        <div class="badge badge-outline badge-sm gap-1">🏠 Smart Working</div>
-                        <div class="badge badge-warning badge-outline badge-sm gap-1">⚠ Da rendicontare</div>
-                        <button class="btn btn-xs btn-outline btn-warning ml-auto">Verifica</button>
-                    </div>
-                    <div class="grid gap-3 items-start" style="grid-template-columns: 240px minmax(0,2fr) minmax(0,3fr);">
-                        <TimelinePanel @highlight-us="highlightUs = $event" @clear-highlight="highlightUs = ''" />
-                        <WorkTpPanel :highlighted-us="highlightUs" />
-                        <SignalsGrid />
-                    </div>
-                </div>
-
-                <!-- Timesheet -->
-                <div v-show="ui.activeView === 'timesheet'">
-                    <TimesheetView />
-                </div>
-
-                <!-- Activity -->
-                <div v-show="ui.activeView === 'activity'">
-                    <div class="card bg-base-100 shadow-sm border border-base-300">
-                        <div class="card-body p-4">
-                            <div class="card-title text-sm mb-3">Timeline commit</div>
-                            <div class="text-xs text-base-content/40 italic">Activity view — dati reali da API</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Teams -->
-                <div v-show="ui.activeView === 'teams'">
-                    <div class="card bg-base-100 shadow-sm border border-base-300">
-                        <div class="card-body p-4">
-                            <div class="card-title text-sm mb-3">Teams / Chat</div>
-                            <div class="text-xs text-base-content/40 italic">Teams view — dati reali da API</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Browser -->
-                <div v-show="ui.activeView === 'browser'">
-                    <div class="card bg-base-100 shadow-sm border border-base-300">
-                        <div class="card-body p-4">
-                            <div class="card-title text-sm mb-3">Browser history</div>
-                            <div class="text-xs text-base-content/40 italic">Browser view — dati reali da API</div>
-                        </div>
-                    </div>
-                </div>
-
+                <RouterView />
             </main>
         </div>
 
@@ -95,43 +42,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
-import { useUiStore }         from './stores/useUiStore';
-import { usePickerStore }     from './stores/usePickerStore';
-import { useDayStore }        from './stores/useDayStore';
-import { useTimesheetStore }  from './stores/useTimesheetStore';
-import AppSidebar             from './components/layout/AppSidebar.vue';
-import DayPickerHeader        from './components/layout/DayPickerHeader.vue';
-import StatStrip              from './components/dashboard/StatStrip.vue';
-import WeekStrip              from './components/dashboard/WeekStrip.vue';
-import TimelinePanel          from './components/dashboard/TimelinePanel.vue';
-import WorkTpPanel            from './components/dashboard/WorkTpPanel.vue';
-import SignalsGrid             from './components/dashboard/SignalsGrid.vue';
-import TimesheetView          from './components/timesheet/TimesheetView.vue';
+import { computed }        from 'vue';
+import { useUiStore }      from './stores/useUiStore';
+import { useDayStore }     from './stores/useDayStore';
+import AppSidebar          from './components/layout/AppSidebar.vue';
+import DayPickerHeader     from './components/layout/DayPickerHeader.vue';
 
-const ui     = useUiStore();
-const picker = usePickerStore();
-const day    = useDayStore();
-const ts     = useTimesheetStore();
-
-onMounted(() => {
-    const todayMonday = (() => {
-        const d = new Date(picker.pickerSelected);
-        d.setHours(0, 0, 0, 0);
-        const dow = d.getDay();
-        d.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1));
-        return d.toISOString().slice(0, 10);
-    })();
-    ts.fetchWeekData(todayMonday);
-});
-
-const highlightUs = ref('');
-
-const dayLabel = computed(() =>
-    picker.pickerSelected.toLocaleDateString('it-IT', {
-        weekday: 'long', day: 'numeric', month: 'short', year: 'numeric',
-    })
-);
+const ui  = useUiStore();
+const day = useDayStore();
 
 const openEmail = computed(() => {
     if (ui.emailModalId === null) return null;
