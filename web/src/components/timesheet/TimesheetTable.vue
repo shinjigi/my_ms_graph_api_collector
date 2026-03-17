@@ -31,7 +31,7 @@
                         </template>
                         <template v-else>
                             <span class="day-header-cell flex flex-col items-center gap-0.5"
-                                  @click="picker.selectDay(2026, 5, i + 1); ui.setView('dashboard')">
+                                  @click="selectTsDay(i)">
                                 <span :class="i === 4 ? 'text-primary font-bold' : ''">{{ d.label }}</span>
                                 <span class="font-normal opacity-60 text-xs">{{ d.date }}</span>
                                 <span class="text-xs font-bold" :class="rendIconCls(d.rend)">{{ rendIcon(d.rend) }}</span>
@@ -130,6 +130,26 @@ import type { Day }           from '../../types';
 const ts     = useTimesheetStore();
 const picker = usePickerStore();
 const ui     = useUiStore();
+
+// Dates of Mon–Sat for the week containing pickerSelected
+const weekDates = computed<Date[]>(() => {
+    const sel = picker.pickerSelected;
+    const dow = sel.getDay();
+    const monday = new Date(sel);
+    monday.setDate(sel.getDate() - (dow === 0 ? 6 : dow - 1));
+    return Array.from({ length: 6 }, (_, i) => {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + i);
+        return d;
+    });
+});
+
+function selectTsDay(i: number) {
+    const date = weekDates.value[i];
+    if (!date) return;
+    picker.selectDay(date.getFullYear(), date.getMonth(), date.getDate());
+    ui.setView('dashboard');
+}
 
 const mainTableRef  = ref<HTMLTableElement | null>(null);
 const pinWidths     = ref<string[]>([]);
