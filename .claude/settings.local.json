@@ -33,7 +33,11 @@
       "Bash(cmd.exe /c \"npx vue-tsc --noEmit 2>&1\")",
       "Bash(curl -s http://localhost:3001/api/health && echo \"\")",
       "Bash(curl -s http://localhost:3001/api/week/2026-03-17 | head -100)",
-      "Bash(curl -s http://localhost:3001/api/week/2026-03-17/tp-hours 2>&1 | head -50)"
+      "Bash(curl -s http://localhost:3001/api/week/2026-03-17/tp-hours 2>&1 | head -50)",
+      "Bash(curl -s http://localhost:3001/api/week/2026-03-10)",
+      "Bash(cmd.exe /c \"netstat -ano | findstr :3001\")",
+      "Bash(cmd.exe /c \"taskkill /PID 42868 /F 2>&1\")",
+      "Bash(curl -s http://localhost:3001/api/health)"
     ]
   }
 }
