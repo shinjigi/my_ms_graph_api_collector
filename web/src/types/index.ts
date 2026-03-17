@@ -84,3 +84,43 @@ export interface QuickLogItem extends UsCard {
     totAllTime: number;
     rem?:       number;
 }
+
+// --- API Response Types (from backend) ---
+
+export interface WeekDayResponse {
+    date:        string;
+    isWorkday:   boolean;
+    oreTarget:   number;
+    location:    string;
+    nibol:       string | null;
+    holiday:     boolean;
+    holidayName?: string;
+    zucchetti:   unknown;
+    calendar:    unknown[];
+    emails:      unknown[];
+    teams:       unknown[];
+    svnCommits:  unknown[];
+    gitCommits:  unknown[];
+    browserVisits: unknown[];
+}
+
+export interface ApiWeekResponse {
+    monday: string;
+    days:   WeekDayResponse[];
+}
+
+export interface ApiTpWeekEntry {
+    tpId:        number;
+    usName:      string;
+    stateName:   string;
+    timeSpent:   number;
+    projectName: string;
+    hours:       number[];
+}
+
+export interface ApiTpWeekResponse {
+    userId:   number;
+    userName: string;
+    entries:  ApiTpWeekEntry[];
+    openItems: unknown[];
+}
