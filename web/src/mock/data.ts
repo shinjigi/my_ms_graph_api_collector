@@ -1,4 +1,4 @@
-import type { Day, TsRow, UsCard, TlEvent, Email, Holiday } from '../types';
+import type { Day, TsRow, UsCard, TlEvent, Email, Holiday, BrowserDomain } from '../types';
 
 /** Standard contractual workday: 7h 42min = 7.7 decimal hours. */
 export const WORKDAY_HOURS      = 7.7;
@@ -104,3 +104,17 @@ export const US_TODAY_DEFAULT: UsCard[] = [
         note:'batch size ridotto a 100 items su staging — OOM risolto, migrazione assets completata.',
     },
 ];
+
+// --- Centralized signal data (for StatStrip and SignalsGrid) ---
+
+export const TEAMS_MSG_COUNT = 47;
+
+export const BROWSER_DOMAINS: BrowserDomain[] = [
+    { domain: 'github.com',          visits: 38, pct: 100 },
+    { domain: 'dev.azure.com',       visits: 24, pct: 63  },
+    { domain: 'learn.microsoft.com', visits: 19, pct: 50  },
+    { domain: 'tpondemand.com',      visits: 15, pct: 39  },
+];
+
+export const BROWSER_TOTAL_VISITS  = 142;
+export const BROWSER_TOTAL_DOMAINS = 23;

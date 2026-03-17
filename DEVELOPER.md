@@ -35,15 +35,37 @@ my_ms_graph_api_collector/
 │       ├── collector.ts              # KB update (npm run kb:update)
 │       ├── format.ts                 # hhmmToHours, parseTpDate helpers
 │       └── types.ts                  # TP entity interfaces
-├── web/                              # Vue 3 + Vite frontend
+├── web/                              # Vue 3 + Vite + Pinia — Activity Portal
 │   └── src/
-│       ├── App.vue
-│       ├── components/
-│       │   ├── CalendarPanel.vue     # left column: calendar, Teams, git, svn
-│       │   ├── AnalysisCard.vue      # center: AI proposal + submit controls
-│       │   └── TaskPanel.vue         # right: TP open items
-│       ├── composables/useProposals.ts
-│       └── types/index.ts
+│       ├── App.vue                   # root: sidebar + day-picker header + views
+│       ├── main.ts                   # Vite entry — registers Pinia + style.css
+│       ├── style.css                 # DaisyUI v5 / Tailwind v4 custom classes
+│       ├── types/index.ts            # shared TypeScript interfaces
+│       ├── mock/data.ts              # mock data + WORKDAY_HOURS / HALF_WORKDAY_HOURS
+│       ├── stores/
+│       │   ├── usePickerStore.ts     # month/day selection, localStorage persistence
+│       │   ├── useTimesheetStore.ts  # weekly timesheet, hoursEdits, fillDay()
+│       │   ├── useDayStore.ts        # day view: US cards, timeline, quick log
+│       │   └── useUiStore.ts         # view switching, UI toggles
+│       └── components/
+│           ├── layout/
+│           │   ├── AppSidebar.vue    # left nav (5 views)
+│           │   └── DayPickerHeader.vue # month nav + scrollable day buttons
+│           ├── dashboard/
+│           │   ├── StatStrip.vue     # 5 KPI cards (commits, meetings, email, …)
+│           │   ├── WeekStrip.vue     # 5 week-day cards with rend status
+│           │   ├── DayHeader.vue     # selected day title + location badge
+│           │   ├── TimelinePanel.vue # hour-by-hour event timeline
+│           │   ├── WorkTpPanel.vue   # US cards + quick log (filter/sort/search)
+│           │   ├── SignalsGrid.vue   # 2×2: email, Teams, browser, git/svn
+│           │   ├── TimeCellWidget.vue # − value + widget with smart ±increment
+│           │   └── NoteEdit.vue      # inline note editor
+│           └── timesheet/
+│               ├── TimesheetView.vue # toolbar: WE toggle, quick-fill, Verifica
+│               ├── TimesheetTable.vue # weekly table with colgroup sync
+│               ├── TsRow.vue         # single timesheet row
+│               ├── TsNoteCell.vue    # per-cell floating note editor
+│               └── TimeCellWidget.vue # reused from dashboard/
 ├── data/                             # gitignored — runtime data
 ├── zucchetti_automation/             # Playwright scripts (plain JS)
 ├── scripts/                          # one-off test/utility scripts

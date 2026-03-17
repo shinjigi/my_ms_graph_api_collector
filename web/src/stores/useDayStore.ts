@@ -3,19 +3,8 @@ import { ref, computed, watch } from 'vue';
 import { US_TODAY_DEFAULT, TS_ACTIVE, TS_PINNED, TL_EVENTS, EMAILS, WORKDAY_HOURS } from '../mock/data';
 import { usePickerStore }       from './usePickerStore';
 import { useTimesheetStore }    from './useTimesheetStore';
-import type { UsCard } from '../types';
-
-function loadJson<T>(key: string, fallback: T): T {
-    try {
-        const raw = localStorage.getItem(key);
-        return raw ? JSON.parse(raw) : fallback;
-    } catch {
-        return fallback;
-    }
-}
-
-const DC = (s: string) =>
-    ({ 'Inception':'#94a3b8', 'Dev/Unit test':'#6366f1', 'Testing':'#f59e0b' }[s] ?? '#94a3b8');
+import { loadJson, stateColor } from '../utils';
+import type { UsCard, QuickLogItem } from '../types';
 
 export const useDayStore = defineStore('day', () => {
     const usToday  = ref<UsCard[]>([
@@ -33,7 +22,7 @@ export const useDayStore = defineStore('day', () => {
         localStorage.setItem('portal_us_extra', JSON.stringify(extra));
     }
 
-    const quickLog = computed<UsCard[]>(() => {
+    const quickLog = computed<QuickLogItem[]>(() => {
         const inToday = new Set(usToday.value.map(u => u.tpId));
         return [...TS_ACTIVE, ...TS_PINNED]
             .filter(r => !inToday.has(r.tpId))
@@ -41,10 +30,10 @@ export const useDayStore = defineStore('day', () => {
                 us: r.us, tpId: r.tpId, state: r.state,
                 tpHours: 0, zucHours: WORKDAY_HOURS,
                 emails: 0, commits: r.git?.[4] ?? 0, meetings: 0,
-                color: DC(r.state), note: '',
+                color: stateColor(r.state), note: '',
                 totAllTime: r.totAllTime,
                 rem: r.rem,
-            } as UsCard & { totAllTime: number; rem?: number }));
+            }));
     });
 
     function addToWorkToday(tpId: number) {
@@ -55,7 +44,7 @@ export const useDayStore = defineStore('day', () => {
             us: src.us, tpId: src.tpId, state: src.state,
             tpHours: 0, zucHours: WORKDAY_HOURS,
             emails: 0, commits: 0, meetings: 0,
-            color: DC(src.state), note: '',
+            color: stateColor(src.state), note: '',
         });
         persistExtra();
     }

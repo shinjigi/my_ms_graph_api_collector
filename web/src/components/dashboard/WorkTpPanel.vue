@@ -101,7 +101,7 @@
                        :class="r.commits > 0 ? 'text-base-content/80' : 'text-base-content/50'"
                        :title="r.us">{{ r.us }}</a>
                     <span v-if="r.commits > 0" class="text-xs shrink-0" style="color:#6366f1aa">💻{{ r.commits }}</span>
-                    <span class="text-base-content/25 text-xs shrink-0 tabular-nums">{{ (r as any).totAllTime ?? '' }}h</span>
+                    <span class="text-base-content/25 text-xs shrink-0 tabular-nums">{{ r.totAllTime ?? '' }}h</span>
                     <button
                         class="btn btn-ghost btn-xs btn-square text-base-content/35 hover:text-primary hover:bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity"
                         @click="day.addToWorkToday(r.tpId)"
@@ -121,7 +121,8 @@
 import { computed }       from 'vue';
 import { useDayStore }    from '../../stores/useDayStore';
 import { useUiStore }     from '../../stores/useUiStore';
-import TimeCellWidget     from './TimeCellWidget.vue';
+import { stateColor, tpLink } from '../../utils';
+import TimeCellWidget     from '../TimeCellWidget.vue';
 import NoteEdit           from './NoteEdit.vue';
 import type { UsCard, QuickSortState } from '../../types';
 
@@ -132,13 +133,9 @@ const ui  = useUiStore();
 
 const STATE_ORDER: Record<string, number> = { 'Inception': 0, 'Dev/Unit test': 1, 'Testing': 2 };
 
-const stateColor = (s: string) =>
-    ({ 'Inception':'#94a3b8', 'Dev/Unit test':'#6366f1', 'Testing':'#f59e0b' }[s] ?? '#94a3b8');
-
-const tpLink = (id: number) => `https://your-org.tpondemand.com/entity/${id}`;
 const tpPct  = (us: UsCard) => us.zucHours > 0 ? Math.min(100, Math.round(us.tpHours / us.zucHours * 100)) : 0;
 
-const signalCount = computed(() => day.quickLog.filter((r: any) => r.commits > 0).length);
+const signalCount = computed(() => day.quickLog.filter(r => r.commits > 0).length);
 const isFiltered  = computed(() => ui.quickFilterSignals || !!ui.quickSearch);
 
 const sortFields: { key: QuickSortState['field']; label: string }[] = [
@@ -153,7 +150,7 @@ function sortIcon(f: string) {
 }
 
 const filteredQuickLog = computed(() => {
-    let items = [...day.quickLog] as (UsCard & { totAllTime?: number; rem?: number })[];
+    let items = [...day.quickLog];
     if (ui.quickFilterSignals) items = items.filter(r => r.commits > 0);
     const needle = ui.quickSearch.trim().toLowerCase();
     if (needle) items = items.filter(r => r.us.toLowerCase().includes(needle) || String(r.tpId).includes(needle));
@@ -161,8 +158,8 @@ const filteredQuickLog = computed(() => {
         let va: number, vb: number;
         switch (ui.quickSort.field) {
             case 'state':    va = STATE_ORDER[a.state] ?? 99; vb = STATE_ORDER[b.state] ?? 99; break;
-            case 'ore':      va = (a as any).totAllTime ?? 0; vb = (b as any).totAllTime ?? 0; break;
-            case 'chiusura': va = (a as any).rem != null ? (a as any).rem : 999; vb = (b as any).rem != null ? (b as any).rem : 999; break;
+            case 'ore':      va = a.totAllTime ?? 0; vb = b.totAllTime ?? 0; break;
+            case 'chiusura': va = a.rem != null ? a.rem : 999; vb = b.rem != null ? b.rem : 999; break;
             default:         va = vb = 0;
         }
         return (va === vb ? 0 : va < vb ? -1 : 1) * ui.quickSort.dir;
