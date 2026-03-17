@@ -1,6 +1,7 @@
 import { defineStore }  from 'pinia';
 import { ref, computed } from 'vue';
 import { HOLIDAYS_IT, MONTH_IT, DAYABB_IT } from '../mock/data';
+import { useTimesheetStore } from './useTimesheetStore';
 
 interface PickerDay {
     date:       Date;
@@ -95,9 +96,31 @@ export const usePickerStore = defineStore('picker', () => {
     });
 
     function selectDay(yr: number, mo: number, d: number) {
-        pickerSelected.value = new Date(yr, mo, d);
+        const newDate = new Date(yr, mo, d);
+        const oldMonday = (() => {
+            const m = pickerSelected.value;
+            const dow = m.getDay();
+            const md = new Date(m);
+            md.setDate(m.getDate() - (dow === 0 ? 6 : dow - 1));
+            return md.toISOString().slice(0, 10);
+        })();
+
+        pickerSelected.value = newDate;
         pickerMonth.value    = new Date(yr, mo, 1);
         persist();
+
+        const newMonday = (() => {
+            const dow = newDate.getDay();
+            const md = new Date(newDate);
+            md.setDate(newDate.getDate() - (dow === 0 ? 6 : dow - 1));
+            return md.toISOString().slice(0, 10);
+        })();
+
+        // Trigger week fetch if week changed
+        if (oldMonday !== newMonday) {
+            const ts = useTimesheetStore();
+            ts.fetchWeekData(newMonday);
+        }
     }
 
     function prevMonth() {
@@ -116,6 +139,15 @@ export const usePickerStore = defineStore('picker', () => {
         pickerSelected.value = new Date(pickerToday.value);
         pickerMonth.value    = new Date(pickerToday.value.getFullYear(), pickerToday.value.getMonth(), 1);
         persist();
+
+        const ts = useTimesheetStore();
+        const todayMonday = (() => {
+            const d = new Date(pickerToday.value);
+            const dow = d.getDay();
+            d.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1));
+            return d.toISOString().slice(0, 10);
+        })();
+        ts.fetchWeekData(todayMonday);
     }
 
     return {

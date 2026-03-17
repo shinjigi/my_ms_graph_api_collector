@@ -95,10 +95,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed }      from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useUiStore }         from './stores/useUiStore';
 import { usePickerStore }     from './stores/usePickerStore';
 import { useDayStore }        from './stores/useDayStore';
+import { useTimesheetStore }  from './stores/useTimesheetStore';
 import AppSidebar             from './components/layout/AppSidebar.vue';
 import DayPickerHeader        from './components/layout/DayPickerHeader.vue';
 import StatStrip              from './components/dashboard/StatStrip.vue';
@@ -111,6 +112,18 @@ import TimesheetView          from './components/timesheet/TimesheetView.vue';
 const ui     = useUiStore();
 const picker = usePickerStore();
 const day    = useDayStore();
+const ts     = useTimesheetStore();
+
+onMounted(() => {
+    const todayMonday = (() => {
+        const d = new Date(picker.pickerSelected);
+        d.setHours(0, 0, 0, 0);
+        const dow = d.getDay();
+        d.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1));
+        return d.toISOString().slice(0, 10);
+    })();
+    ts.fetchWeekData(todayMonday);
+});
 
 const highlightUs = ref('');
 
