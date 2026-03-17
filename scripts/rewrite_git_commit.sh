@@ -32,10 +32,12 @@ git filter-branch -f --msg-filter '
     NEW_PREFIX="[my_ms_graph_api_collector][#324913] PC emails network TP #2026 - "
     
     # Pulizia del messaggio originale (compatibile con GNU sed di Linux)
-    CLEAN_MSG=$(cat | sed -E "s/^(\[shinjigi\]\[#[0-9]+\] (PC emails network TP #[0-9]+ - )?|feat: |Docs — |Docs - )//")
+    # Abbiamo aggiunto il raggruppamento con il raddoppio "+" per rimuovere 
+    # istanze multiple sia del nuovo che dei vecchi prefissi.
+    CLEAN_MSG=$(cat | sed -E "s/^(\[my_ms_graph_api_collector\]\[#[0-9]+\] PC emails network TP #[0-9]+ - |\[shinjigi\]\[#[0-9]+\] (PC emails network TP #[0-9]+ - )?|feat: |Docs — |Docs - )+//")
     
-    # Restituiamo il messaggio finale standardizzato
-    echo "${NEW_PREFIX}${CLEAN_MSG}"
+    # Restituiamo il messaggio finale standardizzato senza spazi bianchi extra all inizio
+    echo "${NEW_PREFIX}$(echo \"$CLEAN_MSG\" | sed -e \"s/^[[:space:]]*//\")"
 ' --env-filter '
     # Impostazione dellidentità dellautore e del committer richiesta
     CORRECT_NAME="Luigi De Pinto"
