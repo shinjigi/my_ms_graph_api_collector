@@ -20,6 +20,7 @@
     "tp:us-detail": "ts-node --project tp/tsconfig.json tp/get-us-detail.ts",
     "nibol:book": "tsx nibol_automation/book_desk.ts",
     "nibol:book:date": "tsx nibol_automation/book_desk.ts --date=2026-03-23",
+    "nibol:calendar": "tsx nibol_automation/test_calendar.ts",
     "nibol:status": "tsx scripts/test-nibol.ts"
   },
   "keywords": [

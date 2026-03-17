@@ -263,7 +263,7 @@ export class TargetprocessClient {
         while (true) {
             const result = await this.request<TpList<TpTimeEntry>>('v1', 'Times', {
                 where:   `(User.Id eq ${userId}) and (Date gte '${from}') and (Date lte '${to}')`,
-                include: '[Id,Date,Spent,Description,User[FullName],Assignable[Id,Name]]',
+                include: '[Id,Date,Spent,Description,User[FullName],Assignable[Id,Name,EntityState[Name],Project[Id,Name]]]',
                 orderby: 'Date',
                 take:    String(take),
                 skip:    String(skip),
