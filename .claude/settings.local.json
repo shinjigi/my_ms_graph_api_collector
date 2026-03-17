@@ -37,7 +37,8 @@
       "Bash(curl -s http://localhost:3001/api/week/2026-03-10)",
       "Bash(cmd.exe /c \"netstat -ano | findstr :3001\")",
       "Bash(cmd.exe /c \"taskkill /PID 42868 /F 2>&1\")",
-      "Bash(curl -s http://localhost:3001/api/health)"
+      "Bash(curl -s http://localhost:3001/api/health)",
+      "Bash(node_modules/.bin/vue-tsc -p web/tsconfig.json --noEmit 2>&1)"
     ]
   }
 }

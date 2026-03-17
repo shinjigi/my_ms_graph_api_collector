@@ -66,6 +66,12 @@ export interface TpTimeEntry {
     Spent:       number;
     Description: string | null;
     User:        TpUserRef | null;
+    Assignable?: {
+        Id:          number;
+        Name:        string;
+        EntityState?: { Name: string } | null;
+        Project?:     { Id: number; Name: string } | null;
+    };
 }
 
 export interface TpLogTimeInput {
