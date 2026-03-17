@@ -64,7 +64,11 @@ function getMonday(dateStr: string): Date {
 }
 
 function dateToString(d: Date): string {
-    return d.toISOString().slice(0, 10);
+    // Use local date components — toISOString() uses UTC and shifts in CET/CEST
+    const yr  = d.getFullYear();
+    const mo  = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${yr}-${mo}-${day}`;
 }
 
 async function readAggregatedDay(date: string): Promise<AggregatedDay | null> {
@@ -117,23 +121,18 @@ weekRouter.get('/:date', async (req: Request, res: Response) => {
     const weekDays: WeekDayData[] = [];
     const monthsToLoad = new Set<string>();
 
-    // Plan which Zucchetti months to load
+    // Plan which Zucchetti months to load (use local date string to avoid UTC shift)
     for (let i = 0; i < 7; i++) {
         const d = new Date(monday);
         d.setDate(monday.getDate() + i);
-        const monthStr = d.toISOString().slice(0, 7);
-        monthsToLoad.add(monthStr);
+        monthsToLoad.add(dateToString(d).slice(0, 7));
     }
 
-    // Load all Zucchetti data for these months
+    // Load raw Zucchetti data as fallback for days without aggregated files
     const zuccAll: ZucchettiDay[] = [];
     for (const month of monthsToLoad) {
         const days = await loadZucchettiMonth(month);
         zuccAll.push(...days);
-    }
-    const zuccMap = new Map<string, ZucchettiDay>();
-    for (const day of zuccAll) {
-        zuccMap.set(day.date, day);
     }
 
     // Build 7-day week response
@@ -142,33 +141,30 @@ weekRouter.get('/:date', async (req: Request, res: Response) => {
         d.setDate(monday.getDate() + i);
         const dateStr = dateToString(d);
 
-        // Load aggregated day data
+        // Aggregated file is the primary source — already contains isWorkday, oreTarget, location
         const agg = await readAggregatedDay(dateStr);
 
-        // Get Zucchetti day data
-        // Zucchetti dates are in DD/MM/YYYY format, need to match against YYYY-MM-DD
-        const zuccDay = zuccAll.find(z => {
-            const [dd, mm, yyyy] = z.date.split('/');
-            return `${yyyy}-${mm}-${dd}` === dateStr;
-        }) ?? null;
+        // Fall back to raw Zucchetti for days without an aggregated file
+        const zuccDay: ZucchettiDay | null = agg?.zucchetti ?? zuccAll.find(z => z.date === dateStr) ?? null;
 
-        const oreTarget = zuccDay && isWorkday(zuccDay) ? hhmmToHours(zuccDay.hOrd) : 0;
-        const isWd = zuccDay ? isWorkday(zuccDay) : false;
+        const isWd      = agg?.isWorkday   ?? (zuccDay ? isWorkday(zuccDay) : false);
+        const oreTarget = agg?.oreTarget   ?? (zuccDay && isWd ? hhmmToHours(zuccDay.hOrd) : 0);
+        const location  = agg?.location    ?? (zuccDay && isWd ? parseZucchettiLocation(zuccDay) : 'unknown');
 
         const dayData: WeekDayData = {
             date:         dateStr,
             isWorkday:    isWd,
             oreTarget,
-            location:     zuccDay && isWd ? parseZucchettiLocation(zuccDay) : 'unknown',
-            nibol:        agg?.nibol ?? null,
+            location,
+            nibol:        null, // not yet in aggregated data
             holiday:      !isWd,
             holidayName:  undefined,
             zucchetti:    zuccDay,
-            calendar:     agg?.calendar ?? [],
-            emails:       agg?.emails ?? [],
-            teams:        agg?.teams ?? [],
-            svnCommits:   agg?.svnCommits ?? [],
-            gitCommits:   agg?.gitCommits ?? [],
+            calendar:     agg?.calendar      ?? [],
+            emails:       agg?.emails        ?? [],
+            teams:        agg?.teams         ?? [],
+            svnCommits:   agg?.svnCommits    ?? [],
+            gitCommits:   agg?.gitCommits    ?? [],
             browserVisits: agg?.browserVisits ?? [],
         };
 

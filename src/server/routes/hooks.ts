@@ -8,7 +8,7 @@ import { Router, Request, Response } from 'express';
 import { spawn }  from 'child_process';
 import * as path  from 'path';
 import { TargetprocessClient } from '../../targetprocess/client';
-import { nibolBookDesk, nibolCheckIn } from '../../collectors/nibol';
+import { nibolBookDesk, nibolCheckIn, nibolFetchCalendarData } from '../../collectors/nibol';
 
 export const hooksRouter = Router();
 
@@ -72,6 +72,16 @@ hooksRouter.post('/nibol', async (req: Request, res: Response) => {
         } else {
             res.status(400).json({ error: `Azione sconosciuta: ${action}` });
         }
+    } catch (err) {
+        res.status(500).json({ error: (err as Error).message });
+    }
+});
+
+// GET /api/hooks/nibol/calendar
+hooksRouter.get('/nibol/calendar', async (req: Request, res: Response) => {
+    try {
+        const data = await nibolFetchCalendarData();
+        res.json(data);
     } catch (err) {
         res.status(500).json({ error: (err as Error).message });
     }

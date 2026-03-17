@@ -12,7 +12,8 @@
         <!-- Day cells -->
         <td v-for="(d, i) in days.slice(0, 6)" :key="i"
             class="text-center"
-            :class="cellCls(d, i)">
+            :class="cellCls(d, i)"
+            @click.stop="i < 5 && !d.holiday ? selectDay(i) : undefined">
             <template v-if="i === 5">
                 <div class="flex flex-col items-center gap-0">
                     <TimeCellWidget
@@ -72,6 +73,16 @@ const props = defineProps<{ row: TsRow; isPinned: boolean }>();
 const ts     = useTimesheetStore();
 const picker = usePickerStore();
 const days   = computed(() => ts.days);
+
+function selectDay(dayIdx: number) {
+    const sel = picker.pickerSelected;
+    const dow = sel.getDay();
+    const monday = new Date(sel);
+    monday.setDate(sel.getDate() - (dow === 0 ? 6 : dow - 1));
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + dayIdx);
+    picker.selectDay(d.getFullYear(), d.getMonth(), d.getDate());
+}
 
 const rowTpLink = makeTpLink(props.row.tpId);
 const dotColor  = computed(() => stateColor(props.row.state));
