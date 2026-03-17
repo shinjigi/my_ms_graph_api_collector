@@ -1,18 +1,85 @@
 import { defineStore }          from 'pinia';
 import { ref, computed, watch } from 'vue';
-import { DAYS, TS_ACTIVE, TS_PINNED } from '../mock/data';
+import { DAYS, TS_ACTIVE, TS_PINNED, DAYABB_IT, MONTH_IT } from '../mock/data';
+import { fetchWeek, fetchTpWeekHours } from '../api';
 import { loadJson }             from '../utils';
+import type { Day, TsRow, ApiWeekResponse, ApiTpWeekResponse } from '../types';
 
 export const useTimesheetStore = defineStore('timesheet', () => {
-    const days   = ref(DAYS);
-    const active = ref(TS_ACTIVE.map(r => ({ ...r, hours: [...(r.hours ?? [0,0,0,0,0,0,0])] })));
-    const pinned = ref(TS_PINNED.map(r => ({ ...r })));
+    const days   = ref<Day[]>(DAYS);
+    const active = ref<TsRow[]>(TS_ACTIVE.map(r => ({ ...r, hours: [...(r.hours ?? [0,0,0,0,0,0,0])] })));
+    const pinned = ref<TsRow[]>(TS_PINNED.map(r => ({ ...r })));
+
+    const loading = ref(false);
+    const error   = ref<string | null>(null);
 
     const hoursEdits = ref<Record<string, number>>(loadJson('portal_hours', {}));
     const noteEdits  = ref<Record<string, string>>(loadJson('portal_ts_notes', {}));
 
     watch(hoursEdits, val => localStorage.setItem('portal_hours',    JSON.stringify(val)), { deep: true });
     watch(noteEdits,  val => localStorage.setItem('portal_ts_notes', JSON.stringify(val)), { deep: true });
+
+    /**
+     * Fetch week data from backend and populate days/active/pinned.
+     * Falls back to mock data if backend is unavailable.
+     */
+    async function fetchWeekData(date: string): Promise<void> {
+        loading.value = true;
+        error.value   = null;
+
+        try {
+            const [weekData, tpData] = await Promise.all([
+                fetchWeek(date),
+                fetchTpWeekHours(date),
+            ]);
+
+            // Map week response to Day[]
+            days.value = weekData.days.map((d, idx) => {
+                const dow = idx; // 0=Mon...6=Sun
+                const dayLabel = DAYABB_IT[([1,2,3,4,5,6,0][dow]) % 7] ?? '?';
+                const dateObj = new Date(d.date);
+                const dateLabel = `${dateObj.getDate()} ${MONTH_IT[dateObj.getMonth()].substring(0, 3)}`;
+
+                return {
+                    label:        dayLabel,
+                    date:         dateLabel,
+                    rend:         null, // computed by rendPerDay
+                    zucHours:     d.oreTarget,
+                    nibol:        d.nibol,
+                    holiday:      d.holiday,
+                    holidayName:  d.holidayName,
+                };
+            });
+
+            // Map TP week response to TsRow[]
+            active.value = tpData.entries.map(e => ({
+                project:    e.projectName,
+                us:         e.usName,
+                tpId:       e.tpId,
+                state:      e.stateName,
+                totAllTime: e.timeSpent,
+                hours:      [...e.hours, 0, 0], // Pad to 7 (Mon-Sun)
+                notes:      [null, null, null, null, null, null, null],
+            }));
+
+            // Map unassigned open items to pinned (items not in active)
+            const activeIds = new Set(active.value.map(r => r.tpId));
+            pinned.value = tpData.openItems
+                .filter((item: any) => !activeIds.has(item.id))
+                .map((item: any) => ({
+                    project:    item.projectName,
+                    us:         item.name,
+                    tpId:       item.id,
+                    state:      item.stateName,
+                    totAllTime: item.timeSpent,
+                }));
+        } catch (err) {
+            console.warn('fetchWeekData failed, falling back to mock data:', (err as Error).message);
+            // Keep existing mock data
+        } finally {
+            loading.value = false;
+        }
+    }
 
     function getHours(tpId: number, dayIdx: number): number {
         const key = `${tpId}_${dayIdx}`;
@@ -89,8 +156,9 @@ export const useTimesheetStore = defineStore('timesheet', () => {
 
     return {
         days, active, pinned,
+        loading, error,
         hoursEdits, noteEdits,
-        getHours, getNote, setHours, setNote, fillDay,
+        getHours, getNote, setHours, setNote, fillDay, fetchWeekData,
         totalsRow, rendPerDay,
     };
 });
