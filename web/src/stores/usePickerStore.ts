@@ -78,6 +78,7 @@ export const usePickerStore = defineStore('picker', () => {
 
     function selectDay(yr: number, mo: number, d: number) {
         pickerSelected.value = new Date(yr, mo, d);
+        pickerMonth.value    = new Date(yr, mo, 1);
         persist();
     }
 
