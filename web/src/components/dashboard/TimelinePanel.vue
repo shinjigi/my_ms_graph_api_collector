@@ -42,7 +42,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed }    from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useDayStore } from '../../stores/useDayStore';
 import { useUiStore }  from '../../stores/useUiStore';
 import type { TlEvent } from '../../types';
@@ -75,12 +75,22 @@ const hourRange  = computed(() => {
     for (let h = startHour.value; h <= endHour.value; h++) arr.push(h);
     return arr;
 });
-const nowTop = computed(() => {
-    const nowMins = 17 * 60 + 20;
-    return (nowMins >= startMin.value && nowMins <= endMin.value)
-        ? nowMins - startMin.value
-        : -1;
-});
+
+function currentMinutes(): number {
+    const now = new Date();
+    return now.getHours() * 60 + now.getMinutes();
+}
+
+const nowMins = ref(currentMinutes());
+let timer: ReturnType<typeof setInterval> | null = null;
+onMounted(() => { timer = setInterval(() => { nowMins.value = currentMinutes(); }, 60_000); });
+onUnmounted(() => { if (timer) clearInterval(timer); });
+
+const nowTop = computed(() =>
+    (nowMins.value >= startMin.value && nowMins.value <= endMin.value)
+        ? nowMins.value - startMin.value
+        : -1
+);
 
 const TYPE_CLASS: Record<string, string> = {
     meeting:    'tl-event-meeting',
