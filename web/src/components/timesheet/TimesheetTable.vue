@@ -121,6 +121,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
+import { useRouter }          from 'vue-router';
 import { useTimesheetStore }  from '../../stores/useTimesheetStore';
 import { usePickerStore }     from '../../stores/usePickerStore';
 import { useUiStore }         from '../../stores/useUiStore';
@@ -128,6 +129,7 @@ import { HOLIDAYS_IT, DAYABB_IT } from '../../mock/data';
 import TsRow                  from './TsRow.vue';
 import type { Day }           from '../../types';
 
+const router = useRouter();
 const ts     = useTimesheetStore();
 const picker = usePickerStore();
 const ui     = useUiStore();
@@ -172,8 +174,10 @@ const colHeaders = computed<ColHeader[]>(() =>
 function selectTsDay(i: number) {
     const date = weekDates.value[i];
     if (!date) return;
-    picker.selectDay(date.getFullYear(), date.getMonth(), date.getDate());
-    ui.setView('dashboard');
+    const yr  = date.getFullYear();
+    const mo  = String(date.getMonth() + 1).padStart(2, '0');
+    const d   = String(date.getDate()).padStart(2, '0');
+    router.push(`/dashboard/${yr}-${mo}-${d}`);
 }
 
 const mainTableRef  = ref<HTMLTableElement | null>(null);

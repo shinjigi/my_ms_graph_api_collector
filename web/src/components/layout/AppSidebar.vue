@@ -13,14 +13,16 @@
             <div class="text-xs text-base-content/30 font-semibold px-3 pt-3 pb-1 uppercase tracking-wider">Viste</div>
             <ul class="menu menu-sm gap-0.5">
                 <li v-for="item in navItems" :key="item.view">
-                    <a class="nav-link rounded-lg"
-                       :class="{ active: ui.activeView === item.view }"
-                       @click="ui.setView(item.view)">
+                    <RouterLink
+                        class="nav-link rounded-lg"
+                        :to="`/${item.view}/${currentDateStr}`"
+                        active-class="active"
+                    >
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="item.icon"/>
                         </svg>
                         {{ item.label }}
-                    </a>
+                    </RouterLink>
                 </li>
             </ul>
             <div class="text-xs text-base-content/30 font-semibold px-3 pt-4 pb-1 uppercase tracking-wider">Sorgenti</div>
@@ -47,10 +49,16 @@
 </template>
 
 <script setup lang="ts">
-import { useUiStore } from '../../stores/useUiStore';
+import { computed }      from 'vue';
+import { usePickerStore } from '../../stores/usePickerStore';
 import type { ActiveView } from '../../types';
 
-const ui = useUiStore();
+const picker = usePickerStore();
+
+const currentDateStr = computed(() => {
+    const d = picker.pickerSelected;
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+});
 
 const navItems: { view: ActiveView; label: string; icon: string }[] = [
     { view:'dashboard',  label:'Dashboard',  icon:'M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z' },

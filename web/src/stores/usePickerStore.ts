@@ -1,7 +1,8 @@
 import { defineStore }  from 'pinia';
 import { ref, computed } from 'vue';
+import { useRouter }     from 'vue-router';
 import { HOLIDAYS_IT, MONTH_IT, DAYABB_IT } from '../mock/data';
-import { useTimesheetStore } from './useTimesheetStore';
+import { useUiStore }      from './useUiStore';
 
 interface PickerDay {
     date:       Date;
@@ -29,6 +30,13 @@ function loadPersisted(): { selectedDay: string; month: string } | null {
     }
 }
 
+function localDateStr(d: Date): string {
+    const yr  = d.getFullYear();
+    const mo  = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${yr}-${mo}-${day}`;
+}
+
 export const usePickerStore = defineStore('picker', () => {
     const persisted = loadPersisted();
 
@@ -37,10 +45,12 @@ export const usePickerStore = defineStore('picker', () => {
         persisted?.selectedDay ? new Date(persisted.selectedDay) : todayMidnight()
     );
     const pickerMonth    = ref<Date>(
-        persisted?.month ? new Date(persisted.month) : new Date(pickerToday.value.getFullYear(), pickerToday.value.getMonth(), 1)
+        persisted?.month
+            ? new Date(persisted.month)
+            : new Date(pickerToday.value.getFullYear(), pickerToday.value.getMonth(), 1)
     );
 
-    function persist() {
+    function persistPicker() {
         localStorage.setItem('portal_picker', JSON.stringify({
             selectedDay: pickerSelected.value.toISOString(),
             month:       pickerMonth.value.toISOString(),
@@ -95,64 +105,55 @@ export const usePickerStore = defineStore('picker', () => {
         return -1;
     });
 
+    /**
+     * Navigate to a specific day: pushes the new URL.
+     * The PortalView route watch updates picker state from the URL.
+     */
     function selectDay(yr: number, mo: number, d: number) {
-        const newDate = new Date(yr, mo, d);
-        const oldMonday = (() => {
-            const m = pickerSelected.value;
-            const dow = m.getDay();
-            const md = new Date(m);
-            md.setDate(m.getDate() - (dow === 0 ? 6 : dow - 1));
-            return md.toISOString().slice(0, 10);
-        })();
-
-        pickerSelected.value = newDate;
-        pickerMonth.value    = new Date(yr, mo, 1);
-        persist();
-
-        const newMonday = (() => {
-            const dow = newDate.getDay();
-            const md = new Date(newDate);
-            md.setDate(newDate.getDate() - (dow === 0 ? 6 : dow - 1));
-            return md.toISOString().slice(0, 10);
-        })();
-
-        // Trigger week fetch if week changed
-        if (oldMonday !== newMonday) {
-            const ts = useTimesheetStore();
-            ts.fetchWeekData(newMonday);
+        const dateStr = `${yr}-${String(mo + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const ui = useUiStore();
+        try {
+            const router = useRouter();
+            router.push(`/${ui.activeView}/${dateStr}`);
+        } catch {
+            // Fallback if called outside component context (e.g. from a store watcher)
+            setFromDate(new Date(yr, mo, d));
         }
+    }
+
+    /** Silent update from router — does NOT push to history. */
+    function setFromDate(date: Date) {
+        pickerSelected.value = date;
+        pickerMonth.value    = new Date(date.getFullYear(), date.getMonth(), 1);
+        persistPicker();
     }
 
     function prevMonth() {
         const m = pickerMonth.value;
         pickerMonth.value = new Date(m.getFullYear(), m.getMonth() - 1, 1);
-        persist();
+        persistPicker();
     }
 
     function nextMonth() {
         const m = pickerMonth.value;
         pickerMonth.value = new Date(m.getFullYear(), m.getMonth() + 1, 1);
-        persist();
+        persistPicker();
     }
 
     function goToday() {
-        pickerSelected.value = new Date(pickerToday.value);
-        pickerMonth.value    = new Date(pickerToday.value.getFullYear(), pickerToday.value.getMonth(), 1);
-        persist();
-
-        const ts = useTimesheetStore();
-        const todayMonday = (() => {
-            const d = new Date(pickerToday.value);
-            const dow = d.getDay();
-            d.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1));
-            return d.toISOString().slice(0, 10);
-        })();
-        ts.fetchWeekData(todayMonday);
+        const today = localDateStr(pickerToday.value);
+        const ui = useUiStore();
+        try {
+            const router = useRouter();
+            router.push(`/${ui.activeView}/${today}`);
+        } catch {
+            setFromDate(new Date(pickerToday.value));
+        }
     }
 
     return {
         pickerToday, pickerSelected, pickerMonth,
         monthLabel, daysInMonth, selectedDayIdx, todayDayIdx,
-        selectDay, prevMonth, nextMonth, goToday,
+        selectDay, setFromDate, prevMonth, nextMonth, goToday, persistPicker,
     };
 });
