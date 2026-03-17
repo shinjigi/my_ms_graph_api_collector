@@ -41,7 +41,6 @@
 import { computed }           from 'vue';
 import { usePickerStore }     from '../../stores/usePickerStore';
 import { useTimesheetStore }  from '../../stores/useTimesheetStore';
-import { DAYS }               from '../../mock/data';
 
 const picker = usePickerStore();
 const ts     = useTimesheetStore();
@@ -52,7 +51,7 @@ const weekCards = computed(() => {
     const monday = new Date(sel);
     monday.setDate(sel.getDate() - (dow === 0 ? 6 : dow - 1));
 
-    return DAYS.slice(0, 5).map((d, i) => {
+    return ts.days.slice(0, 5).map((d, i) => {
         const date      = new Date(monday);
         date.setDate(monday.getDate() + i);
         const monAbbr   = date.toLocaleDateString('it-IT', { month: 'short' });
