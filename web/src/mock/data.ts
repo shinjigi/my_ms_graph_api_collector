@@ -1,5 +1,10 @@
 import type { Day, TsRow, UsCard, TlEvent, Email, Holiday } from '../types';
 
+/** Standard contractual workday: 7h 42min = 7.7 decimal hours. */
+export const WORKDAY_HOURS      = 7.7;
+/** Half contractual workday: 3h 51min = 3.85 decimal hours. */
+export const HALF_WORKDAY_HOURS = 3.85;
+
 export const HOLIDAYS_IT: Holiday[] = [
     { m:  0, d:  1, name: 'Capodanno' },
     { m:  0, d:  6, name: 'Epifania' },
@@ -22,9 +27,9 @@ export const DAYABB_IT = ['Dom','Lun','Mar','Mer','Gio','Ven','Sab'];
 export const DAYS: Day[] = [
     { label:'Lun', date:'1 Giu',  rend:'ok',   zucHours:8,   nibol:'🏠 SW',     holiday:false },
     { label:'Mar', date:'2 Giu',  rend:'ok',   zucHours:0,   nibol:null,         holiday:true,  holidayName:'🇮🇹 Festa della Repubblica' },
-    { label:'Mer', date:'3 Giu',  rend:'warn', zucHours:7.5, nibol:'🏢 Ufficio', holiday:false },
+    { label:'Mer', date:'3 Giu',  rend:'warn', zucHours:WORKDAY_HOURS, nibol:'🏢 Ufficio', holiday:false },
     { label:'Gio', date:'4 Giu',  rend:'err',  zucHours:0,   nibol:'🏢 Ufficio', holiday:false },
-    { label:'Ven', date:'5 Giu',  rend:null,   zucHours:7.5, nibol:'🏠 SW',     holiday:false },
+    { label:'Ven', date:'5 Giu',  rend:null,   zucHours:WORKDAY_HOURS, nibol:'🏠 SW',     holiday:false },
     { label:'Sab', date:'6 Giu',  rend:null,   zucHours:0,   nibol:null,         holiday:false },
     { label:'Dom', date:'7 Giu',  rend:null,   zucHours:0,   nibol:null,         holiday:false },
 ];
@@ -86,14 +91,14 @@ export const EMAILS: Email[] = [
 export const US_TODAY_DEFAULT: UsCard[] = [
     {
         us:'Deploy process #2026', tpId:326279, state:'Inception',
-        tpHours:1, zucHours:7.5, zucPercent:14,
+        tpHours:1, zucHours:WORKDAY_HOURS, zucPercent:14,
         emails:3, commits:1, meetings:1,
         color:'#6366f1',
         note:'Pipeline ACC fix — KeyVault connection string aggiornato, deploy ripristinato.',
     },
     {
         us:'AssetVersioning updates', tpId:326215, state:'Dev/Unit test',
-        tpHours:0.5, zucHours:7.5, zucPercent:7,
+        tpHours:0.5, zucHours:WORKDAY_HOURS, zucPercent:7,
         emails:2, commits:1, meetings:0,
         color:'#8b5cf6',
         note:'batch size ridotto a 100 items su staging — OOM risolto, migrazione assets completata.',

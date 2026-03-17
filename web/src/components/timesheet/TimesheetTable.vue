@@ -13,28 +13,28 @@
                 <tr class="text-xs">
                     <th class="w-48">User Story</th>
                     <th class="w-20">Stato</th>
-                    <th v-for="(d, i) in ts.days.slice(0, 6)" :key="i"
+                    <th v-for="(col, i) in colHeaders" :key="i"
                         class="text-center text-xs"
-                        :class="dayHeadCls(d, i)">
+                        :class="dayHeadCls(ts.days[i], i)">
                         <template v-if="i === 5">
                             <span class="flex flex-col items-center opacity-55">
                                 <span class="font-bold">WE</span>
                                 <span class="font-normal" style="font-size:.6rem">Sab · Dom</span>
                             </span>
                         </template>
-                        <template v-else-if="d.holiday">
+                        <template v-else-if="col.isHoliday">
                             <span class="flex flex-col items-center gap-0.5 opacity-80">
-                                <span>{{ d.label }}</span>
-                                <span class="font-normal text-xs">{{ d.date }}</span>
-                                <span style="font-size:.6rem;color:hsl(280 60% 75%)" :title="d.holidayName">🇮🇹 Festività</span>
+                                <span>{{ col.label }}</span>
+                                <span class="font-normal text-xs">{{ col.date }}</span>
+                                <span style="font-size:.6rem;color:hsl(280 60% 75%)" :title="col.holidayName">🇮🇹 Festività</span>
                             </span>
                         </template>
                         <template v-else>
                             <span class="day-header-cell flex flex-col items-center gap-0.5"
                                   @click="selectTsDay(i)">
-                                <span :class="i === 4 ? 'text-primary font-bold' : ''">{{ d.label }}</span>
-                                <span class="font-normal opacity-60 text-xs">{{ d.date }}</span>
-                                <span class="text-xs font-bold" :class="rendIconCls(d.rend)">{{ rendIcon(d.rend) }}</span>
+                                <span :class="col.isToday ? 'text-primary font-bold' : ''">{{ col.label }}</span>
+                                <span class="font-normal opacity-60 text-xs">{{ col.date }}</span>
+                                <span class="text-xs font-bold" :class="rendIconCls(rend(i))">{{ rendIcon(rend(i)) }}</span>
                             </span>
                         </template>
                     </th>
@@ -46,18 +46,18 @@
             <tbody>
                 <tr class="text-xs" style="background:hsl(var(--b2)/0.55)">
                     <td colspan="2" class="text-right pr-3 text-base-content/50 text-xs font-semibold">Ore TP</td>
-                    <td v-for="(d, i) in ts.days.slice(0, 6)" :key="i" class="text-center text-xs font-bold" :class="totalsCellCls(d, i, 'tp')">
-                        {{ d.holiday || i === 5 ? (i === 5 ? '—' : '🇮🇹') : (ts.totalsRow.tp[i] || '—') }}
+                    <td v-for="(col, i) in colHeaders" :key="i" class="text-center text-xs font-bold" :class="totalsCellCls(ts.days[i], i, 'tp')">
+                        {{ col.isHoliday || i === 5 ? (i === 5 ? '—' : '🇮🇹') : (ts.totalsRow.tp[i] || '—') }}
                     </td>
                     <td class="text-center font-bold text-primary text-xs">{{ tpWeekTotal }}</td>
                     <td></td>
                 </tr>
                 <tr class="text-xs" style="background:hsl(var(--b2)/0.55)">
                     <td colspan="2" class="text-right pr-3 text-base-content/50 text-xs font-semibold">Zucchetti</td>
-                    <td v-for="(d, i) in ts.days.slice(0, 6)" :key="i" class="text-center text-xs font-bold" :class="totalsCellCls(d, i, 'zuc')">
-                        <template v-if="d.holiday">🇮🇹</template>
+                    <td v-for="(col, i) in colHeaders" :key="i" class="text-center text-xs font-bold" :class="totalsCellCls(ts.days[i], i, 'zuc')">
+                        <template v-if="col.isHoliday">🇮🇹</template>
                         <template v-else-if="i === 5">—</template>
-                        <template v-else-if="d.zucHours > 0"><span class="text-success">{{ d.zucHours }}</span></template>
+                        <template v-else-if="ts.days[i]?.zucHours > 0"><span class="text-success">{{ ts.days[i].zucHours }}</span></template>
                         <template v-else><span class="err-x font-black text-sm">✗</span></template>
                     </td>
                     <td class="text-center font-bold text-success text-xs">{{ zucWeekTotal }}</td>
@@ -65,8 +65,8 @@
                 </tr>
                 <tr class="text-xs border-b-2 border-base-300" style="background:hsl(var(--b2)/0.55)">
                     <td colspan="2" class="text-right pr-3 text-base-content/50 text-xs font-semibold">Delta</td>
-                    <td v-for="(d, i) in ts.days.slice(0, 6)" :key="i" class="text-center text-xs" :class="totalsCellCls(d, i, 'delta')">
-                        <template v-if="d.holiday || i === 5">—</template>
+                    <td v-for="(col, i) in colHeaders" :key="i" class="text-center text-xs" :class="totalsCellCls(ts.days[i], i, 'delta')">
+                        <template v-if="col.isHoliday || i === 5">—</template>
                         <template v-else>
                             <span :class="ts.totalsRow.delta[i] === 0 ? 'text-success font-black' : ts.totalsRow.delta[i] > 0 ? 'text-error' : 'text-base-content/40'">
                                 {{ ts.totalsRow.delta[i] === 0 ? '✓' : ts.totalsRow.delta[i] > 0 ? `−${ts.totalsRow.delta[i]}h` : '—' }}
@@ -124,6 +124,7 @@ import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue';
 import { useTimesheetStore }  from '../../stores/useTimesheetStore';
 import { usePickerStore }     from '../../stores/usePickerStore';
 import { useUiStore }         from '../../stores/useUiStore';
+import { HOLIDAYS_IT, DAYABB_IT } from '../../mock/data';
 import TsRow                  from './TsRow.vue';
 import type { Day }           from '../../types';
 
@@ -143,6 +144,30 @@ const weekDates = computed<Date[]>(() => {
         return d;
     });
 });
+
+// Per-column header data derived from real calendar dates
+interface ColHeader {
+    label:       string;
+    date:        string;
+    isToday:     boolean;
+    isHoliday:   boolean;
+    holidayName: string;
+}
+
+const colHeaders = computed<ColHeader[]>(() =>
+    weekDates.value.map(date => {
+        const dow     = date.getDay();
+        const holiday = HOLIDAYS_IT.find(h => h.m === date.getMonth() && h.d === date.getDate());
+        const monAbbr = date.toLocaleDateString('it-IT', { month: 'short' });
+        return {
+            label:       DAYABB_IT[dow],
+            date:        `${date.getDate()} ${monAbbr.charAt(0).toUpperCase() + monAbbr.slice(1, 3)}`,
+            isToday:     date.toDateString() === picker.pickerToday.toDateString(),
+            isHoliday:   !!holiday,
+            holidayName: holiday?.name ?? '',
+        };
+    })
+);
 
 function selectTsDay(i: number) {
     const date = weekDates.value[i];
@@ -173,14 +198,24 @@ const pinColStyles = computed(() => ({ tableLayout: 'fixed' as const }));
 const rendIcon    = (r: Day['rend']) => r === 'ok' ? '✓' : r === 'warn' ? '⚠' : r === 'err' ? '✗' : '';
 const rendIconCls = (r: Day['rend']) => r === 'ok' ? 'text-success' : r === 'warn' ? 'text-warning' : r === 'err' ? 'text-error opacity-80' : 'opacity-0';
 
+// Use reactive rend (from store) instead of static mock d.rend
+const rend = (i: number) => ts.rendPerDay[i] ?? null;
+
 function dayHeadCls(d: Day, i: number): string[] {
     const cls: string[] = [];
     if (i === 5) { cls.push('weekend-col', 'we-col'); return cls; }
-    if (d.holiday) { cls.push('holiday-col'); return cls; }
-    if (i === 4) cls.push('today-col');
-    if (d.rend === 'ok')   cls.push('day-ok');
-    if (d.rend === 'warn') cls.push('day-warn');
-    if (d.rend === 'err')  cls.push('day-err');
+    const col = colHeaders.value[i];
+    if (d?.holiday) {
+        cls.push('holiday-col');
+    } else {
+        const r = rend(i);
+        if (r === 'ok')   cls.push('day-ok');
+        if (r === 'warn') cls.push('day-warn');
+        if (r === 'err')  cls.push('day-err');
+    }
+    // outline-based indicators — always applied, do not override background/box-shadow
+    if (col?.isToday)                cls.push('today-col');
+    if (i === picker.selectedDayIdx) cls.push('selected-col');
     return cls;
 }
 
@@ -198,13 +233,20 @@ function colStyle(d: Day, i: number) {
 
 function totalsCellCls(d: Day, i: number, row: 'tp' | 'zuc' | 'delta'): string[] {
     if (i === 5) return ['weekend-col', 'we-col', 'text-xs', 'opacity-35'];
-    if (d.holiday) return ['holiday-col', 'text-xs'];
+    const col = colHeaders.value[i];
     const cls: string[] = [];
-    if (i === 4) cls.push('today-col');
-    if (d.rend === 'ok')   cls.push('day-ok');
-    if (d.rend === 'warn') cls.push('day-warn');
-    if (d.rend === 'err')  cls.push('day-err');
-    if (row === 'tp' && i === 4) cls.push('text-primary');
+    if (d?.holiday) {
+        cls.push('holiday-col', 'text-xs');
+    } else {
+        const r = rend(i);
+        if (r === 'ok')   cls.push('day-ok');
+        if (r === 'warn') cls.push('day-warn');
+        if (r === 'err')  cls.push('day-err');
+        if (row === 'tp' && col?.isToday) cls.push('text-primary');
+    }
+    // outline-based indicators — always applied, do not override background/box-shadow
+    if (col?.isToday)                cls.push('today-col');
+    if (i === picker.selectedDayIdx) cls.push('selected-col');
     return cls;
 }
 

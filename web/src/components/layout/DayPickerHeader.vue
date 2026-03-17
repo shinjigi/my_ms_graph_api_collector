@@ -22,9 +22,9 @@
                 class="day-btn"
                 :class="{
                     'day-btn-today':    day.isToday,
-                    'day-btn-selected': day.isSelected && !day.isToday,
-                    'day-btn-weekend':  day.isWeekend,
-                    'day-btn-holiday':  day.isHoliday,
+                    'day-btn-selected': day.isSelected,
+                    'day-btn-weekend':  day.isWeekend && !day.isSelected,
+                    'day-btn-holiday':  day.isHoliday && !day.isSelected,
                 }"
                 :title="day.holidayName"
                 @click="picker.selectDay(day.date.getFullYear(), day.date.getMonth(), day.date.getDate())"

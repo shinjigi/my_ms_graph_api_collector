@@ -1,6 +1,8 @@
 import { defineStore }          from 'pinia';
 import { ref, computed, watch } from 'vue';
-import { US_TODAY_DEFAULT, TS_ACTIVE, TS_PINNED, TL_EVENTS, EMAILS } from '../mock/data';
+import { US_TODAY_DEFAULT, TS_ACTIVE, TS_PINNED, TL_EVENTS, EMAILS, WORKDAY_HOURS } from '../mock/data';
+import { usePickerStore }       from './usePickerStore';
+import { useTimesheetStore }    from './useTimesheetStore';
 import type { UsCard } from '../types';
 
 function loadJson<T>(key: string, fallback: T): T {
@@ -37,7 +39,7 @@ export const useDayStore = defineStore('day', () => {
             .filter(r => !inToday.has(r.tpId))
             .map(r => ({
                 us: r.us, tpId: r.tpId, state: r.state,
-                tpHours: 0, zucHours: 7.5,
+                tpHours: 0, zucHours: WORKDAY_HOURS,
                 emails: 0, commits: r.git?.[4] ?? 0, meetings: 0,
                 color: DC(r.state), note: '',
                 totAllTime: r.totAllTime,
@@ -51,7 +53,7 @@ export const useDayStore = defineStore('day', () => {
         if (!src) return;
         usToday.value.push({
             us: src.us, tpId: src.tpId, state: src.state,
-            tpHours: 0, zucHours: 7.5,
+            tpHours: 0, zucHours: WORKDAY_HOURS,
             emails: 0, commits: 0, meetings: 0,
             color: DC(src.state), note: '',
         });
@@ -68,8 +70,13 @@ export const useDayStore = defineStore('day', () => {
     }
 
     const dayTotals = computed(() => {
-        const tp  = +usToday.value.reduce((a, u) => a + u.tpHours, 0).toFixed(1);
-        const zuc = 7.5;
+        const picker = usePickerStore();
+        const ts     = useTimesheetStore();
+        const dayIdx = picker.selectedDayIdx;
+        const tp     = dayIdx < 0
+            ? 0
+            : +ts.active.reduce((acc, r) => acc + ts.getHours(r.tpId, dayIdx), 0).toFixed(1);
+        const zuc    = dayIdx < 0 ? 0 : (ts.days[dayIdx]?.zucHours ?? 0);
         return { tp, zuc, delta: +(zuc - tp).toFixed(1) };
     });
 

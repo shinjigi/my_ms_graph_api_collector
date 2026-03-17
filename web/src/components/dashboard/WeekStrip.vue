@@ -61,9 +61,10 @@ const weekCards = computed(() => {
         const isToday    = date.toDateString() === picker.pickerToday.toDateString();
         const tpH        = +ts.active.reduce((acc, r) => acc + ts.getHours(r.tpId, i), 0).toFixed(1);
 
-        const rendCls  = d.rend === 'ok' ? 'rend-ok' : d.rend === 'warn' ? 'rend-warn' : d.rend === 'err' ? 'rend-err' : '';
-        const rendIcon = d.rend === 'ok' ? '✓' : d.rend === 'warn' ? '⚠' : d.rend === 'err' ? '✗' : '·';
-        const rendIconCls = d.rend === 'ok' ? 'text-success' : d.rend === 'warn' ? 'text-warning' : d.rend === 'err' ? 'text-error' : 'text-base-content/20';
+        const r        = ts.rendPerDay[i] ?? null;
+        const rendCls  = r === 'ok' ? 'rend-ok' : r === 'warn' ? 'rend-warn' : r === 'err' ? 'rend-err' : '';
+        const rendIcon = r === 'ok' ? '✓' : r === 'warn' ? '⚠' : r === 'err' ? '✗' : '·';
+        const rendIconCls = r === 'ok' ? 'text-success' : r === 'warn' ? 'text-warning' : r === 'err' ? 'text-error' : 'text-base-content/20';
 
         return { date, dateLabel, isSelected, isToday, rendCls, rendIcon, rendIconCls, zucH: d.zucHours, tpH, nibol: d.nibol };
     });

@@ -19,6 +19,18 @@
                         </svg>
                         +WE
                     </button>
+
+                    <!-- Quick-fill: applies to selected weekday column -->
+                    <div class="flex items-center gap-1 border-l border-base-300 pl-2">
+                        <span class="text-xs text-base-content/35 mr-1 shrink-0">
+                            {{ selectedDayLabel ?? '–' }}
+                        </span>
+                        <button class="btn btn-xs btn-ghost"        :disabled="fillDisabled" @click="fillDay(WORKDAY_HOURS)"      title="Compila giornata intera SW (7:42)">SW 7:42</button>
+                        <button class="btn btn-xs btn-ghost"        :disabled="fillDisabled" @click="fillDay(HALF_WORKDAY_HOURS)" title="Compila mezza giornata SW (3:51)">½ SW</button>
+                        <button class="btn btn-xs btn-ghost btn-warning opacity-70" :disabled="fillDisabled" @click="fillDay(0)"                   title="Azzera giornata (ferie intere)">Ferie</button>
+                        <button class="btn btn-xs btn-ghost btn-warning opacity-70" :disabled="fillDisabled" @click="fillDay(HALF_WORKDAY_HOURS)" title="Mezza giornata ferie + mezza SW (3:51)">½ Ferie</button>
+                    </div>
+
                     <span class="text-xs text-base-content/30 italic">{{ verificaLabel }}</span>
                     <button class="btn btn-xs btn-outline btn-warning" @click="runVerifica">Verifica concordanza</button>
                 </div>
@@ -32,15 +44,34 @@
 </template>
 
 <script setup lang="ts">
-import { ref }           from 'vue';
-import { useUiStore }    from '../../stores/useUiStore';
-import TimesheetTable    from './TimesheetTable.vue';
+import { ref, computed }        from 'vue';
+import { useUiStore }           from '../../stores/useUiStore';
+import { useTimesheetStore }    from '../../stores/useTimesheetStore';
+import { usePickerStore }       from '../../stores/usePickerStore';
+import { DAYABB_IT, WORKDAY_HOURS, HALF_WORKDAY_HOURS } from '../../mock/data';
+import TimesheetTable           from './TimesheetTable.vue';
 
-const ui            = useUiStore();
+const ui     = useUiStore();
+const ts     = useTimesheetStore();
+const picker = usePickerStore();
+
 const verificaLabel = ref('Ultima verifica: —');
 
 function runVerifica() {
     const now = new Date();
     verificaLabel.value = `Ultima verifica: oggi ${now.getHours()}:${String(now.getMinutes()).padStart(2,'0')}`;
+}
+
+const selectedDayLabel = computed(() => {
+    const idx = picker.selectedDayIdx;
+    if (idx < 0) return null;
+    const d = picker.pickerSelected;
+    return `${DAYABB_IT[d.getDay()]} ${d.getDate()}`;
+});
+
+const fillDisabled = computed(() => picker.selectedDayIdx < 0);
+
+function fillDay(hours: number) {
+    ts.fillDay(picker.selectedDayIdx, hours);
 }
 </script>

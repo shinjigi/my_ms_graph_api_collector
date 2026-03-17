@@ -1,5 +1,5 @@
 <template>
-    <div class="grid grid-cols-6 gap-2 mb-4">
+    <div class="grid grid-cols-5 gap-2 mb-4">
         <!-- Ore Zuc -->
         <div class="card bg-base-100 shadow-sm border border-base-300">
             <div class="card-body p-3">
@@ -8,21 +8,14 @@
                 <div class="text-xs text-base-content/40 mt-0.5">Ordinarie · Zucchetti</div>
             </div>
         </div>
-        <!-- Ore TP -->
+        <!-- Rendicontazione (merged) -->
         <div class="card bg-base-100 shadow-sm border border-base-300">
             <div class="card-body p-3">
-                <div class="text-xs text-base-content/50 uppercase tracking-wide">Ore TP</div>
-                <div class="text-xl font-bold text-primary mt-0.5">{{ day.dayTotals.tp }}<span class="text-sm">h</span></div>
-                <div class="text-xs text-base-content/40 mt-0.5">Loggate · TargetProcess</div>
-            </div>
-        </div>
-        <!-- Rendicontazione -->
-        <div class="card bg-base-100 shadow-sm border border-base-300">
-            <div class="card-body p-3">
-                <div class="text-xs text-base-content/50 uppercase tracking-wide">Rendicontazione</div>
+                <div class="text-xs text-base-content/50 uppercase tracking-wide">Rendicontazione · TP</div>
                 <div class="flex items-baseline gap-1 mt-0.5">
-                    <span class="text-xl font-bold text-primary">{{ day.dayTotals.tp }}</span>
+                    <span class="text-xl font-bold text-primary">{{ day.dayTotals.tp }}h</span>
                     <span class="text-xs text-base-content/40">/ {{ day.dayTotals.zuc }}h</span>
+                    <span class="text-xs text-base-content/35 ml-auto">{{ rendPct }}%</span>
                 </div>
                 <div class="h-1.5 rounded-full mt-1 overflow-hidden bg-base-300">
                     <div class="h-full rounded-full transition-all duration-300"
