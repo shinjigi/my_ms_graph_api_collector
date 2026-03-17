@@ -1,15 +1,7 @@
 import { defineStore }          from 'pinia';
 import { ref, computed, watch } from 'vue';
 import { DAYS, TS_ACTIVE, TS_PINNED } from '../mock/data';
-
-function loadJson<T>(key: string, fallback: T): T {
-    try {
-        const raw = localStorage.getItem(key);
-        return raw ? JSON.parse(raw) : fallback;
-    } catch {
-        return fallback;
-    }
-}
+import { loadJson }             from '../utils';
 
 export const useTimesheetStore = defineStore('timesheet', () => {
     const days   = ref(DAYS);
