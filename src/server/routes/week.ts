@@ -183,38 +183,35 @@ weekRouter.get('/:date', async (req: Request, res: Response) => {
 weekRouter.get('/:date/tp-hours', async (req: Request, res: Response) => {
     try {
         const dateStr = req.params.date as string;
-        const monday = getMonday(dateStr);
-        const friday = new Date(monday);
+        const monday  = getMonday(dateStr);
+        const friday  = new Date(monday);
         friday.setDate(monday.getDate() + 4);
 
+        const mondayStr = dateToString(monday);
         const fridayStr = dateToString(friday);
 
         const tpClient = new TargetprocessClient();
         const me = await tpClient.getMe();
-        const timeEntries = await tpClient.getTimesByUserAndDateRange(
-            me.Id,
-            dateToString(monday),
-            fridayStr
-        );
-        const openItems = await tpClient.getMyAssignedOpenItems();
 
-        // Parse time entries and group by assignable + date
+        const [timeEntries, openItems] = await Promise.all([
+            tpClient.getTimesByUserAndDateRange(me.Id, mondayStr, fridayStr),
+            tpClient.getMyAssignedOpenItems(),
+        ]);
+
+        // Group time entries by assignable ID and day index
         const entriesByAssignable = new Map<number, Map<number, number>>();
 
         for (const entry of timeEntries) {
-            const dateStr = parseTpDate(entry.Date);
-            if (dateStr === '-') continue;
+            const entryDate = parseTpDate(entry.Date);
+            if (entryDate === '-') continue;
 
-            const dayIndex = (() => {
-                const d = new Date(dateStr);
-                const dow = d.getDay();
-                const daysFromMonday = (dow === 0 ? 6 : dow - 1);
-                return daysFromMonday;
-            })();
+            const d   = new Date(entryDate);
+            const dow = d.getDay();
+            const dayIndex = dow === 0 ? 6 : dow - 1;
 
             if (dayIndex < 0 || dayIndex > 4) continue;
 
-            const tpId = (entry as unknown as { Assignable?: { Id: number } }).Assignable?.Id;
+            const tpId = entry.Assignable?.Id;
             if (!tpId) continue;
 
             if (!entriesByAssignable.has(tpId)) {
@@ -224,19 +221,39 @@ weekRouter.get('/:date/tp-hours', async (req: Request, res: Response) => {
             dayMap.set(dayIndex, (dayMap.get(dayIndex) ?? 0) + entry.Spent);
         }
 
-        // Build response entries from openItems, crossing with time data
-        const entries: TpWeekEntry[] = [];
+        // Build metadata map — openItems first (has state, project, timeSpent)
+        const metaMap = new Map<number, { name: string; stateName: string; projectName: string; timeSpent: number }>();
         for (const item of openItems) {
-            const tpId = item.id;
-            const dayHours = entriesByAssignable.get(tpId);
-            const hours: number[] = [0, 1, 2, 3, 4].map(i => dayHours?.get(i) ?? 0);
+            metaMap.set(item.id, {
+                name:        item.name,
+                stateName:   item.stateName,
+                projectName: item.projectName,
+                timeSpent:   item.timeSpent,
+            });
+        }
+        // Enrich with Assignable data from time entries for closed items not in openItems
+        for (const entry of timeEntries) {
+            const asgn = entry.Assignable;
+            if (!asgn || metaMap.has(asgn.Id)) continue;
+            metaMap.set(asgn.Id, {
+                name:        asgn.Name,
+                stateName:   asgn.EntityState?.Name ?? '',
+                projectName: asgn.Project?.Name ?? '',
+                timeSpent:   0,
+            });
+        }
 
+        // Build entries array — all assignables that have time logged this week
+        const entries: TpWeekEntry[] = [];
+        for (const [tpId, dayHoursMap] of entriesByAssignable) {
+            const meta  = metaMap.get(tpId) ?? { name: `TP #${tpId}`, stateName: '', projectName: '', timeSpent: 0 };
+            const hours = [0, 1, 2, 3, 4].map(i => +(dayHoursMap.get(i) ?? 0).toFixed(2));
             entries.push({
                 tpId,
-                usName:      item.name,
-                stateName:   item.stateName,
-                timeSpent:   item.timeSpent,
-                projectName: item.projectName,
+                usName:      meta.name,
+                stateName:   meta.stateName,
+                timeSpent:   meta.timeSpent,
+                projectName: meta.projectName,
                 hours,
             });
         }
@@ -249,6 +266,48 @@ weekRouter.get('/:date/tp-hours', async (req: Request, res: Response) => {
         };
 
         res.json(response);
+    } catch (err) {
+        res.status(500).json({ error: (err as Error).message });
+    }
+});
+
+interface SubmitEdit {
+    tpId:        number;
+    dayIdx:      number;
+    hours:       number;
+    date:        string;       // YYYY-MM-DD
+    description: string;
+}
+
+// POST /api/week/:date/submit  — bulk log hoursEdits to TargetProcess
+weekRouter.post('/:date/submit', async (req: Request, res: Response) => {
+    try {
+        const body = req.body as { edits?: SubmitEdit[] };
+        if (!Array.isArray(body.edits)) {
+            res.status(400).json({ error: 'edits array required' });
+            return;
+        }
+
+        const tpClient = new TargetprocessClient();
+        const submitted: unknown[] = [];
+        const errors:    Array<{ tpId: number; date: string; error: string }> = [];
+
+        for (const edit of body.edits) {
+            if (!edit.tpId || !edit.date || edit.hours <= 0) continue;
+            try {
+                const result = await tpClient.logTime({
+                    usId:        edit.tpId,
+                    spent:       edit.hours,
+                    date:        edit.date,
+                    description: edit.description || '',
+                });
+                submitted.push(result);
+            } catch (err) {
+                errors.push({ tpId: edit.tpId, date: edit.date, error: (err as Error).message });
+            }
+        }
+
+        res.json({ submitted: submitted.length, errors });
     } catch (err) {
         res.status(500).json({ error: (err as Error).message });
     }

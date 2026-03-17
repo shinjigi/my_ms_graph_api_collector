@@ -92,20 +92,30 @@ export async function nibolBookDesk(date: string): Promise<void> {
             const pin = pins.nth(i);
             
             try {
-                // Ensure the pin is in the viewport to avoid "outside of viewport" errors
+                // Ensure the pin is in the viewport. 
+                // Leaflet maps can't always be scrolled by standard Playwright methods.
+                // We try a combine approach.
                 await pin.scrollIntoViewIfNeeded().catch(() => {});
                 
-                // Trigger hover. If physical hover fails, we still proceed with dispatchEvent
+                const box = await pin.boundingBox();
+                if (!box) {
+                    console.log(`Pin ${i}: No bounding box, skipping.`);
+                    continue;
+                }
+
+                console.log(`Pin ${i}: Position [${Math.round(box.x)}, ${Math.round(box.y)}]`);
+
+                // Move mouse to pin and hover
+                await page.mouse.move(box.x + box.width/2, box.y + box.height/2);
                 await pin.hover({ timeout: 1000, force: true }).catch(() => {});
                 await pin.dispatchEvent('mouseover');
                 await pin.dispatchEvent('mouseenter');
                 
-                // Wait for any dynamic changes
-                await page.waitForTimeout(400); 
+                await page.waitForTimeout(600); 
 
                 let tooltipText: string | null = null;
                 
-                // Strategy A: Check if the pin itself has text content (e.g. <span> or text node inside)
+                // Strategy A: Check if the pin itself has text content
                 const internalText = await pin.textContent();
                 if (internalText && internalText.trim().match(/O\d+/)) {
                     tooltipText = internalText.trim();
@@ -120,27 +130,41 @@ export async function nibolBookDesk(date: string): Promise<void> {
                 }
 
                 if (!tooltipText) {
-                    // Strategy C: Generic visible tooltip
-                    const genericTooltip = page.locator('.leaflet-tooltip, .ant-tooltip, .Floorplan_tooltip__').filter({ visible: true });
-                    const tooltipCount = await genericTooltip.count();
-                    if (tooltipCount > 0) {
-                        tooltipText = await genericTooltip.last().textContent();
+                    // Strategy C: Closest visible tooltip
+                    // Instead of just 'last()', find the one whose bounding box is closest to the pin
+                    const possibleTooltips = page.locator('.leaflet-tooltip, .ant-tooltip, .Floorplan_tooltip__').filter({ visible: true });
+                    const tCount = await possibleTooltips.count();
+                    
+                    if (tCount > 0) {
+                        const closest = await page.evaluate(({px, py, sel}) => {
+                            const tls = Array.from(document.querySelectorAll(sel)) as HTMLElement[];
+                            let minData = { text: '', dist: Infinity };
+                            tls.forEach(t => {
+                                const r = t.getBoundingClientRect();
+                                const dist = Math.sqrt(Math.pow(r.left - px, 2) + Math.pow(r.top - py, 2));
+                                if (dist < minData.dist) {
+                                    minData = { text: t.textContent?.trim() || '', dist };
+                                }
+                            });
+                            return minData;
+                        }, { px: box.x, py: box.y, sel: '.leaflet-tooltip, .ant-tooltip, [class*="Floorplan_tooltip"]' });
+                        
+                        if (closest.dist < 100) { // Only trust if relatively close
+                            tooltipText = closest.text;
+                        }
                     }
                 }
 
                 const cleanText = tooltipText?.trim() || "";
                 if (cleanText) {
                     const match = cleanText.match(/O(\d+)/i);
-                    console.log(`Pin ${i}: Text="${cleanText}"`);
+                    console.log(`Pin ${i}: Detected="${cleanText}"`);
                     
                     if (match) {
                         const num = parseInt(match[1], 10);
                         if (num >= 13 && num <= 36) {
                             console.log(`  >>> Target desk found: ${cleanText}!`);
-                            
-                            // Restore UI before clicking
                             if (hideStyle) await hideStyle.evaluate(el => (el as any).remove()).catch(() => {});
-                            
                             console.log(`  >>> Executing click...`);
                             await pin.click({ force: true });
                             booked = true;
@@ -148,7 +172,7 @@ export async function nibolBookDesk(date: string): Promise<void> {
                         }
                     }
                 } else {
-                    console.log(`Pin ${i}: No text found.`);
+                    console.log(`Pin ${i}: No text detected.`);
                 }
                 
                 await pin.dispatchEvent('mouseleave');
@@ -218,41 +242,131 @@ export async function nibolCheckIn(date: string): Promise<void> {
 
 export async function nibolFetchCalendarData(range?: { start: string, end: string }): Promise<NibolBooking[]> {
     const profileDir = getProfileDir();
+    const userName   = process.env['NIBOL_USER_NAME'] || 'Luigi De Pinto';
+    
     const context    = await chromium.launchPersistentContext(profileDir, {
-        headless:  true,
-        slowMo:    200,
-        args:      ['--no-sandbox'],
+        headless:  false,
+        slowMo:    500,
+        args:      ['--no-sandbox', '--start-maximized'],
     });
 
     const page = await context.newPage();
 
     try {
-        await page.goto(`${NIBOL_URL}/calendar`, { waitUntil: 'networkidle' });
+        // If range.start is provided, we could try to navigate to that specific month
+        // For now, we assume the default view or the user will navigate if needed.
+        // We navigate to /calendar which usually shows the current month.
+        console.log(`Navigating to calendar: ${NIBOL_URL}/calendar`);
+        await page.goto(`${NIBOL_URL}/calendar`, { waitUntil: 'load', timeout: 60000 });
 
         if (await isLoginRequired(page)) {
-             console.log('Sessione Nibol scaduta. Lancio browser visibile per login...');
-             await page.waitForURL(url => !url.toString().includes('login') && !url.toString().includes('auth'), {
-                 timeout: 60_000,
-             });
+            console.log('Sessione Nibol scaduta. Login manuale richiesto.');
+            await page.waitForURL(url => !url.toString().includes('login') && !url.toString().includes('auth'), {
+                timeout: 300_000,
+            });
+            await page.goto(`${NIBOL_URL}/calendar`, { waitUntil: 'load', timeout: 60000 });
         }
 
-        const bookings: NibolBooking[] = [];
+        console.log('Waiting for bookings grid to load...');
+        await page.waitForSelector('table, .CalendarTable_container__1hJ2Y', { timeout: 30000 }).catch(() => console.log('Table not found, proceeding anyway...'));
+        await page.waitForTimeout(3000);
         
-        await page.waitForSelector('.booking, [class*="Booking"]', { timeout: 10000 }).catch(() => {});
+        await page.screenshot({ path: 'data/calendar_debug.png', fullPage: true });
 
-        const entries = await page.evaluate(() => {
+        // 1. Extract period (e.g. "March 2026") from the H3 header
+        const periodText = await page.locator('h3').filter({ hasText: /202\d/ }).first().textContent().catch(() => '');
+        console.log('Detected Period:', periodText);
+        
+        let targetMonth = new Date().getMonth();
+        let targetYear = new Date().getFullYear();
+        
+        if (periodText) {
+            const match = periodText.match(/(\w+)\s+(\d{4})/);
+            if (match) {
+                const monthName = match[1];
+                targetYear = parseInt(match[2], 10);
+                const date = new Date(`${monthName} 1, ${targetYear}`);
+                if (!isNaN(date.getTime())) {
+                    targetMonth = date.getMonth();
+                }
+            }
+        }
+
+        const bookings: NibolBooking[] = await page.evaluate(({month, year, targetName}) => {
             const list: any[] = [];
-            const elements = document.querySelectorAll('.booking-item, .card-booking, [data-testid*="booking"]');
-            elements.forEach(el => {
-                const date = el.querySelector('.date, .time')?.textContent?.trim() || '';
-                const title = el.querySelector('.title, .name')?.textContent?.trim() || '';
-                if (date) list.push({ date, type: title });
+            
+            // Identify all rows
+            const rows = Array.from(document.querySelectorAll('tr'));
+            
+            // Prioritize finding the row with "(You)" or the specific target name
+            const myRow = rows.find(r => 
+                r.textContent?.includes('(You)') || 
+                r.textContent?.toLowerCase().includes(targetName.toLowerCase())
+            );
+            
+            if (!myRow) return [];
+
+            // Identify header days (usually in <thead> <th> spans)
+            const headers = Array.from(document.querySelectorAll('thead th'));
+            const dayHeaders = headers.map(h => {
+                const span = h.querySelector('span');
+                const dayMatch = (span?.textContent || h.textContent)?.trim().match(/^(\d+)$/);
+                return dayMatch ? parseInt(dayMatch[1], 10) : null;
             });
+            
+            // Get all cells in the user's row
+            const cells = Array.from(myRow.querySelectorAll('td'));
+            
+            cells.forEach((cell, idx) => {
+                const day = dayHeaders[idx];
+                if (!day) return; // Skip columns that don't represent a day (e.g., the Name column)
+
+                // Detect booking type via classes or colors
+                let type: string | null = null;
+                if (cell.classList.contains('office') || cell.querySelector('span[style*="rgb(22, 119, 255)"]')) {
+                    type = 'Office';
+                } else if (cell.classList.contains('remote') || cell.querySelector('span[style*="rgb(250, 173, 20)"]')) {
+                    type = 'Remote';
+                }
+
+                if (type) {
+                    const monthStr = String(month + 1).padStart(2, '0');
+                    const dayStr = String(day).padStart(2, '0');
+                    list.push({ 
+                        date: `${year}-${monthStr}-${dayStr}`,
+                        type: type,
+                        details: `Detected as ${type} in grid`
+                    });
+                }
+            });
+
             return list;
-        });
+        }, { month: targetMonth, year: targetYear, targetName: userName });
 
-        return entries;
+        // Final filtering by range if start/end are provided
+        if (range) {
+            const start = new Date(range.start);
+            const end = new Date(range.end);
+            return bookings.filter(b => {
+                const bDate = new Date(b.date);
+                return bDate >= start && bDate <= end;
+            }).map(b => {
+                const bDate = new Date(b.date);
+                const monthName = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(bDate);
+                const day = bDate.getDate();
+                const year = bDate.getFullYear();
+                return {
+                    ...b,
+                    date: `${day} ${monthName} ${year}`
+                };
+            });
+        }
 
+        return bookings;
+
+    } catch (error) {
+        console.error("Error fetching calendar data:", error);
+        return [];
     } finally {
         await context.close();
     }
