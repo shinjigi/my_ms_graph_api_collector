@@ -57,6 +57,16 @@ if (!matchedActivity) {
     console.log("Navigating to Zucchetti portal...");
     await page.goto('https://saas.hrzucchetti.it/hrpzcs01/jsp/home.jsp');
 
+    // Check for "Comunicazioni" popup (common on Zucchetti)
+    try {
+        const popupCloseButton = page.locator('[id^="spModalLayer_closebtn"]');
+        await popupCloseButton.waitFor({ state: 'visible', timeout: 3000 });
+        console.log("Closing Zucchetti initial popup...");
+        await popupCloseButton.click();
+    } catch (e) {
+        // Not present or didn't appear in time
+    }
+
     // 2. Login
     console.log("Filling login credentials...");
     const username = process.env.ZUCCHETTI_USERNAME;
