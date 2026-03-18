@@ -1,17 +1,19 @@
 import { defineStore }          from 'pinia';
 import { ref, computed, watch } from 'vue';
 import { DAYS, TS_ACTIVE, TS_PINNED, DAYABB_IT, MONTH_IT } from '../mock/data';
-import { fetchWeek, fetchTpWeekHours } from '../api';
+import { fetchWeek, fetchTpWeekHours, submitWeekHours as submitWeekHoursApi } from '../api';
 import { loadJson }             from '../utils';
-import type { Day, TsRow, ApiWeekResponse, ApiTpWeekResponse } from '../types';
+import type { Day, TsRow, ApiWeekResponse, ApiTpWeekResponse, SubmitEdit } from '../types';
 
 export const useTimesheetStore = defineStore('timesheet', () => {
     const days   = ref<Day[]>(DAYS);
     const active = ref<TsRow[]>(TS_ACTIVE.map(r => ({ ...r, hours: [...(r.hours ?? [0,0,0,0,0,0,0])] })));
     const pinned = ref<TsRow[]>(TS_PINNED.map(r => ({ ...r })));
 
-    const loading = ref(false);
-    const error   = ref<string | null>(null);
+    const loading     = ref(false);
+    const error       = ref<string | null>(null);
+    const weekData    = ref<ApiWeekResponse | null>(null);
+    const currentMonday = ref<string>('');
 
     const hoursEdits = ref<Record<string, number>>(loadJson('portal_hours', {}));
     const noteEdits  = ref<Record<string, string>>(loadJson('portal_ts_notes', {}));
@@ -28,16 +30,18 @@ export const useTimesheetStore = defineStore('timesheet', () => {
         error.value   = null;
 
         try {
-            const [weekData, tpData] = await Promise.all([
+            const [weekRes, tpData] = await Promise.all([
                 fetchWeek(date),
                 fetchTpWeekHours(date),
             ]);
 
+            currentMonday.value = weekRes.monday;
+
             // Map week response to Day[]
-            days.value = weekData.days.map((d, idx) => {
-                const dow = idx; // 0=Mon...6=Sun
+            days.value = weekRes.days.map((d, idx) => {
+                const dow      = idx; // 0=Mon...6=Sun
                 const dayLabel = DAYABB_IT[([1,2,3,4,5,6,0][dow]) % 7] ?? '?';
-                const dateObj = new Date(d.date);
+                const dateObj  = new Date(d.date);
                 const dateLabel = `${dateObj.getDate()} ${MONTH_IT[dateObj.getMonth()].substring(0, 3)}`;
 
                 return {
@@ -51,8 +55,8 @@ export const useTimesheetStore = defineStore('timesheet', () => {
                 };
             });
 
-            // Map TP week response to TsRow[]
-            active.value = tpData.entries.map(e => ({
+            // Map entries to rows; split active (has hours this week) vs pinned (no hours yet)
+            const allRows = tpData.entries.map((e: any) => ({
                 project:    e.projectName,
                 us:         e.usName,
                 tpId:       e.tpId,
@@ -62,17 +66,13 @@ export const useTimesheetStore = defineStore('timesheet', () => {
                 notes:      [null, null, null, null, null, null, null],
             }));
 
-            // Map unassigned open items to pinned (items not in active)
-            const activeIds = new Set(active.value.map(r => r.tpId));
-            pinned.value = tpData.openItems
-                .filter((item: any) => !activeIds.has(item.id))
-                .map((item: any) => ({
-                    project:    item.projectName,
-                    us:         item.name,
-                    tpId:       item.id,
-                    state:      item.stateName,
-                    totAllTime: item.timeSpent,
-                }));
+            // Items with at least one hour logged this week → active (prominent)
+            // Items with no hours yet → pinned (available for logging)
+            active.value = allRows.filter(r => (r.hours as number[]).slice(0, 5).some(h => h > 0));
+            pinned.value = allRows.filter(r => !(r.hours as number[]).slice(0, 5).some(h => h > 0));
+
+            // Set weekData last — triggers useDayStore watcher after active/pinned are populated
+            weekData.value = weekRes;
         } catch (err) {
             console.warn('fetchWeekData failed, falling back to mock data:', (err as Error).message);
             // Keep existing mock data
@@ -154,11 +154,46 @@ export const useTimesheetStore = defineStore('timesheet', () => {
         })
     );
 
+    /**
+     * Bulk-submits all hoursEdits to TargetProcess.
+     * Returns { submitted, errors } from the API.
+     */
+    async function submitWeekHours(): Promise<{ submitted: number; errors: unknown[] }> {
+        const monday = currentMonday.value;
+        if (!monday) throw new Error('No week loaded');
+
+        const edits: SubmitEdit[] = [];
+        for (const [key, hours] of Object.entries(hoursEdits.value)) {
+            if (!hours || hours <= 0) continue;
+            const [tpIdStr, dayIdxStr] = key.split('_');
+            const tpId   = Number(tpIdStr);
+            const dayIdx = Number(dayIdxStr);
+            if (dayIdx < 0 || dayIdx > 4) continue;
+
+            const mondayDate = new Date(monday);
+            mondayDate.setDate(mondayDate.getDate() + dayIdx);
+            const yr  = mondayDate.getFullYear();
+            const mo  = String(mondayDate.getMonth() + 1).padStart(2, '0');
+            const day = String(mondayDate.getDate()).padStart(2, '0');
+
+            edits.push({
+                tpId,
+                dayIdx,
+                hours,
+                date:        `${yr}-${mo}-${day}`,
+                description: noteEdits.value[key] ?? '',
+            });
+        }
+
+        return submitWeekHoursApi(monday, edits);
+    }
+
     return {
         days, active, pinned,
         loading, error,
+        weekData, currentMonday,
         hoursEdits, noteEdits,
-        getHours, getNote, setHours, setNote, fillDay, fetchWeekData,
+        getHours, getNote, setHours, setNote, fillDay, fetchWeekData, submitWeekHours,
         totalsRow, rendPerDay,
     };
 });
