@@ -22,13 +22,13 @@
                         @update="val => ts.setHours(row.tpId, 5, val)"
                     />
                     <div class="flex gap-1 mt-0.5">
-                        <span v-if="(row.git?.[5] ?? 0) + (row.git?.[6] ?? 0)" class="commit-dot source-git" style="width:8px;height:8px"></span>
-                        <span v-if="(row.svn?.[5] ?? 0) + (row.svn?.[6] ?? 0)" class="commit-dot source-svn" style="width:8px;height:8px"></span>
+                        <span v-if="(row.git?.[5] ?? 0) + (row.git?.[6] ?? 0)" class="commit-dot source-git" ></span>
+                        <span v-if="(row.svn?.[5] ?? 0) + (row.svn?.[6] ?? 0)" class="commit-dot source-svn" ></span>
                     </div>
                 </div>
             </template>
             <template v-else-if="d.holiday">
-                <span class="text-xs" style="color:hsl(280 60% 70%)">🇮🇹</span>
+                <span class="text-xs ts-holiday-icon">🇮🇹</span>
             </template>
             <template v-else>
                 <div class="flex flex-col items-center gap-0">
@@ -40,8 +40,8 @@
                     />
                     <TsNoteCell :tpId="row.tpId" :day-idx="i" />
                     <div class="flex gap-1 mt-0.5">
-                        <span v-if="row.git?.[i]" class="commit-dot source-git" style="width:8px;height:8px"></span>
-                        <span v-if="row.svn?.[i]" class="commit-dot source-svn" style="width:8px;height:8px"></span>
+                        <span v-if="row.git?.[i]" class="commit-dot source-git" ></span>
+                        <span v-if="row.svn?.[i]" class="commit-dot source-svn" ></span>
                     </div>
                 </div>
             </template>
