@@ -36,12 +36,15 @@ export const useTimesheetStore = defineStore('timesheet', () => {
             ]);
 
             currentMonday.value = weekRes.monday;
+            console.log('[TS] fetchWeekData:', date, 'monday:', weekRes.monday, 'days:', weekRes.days.map(d => d.date));
 
             // Map week response to Day[]
             days.value = weekRes.days.map((d, idx) => {
                 const dow      = idx; // 0=Mon...6=Sun
                 const dayLabel = DAYABB_IT[([1,2,3,4,5,6,0][dow]) % 7] ?? '?';
-                const dateObj  = new Date(d.date);
+                // Parse ISO date (YYYY-MM-DD) as local midnight to avoid UTC offset issues
+                const parts = d.date.split('-');
+                const dateObj = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
                 const dateLabel = `${dateObj.getDate()} ${MONTH_IT[dateObj.getMonth()].substring(0, 3)}`;
 
                 return {
@@ -54,6 +57,7 @@ export const useTimesheetStore = defineStore('timesheet', () => {
                     holidayName:  d.holidayName,
                 };
             });
+            console.log('[TS] days mapped:', days.value.map(d => d.date));
 
             // Map entries to rows; split active (has hours this week) vs pinned (no hours yet)
             const allRows = tpData.entries.map((e: any) => ({
