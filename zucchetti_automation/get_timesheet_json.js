@@ -42,7 +42,21 @@ if (values.date) {
     await page.waitForSelector('input[placeholder="Username"], input[name*="UserName"]', { state: 'visible', timeout: 30000 });
     await page.locator('input[placeholder="Username"], input[name*="UserName"]').first().fill(username);
     await page.locator('input[placeholder="Password"], input[type="password"]').first().fill(password);
-    await page.locator('button:has-text("Login"), input[value="Login"], a:has-text("Login")').first().click();
+
+    await page.locator('button, input[type="submit"], input[type="button"], a')
+        .filter({ hasText: /Login|Accedi/i })
+        .first()
+        .click();
+
+    // Check for "Comunicazioni" popup (common on Zucchetti)
+    try {
+        const popupCloseButton = page.locator('[id^="spModalLayer_closebtn"]');
+        await popupCloseButton.waitFor({ state: 'visible', timeout: 3000 });
+        console.log("Closing Zucchetti initial popup...");
+        await popupCloseButton.click();
+    } catch (e) {
+        // Not present or didn't appear in time
+    }
 
     // Navigate to Cartellino
     await page.waitForSelector('a[title="Servizi aggiuntivi"]', { state: 'visible', timeout: 30000 });
@@ -53,6 +67,9 @@ if (values.date) {
         context.waitForEvent('page', { timeout: 90000 }),
     ]);
     await newPage.waitForLoadState('networkidle');
+
+    // Aspetta che l'elemento del loading venga rimosso fisicamente dal DOM
+    await newPage.locator('#rif_mbbody').waitFor({ state: 'detached' });
 
     // Select target Month/Year if provided.
     // Zucchetti triggers a partial page reload on every select change; re-query each
@@ -79,6 +96,9 @@ if (values.date) {
                 await newPage.locator('select[id$="_TxtAnno"]').filter({ visible: true }).first().selectOption(targetYear);
                 await waitStable();
             }
+
+            // Aspetta che l'elemento del loading venga rimosso fisicamente dal DOM
+            await newPage.locator('#rif_mbbody').waitFor({ state: 'detached' });
         }
 
         if (targetMonth) {
@@ -93,6 +113,9 @@ if (values.date) {
                 await newPage.locator('select[id$="_TxtMese"]').filter({ visible: true }).first().selectOption(targetMonth);
                 await waitStable();
             }
+
+            // Aspetta che l'elemento del loading venga rimosso fisicamente dal DOM
+            await newPage.locator('#rif_mbbody').waitFor({ state: 'detached' });
         }
     }
 

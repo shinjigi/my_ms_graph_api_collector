@@ -264,11 +264,13 @@ async function run(): Promise<void> {
 
     const kbItems   = await loadKb();
     const defaults  = await loadDefaults();
+    const sinceDate = process.env['COLLECT_SINCE'] ?? '2025-01-01';
 
     await fs.mkdir(PROPOSALS_DIR, { recursive: true });
 
     const aggFiles  = (await fs.readdir(AGG_DIR).catch(() => [] as string[]))
         .filter(f => /^\d{4}-\d{2}-\d{2}\.json$/.test(f))
+        .filter(f => f.replace('.json', '') >= sinceDate)
         .filter(f => !dateArg || f === `${dateArg}.json`);
 
     let processed = 0;
@@ -305,7 +307,12 @@ async function run(): Promise<void> {
             console.log(`    → ${proposal.entries.length} entries, totale ${proposal.totalHours}h`);
             processed++;
         } catch (err) {
-            console.error(`    Errore per ${date}: ${(err as Error).message}`);
+            const msg = (err as Error).message;
+            console.error(`    Errore per ${date}: ${msg}`);
+            if (msg.includes('credit balance is too low')) {
+                console.error('\n[FATAL] Credito Anthropic esaurito. Interruzione processo.');
+                process.exit(1);
+            }
         }
     }
 
