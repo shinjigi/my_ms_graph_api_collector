@@ -85,6 +85,42 @@ export interface QuickLogItem extends UsCard {
     rem?:       number;
 }
 
+// --- Raw signal types (mirroring backend collector interfaces) ---
+
+export interface CalendarEventRaw {
+    id:      string;
+    subject: string;
+    start:   { dateTime: string; timeZone: string };
+    end:     { dateTime: string; timeZone: string };
+    organizer?: { emailAddress: { name: string; address: string } } | null;
+    isOnlineMeeting?: boolean;
+}
+
+export interface GitCommitRaw {
+    hash:    string;
+    author:  string;
+    date:    string;    // YYYY-MM-DD (no time)
+    message: string;
+    repo?:   string;
+}
+
+export interface SvnCommitRaw {
+    revision: string;
+    author:   string;
+    date:     string;   // YYYY-MM-DD
+    message:  string;
+    paths?:   string[];
+}
+
+export interface EmailRaw {
+    id:               string;
+    subject:          string;
+    from:             { emailAddress: { name: string; address: string } } | null;
+    receivedDateTime: string;
+    bodyPreview:      string;
+    webLink:          string;
+}
+
 // --- API Response Types (from backend) ---
 
 export interface WeekDayResponse {
@@ -96,11 +132,11 @@ export interface WeekDayResponse {
     holiday:     boolean;
     holidayName?: string;
     zucchetti:   unknown;
-    calendar:    unknown[];
-    emails:      unknown[];
+    calendar:    CalendarEventRaw[];
+    emails:      EmailRaw[];
     teams:       unknown[];
-    svnCommits:  unknown[];
-    gitCommits:  unknown[];
+    svnCommits:  SvnCommitRaw[];
+    gitCommits:  GitCommitRaw[];
     browserVisits: unknown[];
 }
 
@@ -123,4 +159,19 @@ export interface ApiTpWeekResponse {
     userName: string;
     entries:  ApiTpWeekEntry[];
     openItems: unknown[];
+}
+
+// --- Submit types ---
+
+export interface SubmitEdit {
+    tpId:        number;
+    dayIdx:      number;
+    hours:       number;
+    date:        string;
+    description: string;
+}
+
+export interface SubmitResult {
+    submitted: number;
+    errors:    Array<{ tpId: number; date: string; error: string }>;
 }
