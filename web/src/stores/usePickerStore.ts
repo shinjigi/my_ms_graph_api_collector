@@ -39,6 +39,7 @@ function localDateStr(d: Date): string {
 
 export const usePickerStore = defineStore('picker', () => {
     const persisted = loadPersisted();
+    const router = useRouter();
 
     const pickerToday    = ref<Date>(todayMidnight());
     const pickerSelected = ref<Date>(
@@ -112,13 +113,7 @@ export const usePickerStore = defineStore('picker', () => {
     function selectDay(yr: number, mo: number, d: number) {
         const dateStr = `${yr}-${String(mo + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
         const ui = useUiStore();
-        try {
-            const router = useRouter();
-            router.push(`/${ui.activeView}/${dateStr}`);
-        } catch {
-            // Fallback if called outside component context (e.g. from a store watcher)
-            setFromDate(new Date(yr, mo, d));
-        }
+        router.push(`/${ui.activeView}/${dateStr}`);
     }
 
     /** Silent update from router — does NOT push to history. */
@@ -143,12 +138,7 @@ export const usePickerStore = defineStore('picker', () => {
     function goToday() {
         const today = localDateStr(pickerToday.value);
         const ui = useUiStore();
-        try {
-            const router = useRouter();
-            router.push(`/${ui.activeView}/${today}`);
-        } catch {
-            setFromDate(new Date(pickerToday.value));
-        }
+        router.push(`/${ui.activeView}/${today}`);
     }
 
     return {
