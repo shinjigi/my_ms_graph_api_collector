@@ -9,7 +9,7 @@ import * as path              from 'path';
 import { TargetprocessClient } from '../../targetprocess/client';
 import { parseTpDate, hhmmToHours } from '../../targetprocess/format';
 import type { AggregatedDay } from '../../analysis/aggregator';
-import type { ZucchettiDay } from '../../collectors/zucchetti';
+import type { ZucchettiDay } from '../../collectors/zucchetti/index';
 
 export const weekRouter = Router();
 
@@ -108,9 +108,23 @@ function parseZucchettiLocation(day: ZucchettiDay): string {
 
 function isWorkday(day: ZucchettiDay): boolean {
     const orario = (day.orario ?? '').toUpperCase();
-    if (orario === 'DOM' || orario === 'SAB') return false;
+    if (orario === 'DOM' || orario === 'SAB' || orario === 'FES') return false;
     if (!day.hOrd || day.hOrd.trim() === '') return false;
     return true;
+}
+
+// Italian public holidays (month 0-indexed, day 1-indexed)
+const HOLIDAYS_IT: Array<{ m: number; d: number; name: string }> = [
+    { m: 0, d: 1, name: 'Capodanno' }, { m: 0, d: 6, name: 'Epifania' },
+    { m: 3, d: 5, name: 'Pasqua 2026' }, { m: 3, d: 6, name: "Lunedì dell'Angelo" },
+    { m: 3, d: 25, name: 'Festa della Liberazione' }, { m: 4, d: 1, name: 'Festa del Lavoro' },
+    { m: 5, d: 2, name: 'Festa della Repubblica' }, { m: 7, d: 15, name: 'Ferragosto' },
+    { m: 10, d: 1, name: 'Ognissanti' }, { m: 11, d: 8, name: 'Immacolata' },
+    { m: 11, d: 25, name: 'Natale' }, { m: 11, d: 26, name: 'Santo Stefano' },
+];
+
+function findHoliday(date: Date): { name: string } | undefined {
+    return HOLIDAYS_IT.find(h => h.m === date.getMonth() && h.d === date.getDate());
 }
 
 // GET /api/week/:date
@@ -147,7 +161,11 @@ weekRouter.get('/:date', async (req: Request, res: Response) => {
         // Fall back to raw Zucchetti for days without an aggregated file
         const zuccDay: ZucchettiDay | null = agg?.zucchetti ?? zuccAll.find(z => z.date === dateStr) ?? null;
 
-        const isWd      = agg?.isWorkday   ?? (zuccDay ? isWorkday(zuccDay) : false);
+        // Default: weekdays (Mon-Fri) are workdays; only override if we have Zucchetti evidence
+        const dow       = d.getDay(); // 0=Sun, 6=Sat
+        const isWeekday = dow >= 1 && dow <= 5;
+        const holiday   = findHoliday(d);
+        const isWd      = agg?.isWorkday ?? (zuccDay ? isWorkday(zuccDay) : (isWeekday && !holiday));
         const oreTarget = agg?.oreTarget   ?? (zuccDay && isWd ? hhmmToHours(zuccDay.hOrd) : 0);
         const location  = agg?.location    ?? (zuccDay && isWd ? parseZucchettiLocation(zuccDay) : 'unknown');
 
@@ -156,9 +174,9 @@ weekRouter.get('/:date', async (req: Request, res: Response) => {
             isWorkday:    isWd,
             oreTarget,
             location,
-            nibol:        null, // not yet in aggregated data
+            nibol:        null,
             holiday:      !isWd,
-            holidayName:  undefined,
+            holidayName:  holiday?.name,
             zucchetti:    zuccDay,
             calendar:     agg?.calendar      ?? [],
             emails:       agg?.emails        ?? [],
@@ -243,9 +261,28 @@ weekRouter.get('/:date/tp-hours', async (req: Request, res: Response) => {
             });
         }
 
-        // Build entries array — all assignables that have time logged this week
+        // Build entries array:
+        //  1. All open items (always shown in active section for logging)
+        //  2. Closed items that have time entries this week (so past logs remain visible)
         const entries: TpWeekEntry[] = [];
+        const openIds = new Set(openItems.map(i => i.id));
+
+        for (const item of openItems) {
+            const dayHoursMap = entriesByAssignable.get(item.id);
+            const hours = [0, 1, 2, 3, 4].map(i => +(dayHoursMap?.get(i) ?? 0).toFixed(2));
+            entries.push({
+                tpId:        item.id,
+                usName:      item.name,
+                stateName:   item.stateName,
+                timeSpent:   item.timeSpent,
+                projectName: item.projectName,
+                hours,
+            });
+        }
+
+        // Closed items with hours this week (not in openItems)
         for (const [tpId, dayHoursMap] of entriesByAssignable) {
+            if (openIds.has(tpId)) continue;
             const meta  = metaMap.get(tpId) ?? { name: `TP #${tpId}`, stateName: '', projectName: '', timeSpent: 0 };
             const hours = [0, 1, 2, 3, 4].map(i => +(dayHoursMap.get(i) ?? 0).toFixed(2));
             entries.push({
