@@ -10,13 +10,13 @@ const { createGraphClient } = require('./graphClient') as {
     createGraphClient: () => Promise<import('@microsoft/microsoft-graph-client').Client>;
 };
 
-import { collectGraphCalendar } from './collectors/graph-calendar';
-import { collectGraphEmail }    from './collectors/graph-email';
-import { collectGraphTeams }    from './collectors/graph-teams';
-import { collectSvnCommits }    from './collectors/svn-commits';
-import { collectGitCommits }    from './collectors/git-commits';
-import { collectZucchetti }     from './collectors/zucchetti';
-import { collectBrowserHistory } from './collectors/browser-history';
+import { collectGraphCalendar } from './collectors/graph/calendar';
+import { collectGraphEmail }    from './collectors/graph/email';
+import { collectGraphTeams }    from './collectors/graph/teams';
+import { collectSvnCommits }    from './collectors/vcs/svn';
+import { collectGitCommits }    from './collectors/vcs/git';
+import { collectZucchetti }     from './collectors/zucchetti/index';
+import { collectBrowserHistory } from './collectors/browser/history';
 
 async function run(): Promise<void> {
     const forceFlag = process.argv.includes('--force');

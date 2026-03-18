@@ -9,13 +9,13 @@ import * as path  from 'path';
 import * as dotenv from 'dotenv';
 dotenv.config();
 
-import type { ZucchettiDay }      from '../collectors/zucchetti';
-import type { CalendarEventRaw }  from '../collectors/graph-calendar';
-import type { EmailRaw }          from '../collectors/graph-email';
-import type { TeamsMessageRaw }   from '../collectors/graph-teams';
-import type { SvnCommit }         from '../collectors/svn-commits';
-import type { GitCommit }         from '../collectors/git-commits';
-import type { BrowserVisit }      from '../collectors/browser-history';
+import type { ZucchettiDay }      from '../collectors/zucchetti/index';
+import type { CalendarEventRaw }  from '../collectors/graph/calendar';
+import type { EmailRaw }          from '../collectors/graph/email';
+import type { TeamsMessageRaw }   from '../collectors/graph/teams';
+import type { SvnCommit }         from '../collectors/vcs/svn';
+import type { GitCommit }         from '../collectors/vcs/git';
+import type { BrowserVisit }      from '../collectors/browser/history';
 import { hhmmToHours }            from '../targetprocess/format';
 
 const RAW_DIR      = path.join(process.cwd(), 'data', 'raw');
@@ -100,6 +100,7 @@ async function run(): Promise<void> {
     console.log('Aggregazione dati raw → aggregated...');
 
     await fs.mkdir(AGG_DIR, { recursive: true });
+    const sinceDate = process.env['COLLECT_SINCE'] ?? '2025-01-01';
 
     const zuccDays     = await loadDirMonthly<ZucchettiDay>(ZUCC_DIR);
     const calendar     = await loadDirMonthly<CalendarEventRaw>(CAL_DIR);
@@ -179,6 +180,7 @@ async function run(): Promise<void> {
 
     for (const zDay of zuccDays) {
         const date      = zDay.date;
+        if (date < sinceDate) continue;
         const workday   = isWorkday(zDay);
         const oreTarget = workday ? hhmmToHours(zDay.hOrd) : 0;
 
