@@ -1,252 +1,292 @@
-import { chromium, Page, Frame, BrowserContext } from 'playwright';
+import { Page, Frame } from 'playwright';
 import { parseArgs } from 'node:util';
+import { startZucchettiSession } from './session';
+import { scrapeSingleDay, validateDay, patchRawZucchettiFile } from './scraper';
+import { aggregateSingleDay } from '../../analysis/aggregator';
+import type { WeekDayData } from '../../server/routes/week';
 
-const options = {
-    date: { type: 'string' as const },
-    type: { type: 'string' as const, default: 'SMART WORKING' },
-    'full-day': { type: 'boolean' as const, default: false },
-    hours: { type: 'string' as const, default: '0' },
-    minutes: { type: 'string' as const, default: '0' },
-};
-
-const args = process.argv.slice(2);
-const { values } = parseArgs({ options, args, strict: false });
-
-const targetDate = values.date as string; // format YYYY-MM-DD
-const activityType = (values.type as string).trim().toUpperCase();
-const isFullDay = values['full-day'] as boolean;
-const hours = values.hours as string;
-const minutes = values.minutes as string;
-
-// Zucchetti valid giustificativi mapped perfectly to the HTML options
+// Zucchetti valid giustificativi mapped to the HTML select options
 const validActivities = [
-    "DONAZIONE SANGUE", "EX FESTIVITA'", "FERIE", "FORMAZIONE", 
-    "GIORNO PERMESSO STUDIO RETR. A", "PERM. AGG.VO INSERIMENTO ASILO", 
-    "PERMESSO NON RETRIBUITO MALATTIA FIGLIO 9 -14 ANNI", 
-    "PERMESSO NON RETRIBUITO MALATTIA FIGLIO FINO 3 ANN", 
-    "PERMESSO NON RETRIBUITO MALATTIA FIGLIO FINO 8  AN", 
-    "PERMESSO PER ESAMI", "PERMESSO STUDIO", "RIPOSO COMPENSATIVO", 
-    "RIPOSO COMPENSATIVO ELEZIONI", "SERVIZIO ESTERNO", "SMART WORKING", 
-    "Straordinario da autorizzare", "TRASFERTA CON PERNOTTO ALTRI P", 
-    "TRASFERTA CON PERNOTTO BELGIO", "TRASFERTA CON PERNOTTO BRASILE", 
-    "TRASFERTA CON PERNOTTO ITALIA", "TRASFERTA CON PERNOTTO PORTOGA", 
-    "TRASFERTA CON PERNOTTO SPAGNA", "TRASFERTA SENZA PERNOTTO ALTRI", 
-    "TRASFERTA SENZA PERNOTTO BELGI", "TRASFERTA SENZA PERNOTTO BRASI", 
-    "TRASFERTA SENZA PERNOTTO ITALI", "TRASFERTA SENZA PERNOTTO PORTO", 
+    "DONAZIONE SANGUE", "EX FESTIVITA'", "FERIE", "FORMAZIONE",
+    "GIORNO PERMESSO STUDIO RETR. A", "PERM. AGG.VO INSERIMENTO ASILO",
+    "PERMESSO NON RETRIBUITO MALATTIA FIGLIO 9 -14 ANNI",
+    "PERMESSO NON RETRIBUITO MALATTIA FIGLIO FINO 3 ANN",
+    "PERMESSO NON RETRIBUITO MALATTIA FIGLIO FINO 8  AN",
+    "PERMESSO PER ESAMI", "PERMESSO STUDIO", "RIPOSO COMPENSATIVO",
+    "RIPOSO COMPENSATIVO ELEZIONI", "SERVIZIO ESTERNO", "SMART WORKING",
+    "Straordinario da autorizzare", "TRASFERTA CON PERNOTTO ALTRI P",
+    "TRASFERTA CON PERNOTTO BELGIO", "TRASFERTA CON PERNOTTO BRASILE",
+    "TRASFERTA CON PERNOTTO ITALIA", "TRASFERTA CON PERNOTTO PORTOGA",
+    "TRASFERTA CON PERNOTTO SPAGNA", "TRASFERTA SENZA PERNOTTO ALTRI",
+    "TRASFERTA SENZA PERNOTTO BELGI", "TRASFERTA SENZA PERNOTTO BRASI",
+    "TRASFERTA SENZA PERNOTTO ITALI", "TRASFERTA SENZA PERNOTTO PORTO",
     "TRASFERTA SENZA PERNOTTO SPAGN", "VISITA MEDICA"
 ];
 
-if (!targetDate) {
-    console.error("Error: Please provide a target date.");
-    console.error("Usage: npm run zucchetti:update -- --date=YYYY-MM-DD [--full-day=true] [--type='SMART WORKING'] [--hours=4] [--minutes=30]");
-    process.exit(1);
+export { validActivities };
+
+export interface ZucchettiRequestParams {
+    date:     string;   // YYYY-MM-DD
+    type:     string;   // activity name (e.g. "SMART WORKING", "FERIE")
+    fullDay:  boolean;
+    hours?:   number;
+    minutes?: number;
+    headless?: boolean;
+    scrapeAfterSubmit?: boolean;
 }
 
-const matchedActivity = validActivities.find(a => a.toUpperCase().includes(activityType));
-if (!matchedActivity) {
-    console.error(`Error: Activity type "${activityType}" is not recognized.`);
-    console.error(`Valid options are: \n${validActivities.join('\n')}`);
-    process.exit(1);
+export interface ZucchettiRequestResult {
+    success:      boolean;
+    message:      string;
+    skipped?:     boolean;       // true if activity already existed
+    scrapeError?: string;        // non-null if post-submit scrape failed
+    dayUpdate?:   WeekDayData;   // re-aggregated day data for frontend
 }
 
-(async () => {
-    // 1. Launch browser
-    const browser = await chromium.launch({ headless: false });
-    const context = await browser.newContext();
-    const page: Page = await context.newPage();
+/**
+ * After submit (or skip), scrape the current day from the Cartellino,
+ * patch the raw Zucchetti file, re-aggregate the day, and return WeekDayData.
+ */
+async function postSubmitScrape(page: Page, targetDate: string): Promise<WeekDayData> {
+    console.log(`[zucchetti] Post-submit scrape for ${targetDate}...`);
+    const scraped = await scrapeSingleDay(page, targetDate);
+    if (!scraped) throw new Error(`Day ${targetDate} not found in Cartellino grid.`);
 
-    console.log("Navigating to Zucchetti portal...");
-    await page.goto('https://saas.hrzucchetti.it/hrpzcs01/jsp/home.jsp');
+    const validated = validateDay(scraped);
+    await patchRawZucchettiFile(targetDate, validated);
 
-    // Check for "Comunicazioni" popup (common on Zucchetti)
+    const agg = await aggregateSingleDay(targetDate, validated);
+
+    return {
+        date:          agg.date,
+        isWorkday:     agg.isWorkday,
+        oreTarget:     agg.oreTarget,
+        location:      agg.location,
+        nibol:         null,
+        holiday:       !agg.isWorkday,
+        zucchetti:     agg.zucchetti,
+        calendar:      agg.calendar,
+        emails:        agg.emails,
+        teams:         agg.teams,
+        svnCommits:    agg.svnCommits,
+        gitCommits:    agg.gitCommits,
+        browserVisits: agg.browserVisits,
+    };
+}
+
+/**
+ * Submits an activity request to the Zucchetti portal via Playwright.
+ * Uses the shared session module for login and Cartellino navigation.
+ * If scrapeAfterSubmit is true, also scrapes the updated day and re-aggregates.
+ */
+export async function submitZucchettiRequest(params: ZucchettiRequestParams): Promise<ZucchettiRequestResult> {
+    const { date: targetDate, type: rawType, fullDay: isFullDay, hours = 0, minutes = 0, headless = true, scrapeAfterSubmit = false } = params;
+    const activityType = rawType.trim().toUpperCase();
+
+    if (!targetDate || !/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
+        return { success: false, message: `Invalid date format: "${targetDate}". Expected YYYY-MM-DD.` };
+    }
+
+    const matchedActivity = validActivities.find(a => a.toUpperCase().includes(activityType));
+    if (!matchedActivity) {
+        return { success: false, message: `Activity type "${activityType}" not recognized. Valid: ${validActivities.join(', ')}` };
+    }
+
+    // Use shared session for login + Cartellino navigation (headless resolved from env if not explicit)
+    const session = await startZucchettiSession(headless);
+    const { browser, page: newPage } = session;
+
     try {
-        const popupCloseButton = page.locator('[id^="spModalLayer_closebtn"]');
-        await popupCloseButton.waitFor({ state: 'visible', timeout: 3000 });
-        console.log("Closing Zucchetti initial popup...");
-        await popupCloseButton.click();
-    } catch (e) {
-        // Not present or didn't appear in time
-    }
+        // Check if activity already exists (and is NOT cancelled)
+        console.log(`[zucchetti] Checking existing activities for ${targetDate}...`);
+        const dayCell = newPage.locator('td.richieste').filter({ has: newPage.locator(`span[onclick*="${targetDate}"]`) }).first();
 
-    // 2. Login
-    console.log("Filling login credentials...");
-    const username = process.env.ZUCCHETTI_USERNAME;
-    const password = process.env.ZUCCHETTI_PASSWORD;
-
-    if (!username || !password) {
-        console.error("Error: ZUCCHETTI_USERNAME or ZUCCHETTI_PASSWORD not found in environment.");
-        process.exit(1);
-    }
-
-    try {
-        await page.waitForTimeout(2000);
-        await page.waitForSelector('input[placeholder="Username"], input[name*="UserName"]', { state: 'visible', timeout: 30000 });
-    } catch (error) {
-        console.error("Could not find the login form! Taking a screenshot for debugging...");
-        await page.screenshot({ path: 'login_error_debug.png', fullPage: true });
-        throw error;
-    }
-
-    const usernameInput = page.locator('input[placeholder="Username"], input[name*="UserName"]').first();
-    const passwordInput = page.locator('input[placeholder="Password"], input[type="password"]').first();
-    const loginButton = page.locator('button:has-text("Login"), input[value="Login"], a:has-text("Login")').first();
-
-    await usernameInput.fill(username);
-    await passwordInput.fill(password);
-    
-    console.log("Clicking Login button...");
-    await loginButton.click();
-
-    // 3. Wait for post-login page
-    console.log("Waiting for 'Servizi aggiuntivi' link to appear...");
-    const serviziAggiuntiviSelector = 'a[title="Servizi aggiuntivi"]';
-    
-    try {
-        await page.waitForSelector(serviziAggiuntiviSelector, { state: 'visible', timeout: 30000 });
-    } catch (error) {
-        console.error("Could not find 'Servizi aggiuntivi'! Check home_error_debug.png.");
-        await page.screenshot({ path: 'home_error_debug.png', fullPage: true });
-        throw error;
-    }
-
-    // 4. Click 'Servizi aggiuntivi'
-    console.log("Clicking 'Servizi aggiuntivi'...");
-    await page.click(serviziAggiuntiviSelector);
-
-    // 5. Click "Cartellino Mensile"
-    console.log("Clicking 'Cartellino Mensile'...");
-    await page.getByText('Cartellino Mensile', { exact: false }).click();
-
-    console.log("Waiting for new tab to open...");
-    const newPagePromise = context.waitForEvent('page', { timeout: 90000 });
-    const newPage = await newPagePromise;
-    await newPage.waitForLoadState('networkidle');
-
-    console.log("New tab opened! Navigated to HR-WorkFlow.");
-
-    // 6. Check if activity already exists (and is NOT cancelled), then click "Nuova richiesta"
-    console.log(`Checking if '${matchedActivity}' already exists for ${targetDate}...`);
-    const dayCell = newPage.locator(`td.richieste`).filter({ has: newPage.locator(`span[onclick*="${targetDate}"]`) }).first();
-    
-    if (await dayCell.count() > 0) {
-        // Find all activity rows in the cell
-        const activityRows = dayCell.locator('div.fakeRow');
-        const rowCount = await activityRows.count();
-        
-        for (let i = 0; i < rowCount; i++) {
-            const row = activityRows.nth(i);
-            const rowText = await row.innerText();
-            
-            if (rowText.toUpperCase().includes(matchedActivity.toUpperCase())) {
-                const isCancelled = await row.locator('span[title="Cancellata"]').count() > 0;
-                if (!isCancelled) {
-                    console.log(`Success: Active activity '${matchedActivity}' already exists for ${targetDate}. Skipping submission.`);
-                    await browser.close();
-                    process.exit(0);
-                } else {
-                    console.log(`Found a cancelled instance of '${matchedActivity}' for ${targetDate}. Ignoring it.`);
+        if (await dayCell.count() > 0) {
+            const activityRows = dayCell.locator('div.fakeRow');
+            const rowCount = await activityRows.count();
+            for (let i = 0; i < rowCount; i++) {
+                const row = activityRows.nth(i);
+                const rowText = await row.innerText();
+                if (rowText.toUpperCase().includes(matchedActivity.toUpperCase())) {
+                    const isCancelled = await row.locator('span[title="Cancellata"]').count() > 0;
+                    if (!isCancelled) {
+                        console.log(`[zucchetti] Activity already exists for ${targetDate}. Skipping.`);
+                        const result: ZucchettiRequestResult = {
+                            success: true,
+                            message: `"${matchedActivity}" already exists for ${targetDate}.`,
+                            skipped: true,
+                        };
+                        // Still scrape to refresh day data even when skipping
+                        if (scrapeAfterSubmit) {
+                            try {
+                                result.dayUpdate = await postSubmitScrape(newPage, targetDate);
+                            } catch (err) {
+                                result.scrapeError = (err as Error).message;
+                            }
+                        }
+                        return result;
+                    }
                 }
             }
         }
-    }
 
-    console.log(`Clicking 'Nuova richiesta' for ${targetDate}...`);
-    await newPage.locator(`span[title="Nuova richiesta"][onclick*="${targetDate}"]`).click();
+        // Click "Nuova richiesta" for target date
+        console.log(`[zucchetti] Submitting "${matchedActivity}" for ${targetDate}...`);
+        await newPage.locator(`span[title="Nuova richiesta"][onclick*="${targetDate}"]`).click();
 
-    // 7. Wait for modal and select activity
-    console.log("Waiting for the modal to fully load...");
-    await newPage.waitForTimeout(4000); 
+        // Wait for modal and select activity
+        await newPage.waitForTimeout(4000);
 
-    console.log(`Selecting matched activity: "${matchedActivity}"...`);
-    try {
-        // Zucchetti often uses iframes for modals. Let's find the right frame.
-        let targetFrame: Page | Frame = newPage;
-        const frames = newPage.frames();
-        console.log(`Searching across ${frames.length} frames...`);
+        try {
+            let targetFrame: Page | Frame = newPage;
+            const frames = newPage.frames();
+            const dropdownSelector = 'select[id$="_Combobox23"], select.Combobox23_ctrl';
 
-        const dropdownSelector = 'select[id$="_Combobox23"], select.Combobox23_ctrl';
-        
-        let dropdown = null;
-        for (const frame of frames) {
-            const found = frame.locator(dropdownSelector).first();
-            if (await found.count() > 0) {
-                console.log(`Found dropdown in frame: ${frame.url()}`);
-                targetFrame = frame;
-                dropdown = found;
-                break;
+            let dropdown = null;
+            for (const frame of frames) {
+                const found = frame.locator(dropdownSelector).first();
+                if (await found.count() > 0) {
+                    targetFrame = frame;
+                    dropdown = found;
+                    break;
+                }
             }
+
+            if (!dropdown) {
+                dropdown = newPage.locator(dropdownSelector).first();
+                await dropdown.waitFor({ state: 'attached', timeout: 5000 });
+            }
+
+            await dropdown.selectOption({ label: matchedActivity });
+            console.log(`[zucchetti] Selected "${matchedActivity}".`);
+            await (targetFrame as Page).waitForTimeout(3000);
+
+            // Handle duration — Zucchetti has TWO "Giornata intera" checkboxes:
+            //   InteraBox  (hidden) — used for specific event types
+            //   cPeriodoBox (visible) — the standard full-day checkbox
+            // We must target the VISIBLE one (cPeriodoBox) first.
+            if (isFullDay) {
+                console.log('[zucchetti] Checking "Giornata intera" (cPeriodoBox)...');
+                const checked = await targetFrame.evaluate(() => {
+                    // Find the visible checkbox div — cPeriodoBox is visible for standard activities
+                    const cpDiv = document.querySelector<HTMLDivElement>('div[id$="_cPeriodoBox_div"]');
+                    if (cpDiv && cpDiv.style.display !== 'none') {
+                        const cb = cpDiv.querySelector<HTMLInputElement>('input[type="checkbox"]');
+                        if (cb && !cb.checked) {
+                            cb.click();
+                            return 'cPeriodoBox';
+                        }
+                        if (cb?.checked) return 'cPeriodoBox-already';
+                    }
+                    // Fallback: InteraBox
+                    const ibDiv = document.querySelector<HTMLDivElement>('div[id$="_InteraBox_div"]');
+                    if (ibDiv && ibDiv.style.display !== 'none') {
+                        const cb = ibDiv.querySelector<HTMLInputElement>('input[type="checkbox"]');
+                        if (cb && !cb.checked) {
+                            cb.click();
+                            return 'InteraBox';
+                        }
+                        if (cb?.checked) return 'InteraBox-already';
+                    }
+                    return null;
+                });
+
+                if (checked) {
+                    console.log(`[zucchetti] Checked via ${checked}.`);
+                } else {
+                    throw new Error('Could not find any visible "Giornata intera" checkbox.');
+                }
+                // Wait for Zucchetti JS to react to the checkbox change
+                await (targetFrame as Page).waitForTimeout(1000);
+            } else {
+                console.log(`[zucchetti] Setting time to ${hours}:${minutes}...`);
+                // qtahh/qtamm inputs may be hidden — use evaluate for reliability
+                await targetFrame.evaluate(({ h, m }: { h: number; m: number }) => {
+                    const hInput = document.querySelector<HTMLInputElement>('input[id$="_qtahh"]');
+                    const mInput = document.querySelector<HTMLInputElement>('input[id$="_qtamm"]');
+                    if (hInput) {
+                        hInput.value = String(h);
+                        hInput.dispatchEvent(new Event('change', { bubbles: true }));
+                        hInput.dispatchEvent(new Event('blur', { bubbles: true }));
+                    }
+                    if (mInput) {
+                        mInput.value = String(m);
+                        mInput.dispatchEvent(new Event('change', { bubbles: true }));
+                        mInput.dispatchEvent(new Event('blur', { bubbles: true }));
+                    }
+                }, { h: hours, m: minutes });
+            }
+
+            // Click "Invia"
+            console.log('[zucchetti] Clicking Invia...');
+            const inviaBtn = targetFrame.locator('input[id$="_InvioButton"]').first();
+            await inviaBtn.waitFor({ state: 'visible', timeout: 10000 });
+            await inviaBtn.click({ force: true });
+
+        } catch (err) {
+            await newPage.screenshot({ path: 'dropdown_error_debug.png', fullPage: true });
+            return { success: false, message: `Modal interaction failed: ${(err as Error).message}` };
         }
 
-        if (!dropdown) {
-            console.log("Not found in any frame, trying main page...");
-            dropdown = newPage.locator(dropdownSelector).first();
-            await dropdown.waitFor({ state: 'attached', timeout: 5000 });
+        // Verification
+        console.log('[zucchetti] Verifying submission...');
+        const result: ZucchettiRequestResult = { success: true, message: '' };
+        try {
+            await newPage.waitForTimeout(3000);
+            await newPage.waitForSelector(`text=${matchedActivity}`, { state: 'visible', timeout: 15000 });
+            console.log(`[zucchetti] Verified "${matchedActivity}" on timesheet for ${targetDate}.`);
+            result.message = `"${matchedActivity}" submitted for ${targetDate}.`;
+        } catch {
+            await newPage.screenshot({ path: 'verification_fyi.png', fullPage: true });
+            result.message = `Request sent for ${targetDate}, but verification timed out. Check portal manually.`;
         }
 
-        // Use the identified frame for subsequent actions (checkboxes, inputs)
-        console.log(`Selecting ${matchedActivity} using frame/page...`);
-        await dropdown.selectOption({ label: matchedActivity });
-        console.log(`Selected ${matchedActivity}.`);
-        
-        // Zucchetti usually triggers a lot of JS. Wait for the page to settle.
-        await (targetFrame as any).waitForTimeout(3000);
-        await newPage.screenshot({ path: 'after_selection_debug.png', fullPage: true });
-
-        // 8. Handle duration
-        console.log(`Handling duration in same frame: FullDay=${isFullDay}`);
-        if (isFullDay) {
-            console.log("Checking 'Giornata intera' box...");
-            // Filter by visibility to avoid hitting hidden copies of the checkbox
-            const fullDayCheckbox = targetFrame.locator('input[id$="_cPeriodoBox"], input[id$="_InteraBox"]').filter({ visible: true }).first();
-            
+        // Post-submit scrape: reuse the same page to read updated day data
+        if (scrapeAfterSubmit) {
             try {
-                await fullDayCheckbox.waitFor({ state: 'visible', timeout: 5000 });
-                await fullDayCheckbox.check({ force: true });
-            } catch (e) {
-                console.log("Direct check failed, trying to click by text 'Giornata intera'...");
-                await targetFrame.locator('label:has-text("Giornata intera")').filter({ visible: true }).first().click({ force: true });
+                result.dayUpdate = await postSubmitScrape(newPage, targetDate);
+            } catch (err) {
+                result.scrapeError = (err as Error).message;
+                console.warn(`[zucchetti] Post-submit scrape failed: ${result.scrapeError}`);
             }
-        } else {
-            console.log(`Setting time to ${hours}:${minutes}...`);
-            const hoursInput = targetFrame.locator('input[id$="_qtahh"]').filter({ visible: true }).first();
-            const minutesInput = targetFrame.locator('input[id$="_qtamm"]').filter({ visible: true }).first();
-            
-            await hoursInput.waitFor({ state: 'visible', timeout: 5000 });
-            await hoursInput.fill(hours.toString(), { force: true });
-            await hoursInput.dispatchEvent('blur'); // Trigger validation/UI update
-
-            await minutesInput.fill(minutes.toString(), { force: true });
-            await minutesInput.dispatchEvent('blur'); // Trigger validation/UI update
         }
 
-        // 9. Click "Invia"
-        console.log("Clicking Invia...");
-        const inviaButton = targetFrame.locator('input[id$="_InvioButton"]').first();
-        
-        // Use a longer timeout (10s) as Zucchetti's UI can be slow to update visiblity
-        await inviaButton.waitFor({ state: 'visible', timeout: 10000 });
-        await inviaButton.click({ force: true });
+        return result;
 
-    } catch (error) {
-        console.error(`Failed during modal interaction! Check dropdown_error_debug.png.`);
-        await newPage.screenshot({ path: 'dropdown_error_debug.png', fullPage: true });
-        throw error;
+    } finally {
+        await browser.close();
+    }
+}
+
+// --- CLI entry point ---
+if (require.main === module || process.argv[1]?.includes('updateData')) {
+    const cliOptions = {
+        date:       { type: 'string' as const },
+        type:       { type: 'string' as const, default: 'SMART WORKING' },
+        'full-day': { type: 'boolean' as const, default: false },
+        hours:      { type: 'string' as const, default: '0' },
+        minutes:    { type: 'string' as const, default: '0' },
+    };
+
+    const { values } = parseArgs({ options: cliOptions, args: process.argv.slice(2), strict: false });
+
+    if (!values.date) {
+        console.error('Usage: npm run zucchetti:update -- --date=YYYY-MM-DD [--full-day=true] [--type="SMART WORKING"] [--hours=4] [--minutes=30]');
+        process.exit(1);
     }
 
-    // 10. Verification
-    console.log("Verifying submission...");
-    try {
-        // Wait for potential success message or for modal to close
-        await newPage.waitForTimeout(3000);
-        // Look for the activity text on the timesheet for verification
-        await newPage.waitForSelector(`text=${matchedActivity}`, { state: 'visible', timeout: 15000 });
-        console.log(`Success! "${matchedActivity}" verified on timesheet for ${targetDate}.`);
-    } catch (error) {
-        console.log("Verification timed out, but request might have been sent. Check the portal manually.");
-        await newPage.screenshot({ path: 'verification_fyi.png', fullPage: true });
-    }
-
-    console.log("Completion achieved. Closing browser in 5 seconds...");
-    await newPage.waitForTimeout(5000);
-    await browser.close();
-})();
+    submitZucchettiRequest({
+        date:     values.date as string,
+        type:     values.type as string,
+        fullDay:  values['full-day'] as boolean,
+        hours:    parseInt(values.hours as string, 10),
+        minutes:  parseInt(values.minutes as string, 10),
+        // headless resolved from ZUCCHETTI_HEADLESS env var (default true)
+    }).then(result => {
+        console.log(result.success ? `OK: ${result.message}` : `FAIL: ${result.message}`);
+        process.exit(result.success ? 0 : 1);
+    }).catch(err => {
+        console.error('Fatal:', err);
+        process.exit(1);
+    });
+}

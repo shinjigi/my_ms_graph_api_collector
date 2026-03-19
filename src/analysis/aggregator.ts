@@ -44,7 +44,7 @@ export interface AggregatedDay {
     browserVisits: BrowserVisit[];
 }
 
-function parseZucchettiLocation(day: ZucchettiDay): 'office' | 'smart' | 'mixed' | 'unknown' {
+export function parseZucchettiLocation(day: ZucchettiDay): 'office' | 'smart' | 'mixed' | 'unknown' {
     const hasSmartWorking = day.giustificativi.some(g =>
         g.text.toUpperCase().includes('SMART')
     );
@@ -59,7 +59,7 @@ function parseZucchettiLocation(day: ZucchettiDay): 'office' | 'smart' | 'mixed'
     return 'unknown';
 }
 
-function isWorkday(day: ZucchettiDay): boolean {
+export function isWorkday(day: ZucchettiDay): boolean {
     const orario = (day.orario ?? '').toUpperCase();
 
     // Weekend markers
@@ -94,6 +94,58 @@ async function loadDirMonthly<T>(dir: string): Promise<T[]> {
     }
 
     return all;
+}
+
+/** Load a single month file from a raw source directory. */
+async function loadMonthFile<T>(dir: string, monthStr: string): Promise<T[]> {
+    const filePath = path.join(dir, `${monthStr}.json`);
+    try {
+        const raw  = await fs.readFile(filePath, 'utf-8');
+        const data = JSON.parse(raw) as T[];
+        return Array.isArray(data) ? data : [];
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * Aggregate a single day: reads raw source files for the target month,
+ * filters by date, builds and writes AggregatedDay, and returns it.
+ */
+export async function aggregateSingleDay(date: string, zDay: ZucchettiDay): Promise<AggregatedDay> {
+    const monthStr = date.slice(0, 7);
+
+    const [calendar, emails, teams, svn, git, chrome, firefox] = await Promise.all([
+        loadMonthFile<CalendarEventRaw>(CAL_DIR, monthStr),
+        loadMonthFile<EmailRaw>(EMAIL_DIR, monthStr),
+        loadMonthFile<TeamsMessageRaw>(TEAMS_DIR, monthStr),
+        loadMonthFile<SvnCommit>(SVN_DIR, monthStr),
+        loadMonthFile<GitCommit>(GIT_DIR, monthStr),
+        loadMonthFile<BrowserVisit>(CHROME_DIR, monthStr),
+        loadMonthFile<BrowserVisit>(FIREFOX_DIR, monthStr),
+    ]);
+
+    const workday   = isWorkday(zDay);
+    const oreTarget = workday ? hhmmToHours(zDay.hOrd) : 0;
+
+    const bundle: AggregatedDay = {
+        date,
+        isWorkday:     workday,
+        oreTarget,
+        location:      workday ? parseZucchettiLocation(zDay) : 'unknown',
+        zucchetti:     zDay,
+        calendar:      calendar.filter(e => e.start?.dateTime?.slice(0, 10) === date),
+        emails:        emails.filter(e => e.receivedDateTime?.slice(0, 10) === date),
+        teams:         teams.filter(m => m.createdDateTime?.slice(0, 10) === date),
+        svnCommits:    svn.filter(c => c.date?.slice(0, 10) === date),
+        gitCommits:    git.filter(c => c.date?.slice(0, 10) === date),
+        browserVisits: [...chrome, ...firefox].filter(v => v.date?.slice(0, 10) === date),
+    };
+
+    await fs.mkdir(AGG_DIR, { recursive: true });
+    await fs.writeFile(path.join(AGG_DIR, `${date}.json`), JSON.stringify(bundle, null, 2), 'utf-8');
+
+    return bundle;
 }
 
 async function run(): Promise<void> {
