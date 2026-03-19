@@ -1,8 +1,8 @@
 /**
- * Frontend API client for week data and TP hours.
+ * Frontend API client for week data, TP hours, and Zucchetti automation.
  * Endpoints are proxied via Vite: /api → http://localhost:3001
  */
-import type { ApiWeekResponse, ApiTpWeekResponse, SubmitEdit, SubmitResult } from './types';
+import type { ApiWeekResponse, ApiTpWeekResponse, SubmitEdit, SubmitResult, ZucchettiRequestResult } from './types';
 
 export async function fetchWeek(date: string): Promise<ApiWeekResponse> {
     const res = await fetch(`/api/week/${date}`);
@@ -28,6 +28,26 @@ export async function submitWeekHours(monday: string, edits: SubmitEdit[]): Prom
     });
     if (!res.ok) {
         throw new Error(`submitWeekHours: ${res.status} ${res.statusText}`);
+    }
+    return res.json();
+}
+
+export interface ZucchettiRequestPayload {
+    date:     string;
+    type:     string;
+    fullDay:  boolean;
+    hours?:   number;
+    minutes?: number;
+}
+
+export async function submitZucchettiRequest(payload: ZucchettiRequestPayload): Promise<ZucchettiRequestResult> {
+    const res = await fetch('/api/zucchetti/request', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify(payload),
+    });
+    if (!res.ok) {
+        throw new Error(`submitZucchettiRequest: ${res.status} ${res.statusText}`);
     }
     return res.json();
 }

@@ -18,16 +18,43 @@
                 +WE
             </button>
 
-            <!-- Quick-fill: applies to selected weekday column -->
+            <!-- Zucchetti quick-fill: submits activity request + fills TP hours -->
             <div class="flex items-center gap-1 border-l border-base-300 pl-2">
                 <span class="text-xs text-base-content/35 mr-1 shrink-0">
                     {{ selectedDayLabel ?? '–' }}
                 </span>
-                <button class="btn btn-xs btn-ghost"        :disabled="fillDisabled" @click="fillDay(WORKDAY_HOURS)"      title="Compila giornata intera SW (7:42)">SW 7:42</button>
-                <button class="btn btn-xs btn-ghost"        :disabled="fillDisabled" @click="fillDay(HALF_WORKDAY_HOURS)" title="Compila mezza giornata SW (3:51)">½ SW</button>
-                <button class="btn btn-xs btn-ghost btn-warning opacity-70" :disabled="fillDisabled" @click="fillDay(0)"                   title="Azzera giornata (ferie intere)">Ferie</button>
-                <button class="btn btn-xs btn-ghost btn-warning opacity-70" :disabled="fillDisabled" @click="fillDay(HALF_WORKDAY_HOURS)" title="Mezza giornata ferie + mezza SW (3:51)">½ Ferie</button>
+                <button class="btn btn-xs btn-ghost"
+                        :disabled="fillDisabled || zuccBusy"
+                        @click="zuccAction('SMART WORKING', true, WORKDAY_HOURS)"
+                        title="Zucchetti: Smart Working giornata intera (7:42) + fill TP">
+                    <span v-if="zuccBusy && zuccAction_ === 'sw'" class="loading loading-spinner loading-xs"></span>
+                    <span v-else>SW 7:42</span>
+                </button>
+                <button class="btn btn-xs btn-ghost"
+                        :disabled="fillDisabled || zuccBusy"
+                        @click="zuccAction('SMART WORKING', false, HALF_WORKDAY_HOURS, 3, 51)"
+                        title="Zucchetti: Smart Working mezza giornata (3:51) + fill TP">
+                    <span v-if="zuccBusy && zuccAction_ === 'halfsw'" class="loading loading-spinner loading-xs"></span>
+                    <span v-else>½ SW</span>
+                </button>
+                <button class="btn btn-xs btn-ghost btn-warning opacity-70"
+                        :disabled="fillDisabled || zuccBusy"
+                        @click="zuccAction('FERIE', true, 0)"
+                        title="Zucchetti: Ferie giornata intera + azzera TP">
+                    <span v-if="zuccBusy && zuccAction_ === 'ferie'" class="loading loading-spinner loading-xs"></span>
+                    <span v-else>Ferie</span>
+                </button>
+                <button class="btn btn-xs btn-ghost btn-warning opacity-70"
+                        :disabled="fillDisabled || zuccBusy"
+                        @click="zuccAction('FERIE', false, HALF_WORKDAY_HOURS, 3, 51)"
+                        title="Zucchetti: Ferie mezza giornata + fill TP 3:51">
+                    <span v-if="zuccBusy && zuccAction_ === 'halfferie'" class="loading loading-spinner loading-xs"></span>
+                    <span v-else>½ Ferie</span>
+                </button>
             </div>
+
+            <!-- Zucchetti feedback -->
+            <span v-if="zuccMsg" class="text-xs" :class="zuccMsgCls">{{ zuccMsg }}</span>
 
             <button
                 class="btn btn-xs btn-outline btn-warning"
@@ -53,6 +80,7 @@ import { ref, computed } from 'vue';
 import { useUiStore } from '../../stores/useUiStore';
 import { useTimesheetStore } from '../../stores/useTimesheetStore';
 import { usePickerStore } from '../../stores/usePickerStore';
+import { submitZucchettiRequest } from '../../api';
 import { DAYABB_IT, WORKDAY_HOURS, HALF_WORKDAY_HOURS } from '../../mock/data';
 
 defineEmits<{ (e: 'open-verifica'): void }>();
@@ -61,7 +89,7 @@ const ui     = useUiStore();
 const ts     = useTimesheetStore();
 const picker = usePickerStore();
 
-// ---- Quick-fill ----
+// ---- Selected day label ----
 
 const selectedDayLabel = computed(() => {
     const idx = picker.selectedDayIdx;
@@ -72,8 +100,70 @@ const selectedDayLabel = computed(() => {
 
 const fillDisabled = computed(() => picker.selectedDayIdx < 0);
 
-function fillDay(hours: number) {
-    ts.fillDay(picker.selectedDayIdx, hours);
+/** Compute YYYY-MM-DD for the currently selected day. */
+function selectedDateStr(): string {
+    const d = picker.pickerSelected;
+    const yr  = d.getFullYear();
+    const mo  = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${yr}-${mo}-${day}`;
+}
+
+// ---- Zucchetti automation ----
+
+const zuccBusy    = ref(false);
+const zuccAction_ = ref('');     // which button is spinning
+const zuccMsg     = ref('');
+const zuccMsgCls  = ref('text-success');
+
+async function zuccAction(type: string, fullDay: boolean, tpHours: number, hours?: number, minutes?: number) {
+    if (fillDisabled.value || zuccBusy.value) return;
+
+    // Determine spinner key
+    if (type === 'SMART WORKING' && fullDay)       zuccAction_.value = 'sw';
+    else if (type === 'SMART WORKING' && !fullDay)  zuccAction_.value = 'halfsw';
+    else if (type === 'FERIE' && fullDay)            zuccAction_.value = 'ferie';
+    else                                             zuccAction_.value = 'halfferie';
+
+    zuccBusy.value = true;
+    zuccMsg.value  = '';
+
+    try {
+        const result = await submitZucchettiRequest({
+            date:    selectedDateStr(),
+            type,
+            fullDay,
+            hours:   hours ?? 0,
+            minutes: minutes ?? 0,
+        });
+
+        if (result.success) {
+            zuccMsg.value    = result.skipped ? `Già presente` : `✓ ${type}`;
+            zuccMsgCls.value = result.skipped ? 'text-warning' : 'text-success';
+
+            // Patch store with fresh day data from post-submit scrape
+            if (result.dayUpdate) {
+                ts.patchDay(picker.selectedDayIdx, result.dayUpdate);
+            }
+            if (result.scrapeError) {
+                console.warn('[TsToolbar] Post-submit scrape failed:', result.scrapeError);
+            }
+        } else {
+            zuccMsg.value    = `✗ ${result.message}`;
+            zuccMsgCls.value = 'text-error';
+        }
+
+        // Fill TP hours for the selected day column regardless of Zucchetti result
+        ts.fillDay(picker.selectedDayIdx, tpHours);
+
+    } catch (err) {
+        zuccMsg.value    = `✗ ${(err as Error).message}`;
+        zuccMsgCls.value = 'text-error';
+    } finally {
+        zuccBusy.value = false;
+        // Auto-clear message after 8s
+        setTimeout(() => { zuccMsg.value = ''; }, 8000);
+    }
 }
 
 // ---- Submit to TP ----

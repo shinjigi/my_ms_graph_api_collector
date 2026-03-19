@@ -13,6 +13,7 @@
     "serve": "tsx src/server/app.ts",
     "all": "npm run collect && npm run aggregate && npm run analyze && npm run serve",
     "zucchetti:get": "tsx --env-file=.env src/collectors/zucchetti/getTimesheet.ts",
+    "zucchetti:get:date": "tsx --env-file=.env src/collectors/zucchetti/getTimesheet.ts --year=2025 --month=6 ",
     "zucchetti:update": "tsx --env-file=.env src/collectors/zucchetti/updateData.ts",
     "tp:log-time": "ts-node --project tp/tsconfig.json tp/log-time.ts",
     "tp:projects": "ts-node --project tp/tsconfig.json tp/get-projects.ts",

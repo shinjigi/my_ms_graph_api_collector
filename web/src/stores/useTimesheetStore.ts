@@ -3,7 +3,7 @@ import { ref, computed, watch } from 'vue';
 import { DAYS, TS_ACTIVE, TS_PINNED, DAYABB_IT, MONTH_IT } from '../mock/data';
 import { fetchWeek, fetchTpWeekHours, submitWeekHours as submitWeekHoursApi } from '../api';
 import { loadJson }             from '../utils';
-import type { Day, TsRow, ApiWeekResponse, ApiTpWeekResponse, SubmitEdit } from '../types';
+import type { Day, TsRow, ApiWeekResponse, ApiTpWeekResponse, SubmitEdit, WeekDayResponse } from '../types';
 
 export const useTimesheetStore = defineStore('timesheet', () => {
     const days   = ref<Day[]>(DAYS);
@@ -136,6 +136,18 @@ export const useTimesheetStore = defineStore('timesheet', () => {
         });
     }
 
+    /** Patch a single day in-place with fresh data from the backend (e.g. after Zucchetti submit). */
+    function patchDay(dayIdx: number, update: WeekDayResponse) {
+        const d = days.value[dayIdx];
+        if (!d) return;
+        d.zucHours = update.oreTarget;
+        d.holiday  = update.holiday ?? !update.isWorkday;
+        d.nibol    = update.nibol;
+        if (weekData.value?.days?.[dayIdx]) {
+            weekData.value.days[dayIdx] = update;
+        }
+    }
+
     const totalsRow = computed(() => {
         const tp    = days.value.map((_, i) =>
             active.value.reduce((acc, r) => acc + getHours(r.tpId, i), 0)
@@ -197,7 +209,7 @@ export const useTimesheetStore = defineStore('timesheet', () => {
         loading, error,
         weekData, currentMonday,
         hoursEdits, noteEdits,
-        getHours, getNote, setHours, setNote, fillDay, fetchWeekData, submitWeekHours,
+        getHours, getNote, setHours, setNote, fillDay, patchDay, fetchWeekData, submitWeekHours,
         totalsRow, rendPerDay,
     };
 });
