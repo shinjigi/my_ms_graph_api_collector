@@ -17,9 +17,20 @@ export interface ZucchettiSession {
  * Restituisce sia gli oggetti Playwright (per automazione DOM)
  * che i token per chiamate API dirette.
  */
+/**
+ * Resolve headless mode: explicit param > env var ZUCCHETTI_HEADLESS > default true.
+ */
+function resolveHeadless(explicit?: boolean): boolean {
+    if (explicit !== undefined) return explicit;
+    const env = process.env.ZUCCHETTI_HEADLESS;
+    if (env !== undefined) return env === 'true' || env === '1';
+    return true;
+}
+
 export async function startZucchettiSession(
-  headless = true,
+  headless?: boolean,
 ): Promise<ZucchettiSession> {
+  headless = resolveHeadless(headless);
   const baseUrl = "https://saas.hrzucchetti.it";
   const username = process.env.ZUCCHETTI_USERNAME;
   const password = process.env.ZUCCHETTI_PASSWORD;

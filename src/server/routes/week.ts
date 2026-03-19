@@ -16,7 +16,7 @@ export const weekRouter = Router();
 const RAW_DIR = path.join(process.cwd(), 'data', 'raw');
 const AGG_DIR = path.join(process.cwd(), 'data', 'aggregated');
 
-interface WeekDayData {
+export interface WeekDayData {
     date:        string;
     isWorkday:   boolean;
     oreTarget:   number;
@@ -84,9 +84,10 @@ async function readAggregatedDay(date: string): Promise<AggregatedDay | null> {
 async function loadZucchettiMonth(month: string): Promise<ZucchettiDay[]> {
     const filePath = path.join(RAW_DIR, 'zucchetti', `${month}.json`);
     try {
-        const raw = await fs.readFile(filePath, 'utf-8');
-        const data = JSON.parse(raw) as { days?: ZucchettiDay[] };
-        return data.days ?? [];
+        const raw    = await fs.readFile(filePath, 'utf-8');
+        const parsed = JSON.parse(raw);
+        // Handle both flat ZucchettiDay[] and wrapped { days: [...] } formats
+        return Array.isArray(parsed) ? parsed : (parsed.days ?? []);
     } catch {
         return [];
     }

@@ -175,3 +175,11 @@ export interface SubmitResult {
     submitted: number;
     errors:    Array<{ tpId: number; date: string; error: string }>;
 }
+
+export interface ZucchettiRequestResult {
+    success:      boolean;
+    message:      string;
+    skipped?:     boolean;
+    scrapeError?: string;
+    dayUpdate?:   WeekDayResponse;
+}

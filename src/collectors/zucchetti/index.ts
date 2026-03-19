@@ -12,6 +12,7 @@ export interface ZucchettiJustification {
 
 export interface ZucchettiRequest {
     text:   string;
+    qta?:   string;
     status: string;
 }
 
