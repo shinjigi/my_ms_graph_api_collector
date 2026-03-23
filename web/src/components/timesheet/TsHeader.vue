@@ -7,16 +7,19 @@
                 class="text-center text-xs"
                 :class="dayHeadCls(d, i)">
                 <template v-if="i === 5">
-                    <span class="flex flex-col items-center opacity-55">
+                    <span class="flex flex-col items-center opacity-55 cursor-pointer select-none"
+                          @click="ui.toggleWE()"
+                          :title="ui.weVisible ? 'Nascondi weekend' : 'Mostra weekend'">
                         <span class="font-bold">WE</span>
                         <span class="font-normal text-xxs">Sab · Dom</span>
+                        <span class="text-xxs mt-0.5">{{ ui.weVisible ? '▾' : '▸' }}</span>
                     </span>
                 </template>
                 <template v-else-if="d.holiday">
                     <span class="flex flex-col items-center gap-0.5 opacity-80" :title="d.holidayName">
                         <span>{{ d.label }}</span>
                         <span class="font-normal text-xs">{{ d.date }}</span>
-                        <span class="ts-holiday-hint">🇮🇹 Festività</span>
+                        <span class="ts-holiday-hint">Festività</span>
                     </span>
                 </template>
                 <template v-else>
@@ -38,11 +41,13 @@
 import { useRouter } from 'vue-router';
 import { useTimesheetStore } from '../../stores/useTimesheetStore';
 import { usePickerStore } from '../../stores/usePickerStore';
+import { useUiStore } from '../../stores/useUiStore';
 import type { Day } from '../../types';
 
 const router = useRouter();
 const ts     = useTimesheetStore();
 const picker = usePickerStore();
+const ui     = useUiStore();
 
 function selectTsDay(i: number) {
     const dObj = ts.days[i];
