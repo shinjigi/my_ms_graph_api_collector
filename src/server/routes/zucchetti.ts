@@ -1,6 +1,9 @@
 /**
  * Zucchetti automation routes.
  * POST /api/zucchetti/request — submit an activity request via Playwright.
+ *
+ * Re-aggregation after submit is handled internally by postSubmitScrape()
+ * in updateData.ts (when scrapeAfterSubmit is true).
  */
 import { Router, Request, Response } from 'express';
 import { submitZucchettiRequest, validActivities } from '../../collectors/zucchetti/updateData';
