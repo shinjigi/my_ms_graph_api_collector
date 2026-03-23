@@ -13,7 +13,7 @@ import type { AggregatedDay } from "../../analysis/aggregator";
 import {
     AGG_DIR,
     PROPOSALS_DIR,
-    analyzeDay,
+    analyzeBatch,
     buildProviders,
     loadKb,
     loadDefaults,
@@ -94,6 +94,8 @@ async function runAnalysis(job: AnalysisJob, force: boolean): Promise<void> {
 
         await fs.mkdir(PROPOSALS_DIR, { recursive: true });
 
+        const daysToProcess: AggregatedDay[] = [];
+
         for (const date of job.dates) {
             // Skip if proposal exists and not forced
             if (!force && await proposalExists(date)) {
@@ -102,19 +104,27 @@ async function runAnalysis(job: AnalysisJob, force: boolean): Promise<void> {
 
             const day = await loadAggDay(date);
             if (!day || !day.isWorkday) continue;
+            daysToProcess.push(day);
+        }
 
+        if (daysToProcess.length > 0) {
+            console.log(`[analyze-job ${job.id}] Analisi batch per ${daysToProcess.length} giorni...`);
             try {
-                console.log(`[analyze-job ${job.id}] Analisi ${date}...`);
-                const proposal = await analyzeDay(day, kbItems, defaults, providers);
-                await fs.writeFile(
-                    path.join(PROPOSALS_DIR, `${date}.json`),
-                    JSON.stringify(proposal, null, 2),
-                    "utf-8",
-                );
-                job.results[date] = proposal;
+                const proposals = await analyzeBatch(daysToProcess, kbItems, defaults, providers);
+                for (const proposal of proposals) {
+                    await fs.writeFile(
+                        path.join(PROPOSALS_DIR, `${proposal.date}.json`),
+                        JSON.stringify(proposal, null, 2),
+                        "utf-8",
+                    );
+                    job.results[proposal.date] = proposal;
+                }
             } catch (err) {
-                job.errors[date] = (err as Error).message;
-                console.error(`[analyze-job ${job.id}] Errore per ${date}: ${(err as Error).message}`);
+                // Se l'intero batch fallisce, segna errore per tutte le date
+                for (const date of daysToProcess.map(d => d.date)) {
+                    job.errors[date] = (err as Error).message;
+                    console.error(`[analyze-job ${job.id}] Errore per ${date}: ${(err as Error).message}`);
+                }
             }
         }
 

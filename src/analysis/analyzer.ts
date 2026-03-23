@@ -85,6 +85,17 @@ export interface AnalyzerProvider {
     analyze(systemPrompt: string, userPrompt: string): Promise<ProposalEntry[]>;
 }
 
+export abstract class BatchAnalyzerProvider implements AnalyzerProvider {
+    abstract readonly name: string;
+    abstract isAvailable(): boolean;
+    
+    async analyze(systemPrompt: string, userPrompt: string): Promise<ProposalEntry[]> {
+        throw new Error("BatchAnalyzerProvider cannot be called via simple analyze()");
+    }
+    
+    abstract analyzeBatch(systemPrompt: string, userPromptBatched: string): Promise<{date: string, entries: ProposalEntry[]}[]>;
+}
+
 // ─── Shared utilities ───────────────────────────────────────────────
 export function stripCodeFence(text: string): string {
     return text
@@ -112,33 +123,11 @@ export function buildSystemPrompt(): string {
     return SYSTEM_PROMPT;
 }
 
-export function buildUserPrompt(
-    day: AggregatedDay,
+export function buildUserPromptBatched(
+    days: AggregatedDay[],
     kbItems: KbEntry[],
     defaults: DefaultsConfig,
 ): string {
-    const recurringHours = defaults.recurringActivities.reduce(
-        (s, a) => s + a.hours,
-        0,
-    );
-    const remainingHours = Math.max(0, day.oreTarget - recurringHours);
-
-    const signals = {
-        calendarEvents: day.calendar.map((e) => ({
-            subject: e.subject,
-            start: e.start?.dateTime?.slice(11, 16),
-            end: e.end?.dateTime?.slice(11, 16),
-            attendees: e.attendees?.length ?? 0,
-        })),
-        teamsMessages: day.teams.length,
-        gitCommits: day.gitCommits.map((c) => ({
-            repo: c.repo,
-            message: c.message,
-        })),
-        svnCommits: day.svnCommits.map((c) => ({ message: c.message })),
-        emailsReceived: day.emails.length,
-    };
-
     const activeTasks = kbItems.map((kb) => ({
         id: kb.id,
         entityType: kb.entityType,
@@ -146,26 +135,54 @@ export function buildUserPrompt(
         summary: kb.summary,
     }));
 
-    const preSeeded: ProposalEntry[] = defaults.recurringActivities.map((a) => ({
-        taskId: a.taskId,
-        entityType: "recurring" as const,
-        taskName: a.label,
-        inferredHours: a.hours,
-        confidence: "high" as const,
-        reasoning: a.comment,
-        approved: a.autoApprove,
-    }));
+    const daysContext = days.map((day) => {
+        const recurringHours = defaults.recurringActivities.reduce(
+            (s, a) => s + a.hours,
+            0,
+        );
+        const remainingHours = Math.max(0, day.oreTarget - recurringHours);
 
-    return JSON.stringify(
-        {
+        const signals = {
+            calendarEvents: day.calendar.map((e) => ({
+                subject: e.subject,
+                start: e.start?.dateTime?.slice(11, 16),
+                end: e.end?.dateTime?.slice(11, 16),
+                attendees: e.attendees?.length ?? 0,
+            })),
+            teamsMessages: day.teams.length,
+            gitCommits: day.gitCommits.map((c) => ({
+                repo: c.repo,
+                message: c.message,
+            })),
+            svnCommits: day.svnCommits.map((c) => ({ message: c.message })),
+            emailsReceived: day.emails.length,
+        };
+
+        const preSeeded: ProposalEntry[] = defaults.recurringActivities.map((a) => ({
+            taskId: a.taskId,
+            entityType: "recurring" as const,
+            taskName: a.label,
+            inferredHours: a.hours,
+            confidence: "high" as const,
+            reasoning: a.comment,
+            approved: a.autoApprove,
+        }));
+
+        return {
             date: day.date,
             oreTarget: day.oreTarget,
             remainingHours,
             location: day.location,
             signals,
-            activeTasks,
             preSeededEntries: preSeeded,
-            instruction: userInstruction(remainingHours, day.oreTarget),
+        };
+    });
+
+    return JSON.stringify(
+        {
+            activeTasks,
+            days: daysContext,
+            instruction: userInstruction(),
         },
         null,
         2,
@@ -175,11 +192,12 @@ export function buildUserPrompt(
 // ─── Provider chain ─────────────────────────────────────────────────
 export function buildProviders(forceProvider?: string): AnalyzerProvider[] {
     // Lazy imports to avoid circular deps at module level
-    const { ClaudeApiProvider, ClaudeCliProvider } = require("./claudeProvider");
+    const { ClaudeApiProvider, ClaudeCliProvider, OpenAiCompatibleProvider } = require("./claudeProvider");
     const { GeminiProvider } = require("./geminiProvider");
 
     const all: Record<string, AnalyzerProvider> = {
         claude: new ClaudeApiProvider(),
+        ollama: new OpenAiCompatibleProvider(),
         gemini: new GeminiProvider(),
         cli: new ClaudeCliProvider(),
     };
@@ -190,19 +208,19 @@ export function buildProviders(forceProvider?: string): AnalyzerProvider[] {
         return [p];
     }
 
-    // Default order: Claude API → Gemini → Claude CLI
-    return [all["claude"], all["gemini"], all["cli"]];
+    // Default order: Claude API → Ollama/OpenAICompat → Gemini → Claude CLI
+    return [all["claude"], all["ollama"], all["gemini"], all["cli"]];
 }
 
 // ─── Core analysis ──────────────────────────────────────────────────
-export async function analyzeDay(
-    day: AggregatedDay,
+export async function analyzeBatch(
+    batch: AggregatedDay[],
     kbItems: KbEntry[],
     defaults: DefaultsConfig,
     providers: AnalyzerProvider[],
-): Promise<DayProposal> {
+): Promise<DayProposal[]> {
     const system = buildSystemPrompt();
-    const user = buildUserPrompt(day, kbItems, defaults);
+    const user = buildUserPromptBatched(batch, kbItems, defaults);
 
     let lastError: Error | null = null;
     for (const provider of providers) {
@@ -212,18 +230,34 @@ export async function analyzeDay(
         }
 
         try {
-            console.log(`    [${provider.name}] in corso...`);
-            const entries = await provider.analyze(system, user);
-            const totalHours = entries.reduce((s, e) => s + e.inferredHours, 0);
+            console.log(`    [${provider.name}] in corso per ${batch.length} giorni...`);
+            
+            let results: {date: string, entries: ProposalEntry[]}[];
+            if ('analyzeBatch' in provider) {
+                results = await (provider as BatchAnalyzerProvider).analyzeBatch(system, user);
+            } else {
+                // fallback to single day queries sequentially!
+                results = [];
+                for (const day of batch) {
+                    const singleSystem = buildSystemPrompt();
+                    const singleUser = buildUserPromptBatched([day], kbItems, defaults);
+                    const entries = await provider.analyze(singleSystem, singleUser);
+                    results.push({ date: day.date, entries });
+                }
+            }
 
-            return {
-                date: day.date,
-                oreTarget: day.oreTarget,
-                totalHours: Math.round(totalHours * 100) / 100,
-                entries,
-                generatedAt: new Date().toISOString(),
-                provider: provider.name,
-            };
+            return results.map(r => {
+                const day = batch.find(d => d.date === r.date)!;
+                const totalHours = r.entries.reduce((s, e) => s + e.inferredHours, 0);
+                return {
+                    date: r.date,
+                    oreTarget: day?.oreTarget ?? 0,
+                    totalHours: Math.round(totalHours * 100) / 100,
+                    entries: r.entries,
+                    generatedAt: new Date().toISOString(),
+                    provider: provider.name,
+                };
+            });
         } catch (err) {
             lastError = err as Error;
             const msg = lastError.message;
@@ -245,9 +279,34 @@ async function run(): Promise<void> {
     const dateArg = process.argv
         .find((a) => a.startsWith("--date="))
         ?.split("=")[1];
+    const startDateArg = process.argv
+        .find((a) => a.startsWith("--start-date="))
+        ?.split("=")[1];
+    const endDateArg = process.argv
+        .find((a) => a.startsWith("--end-date="))
+        ?.split("=")[1];
+    const weekArg = process.argv
+        .find((a) => a.startsWith("--week="))
+        ?.split("=")[1];
     const providerArg = process.argv
         .find((a) => a.startsWith("--provider="))
         ?.split("=")[1];
+
+    let weekStart = "";
+    let weekEnd = "";
+    if (weekArg) {
+        const [yearStr, weekStr] = weekArg.split("-");
+        const year = parseInt(yearStr, 10);
+        const week = parseInt(weekStr.replace("W", ""), 10);
+        const date = new Date(year, 0, 1 + (week - 1) * 7);
+        const day = date.getDay();
+        const start = new Date(date);
+        start.setDate(date.getDate() - day + (day === 0 ? -6 : 1));
+        const end = new Date(start);
+        end.setDate(start.getDate() + 6);
+        weekStart = start.toISOString().split("T")[0];
+        weekEnd = end.toISOString().split("T")[0];
+    }
 
     // KB is a prerequisite — fail fast
     let kbItems: KbEntry[];
@@ -272,10 +331,50 @@ async function run(): Promise<void> {
     const aggFiles = (await fs.readdir(AGG_DIR).catch(() => [] as string[]))
         .filter((f) => /^\d{4}-\d{2}-\d{2}\.json$/.test(f))
         .filter((f) => f.replace(".json", "") >= sinceDate)
-        .filter((f) => !dateArg || f === `${dateArg}.json`);
+        .filter((f) => {
+            const dateStr = f.replace(".json", "");
+            if (dateArg && dateStr !== dateArg) return false;
+            if (startDateArg && dateStr < startDateArg) return false;
+            if (endDateArg && dateStr > endDateArg) return false;
+            if (weekStart && dateStr < weekStart) return false;
+            if (weekEnd && dateStr > weekEnd) return false;
+            return true;
+        });
 
     let processed = 0;
     let skipped = 0;
+
+    const maxTpm = 30000;
+    let currentBatch: AggregatedDay[] = [];
+    let currentTokens = 0;
+
+    const processBatch = async () => {
+        if (currentBatch.length === 0) return;
+        
+        try {
+            const proposals = await analyzeBatch(currentBatch, kbItems, defaults, providers);
+            for (const proposal of proposals) {
+                const propPath = path.join(PROPOSALS_DIR, `${proposal.date}.json`);
+                await fs.writeFile(propPath, JSON.stringify(proposal, null, 2), "utf-8");
+                console.log(
+                    `    → ${proposal.date}: ${proposal.entries.length} entries, totale ${proposal.totalHours}h [${proposal.provider}]`,
+                );
+                processed++;
+            }
+        } catch (err) {
+            const msg = (err as Error).message;
+            console.error(`    Errore batch per le date da ${currentBatch[0]?.date} a ${currentBatch[currentBatch.length - 1]?.date}: ${msg}`);
+            if (msg.includes("credit balance is too low")) {
+                console.error(
+                    "\n[FATAL] Credito Anthropic esaurito. Interruzione processo.",
+                );
+                process.exit(1);
+            }
+        }
+        
+        currentBatch = [];
+        currentTokens = 0;
+    };
 
     for (const file of aggFiles) {
         const date = file.replace(".json", "");
@@ -300,27 +399,19 @@ async function run(): Promise<void> {
         }
 
         console.log(
-            `  Analisi ${date} (target ${day.oreTarget.toFixed(2)}h, ${day.calendar.length} eventi, ${day.gitCommits.length} commit git)...`,
+            `  Accodo ${date} (target ${day.oreTarget.toFixed(2)}h, ${day.calendar.length} eventi, ${day.gitCommits.length} commit)...`,
         );
 
-        try {
-            const proposal = await analyzeDay(day, kbItems, defaults, providers);
-            await fs.writeFile(propPath, JSON.stringify(proposal, null, 2), "utf-8");
-            console.log(
-                `    → ${proposal.entries.length} entries, totale ${proposal.totalHours}h [${proposal.provider}]`,
-            );
-            processed++;
-        } catch (err) {
-            const msg = (err as Error).message;
-            console.error(`    Errore per ${date}: ${msg}`);
-            if (msg.includes("credit balance is too low")) {
-                console.error(
-                    "\n[FATAL] Credito Anthropic esaurito. Interruzione processo.",
-                );
-                process.exit(1);
-            }
+        const estTokens = Math.ceil(aggRaw.length / 4);
+        if (currentTokens + estTokens > maxTpm && currentBatch.length > 0) {
+            await processBatch();
         }
+        
+        currentBatch.push(day);
+        currentTokens += estTokens;
     }
+    
+    await processBatch();
 
     console.log(
         `\nAnalisi completata: ${processed} giorni analizzati, ${skipped} saltati.`,
