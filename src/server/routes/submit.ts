@@ -7,7 +7,7 @@
 import { Router, Request, Response } from 'express';
 import * as fs   from 'fs/promises';
 import * as path from 'path';
-import type { DayProposal, ProposalEntry } from '../../analysis/claudeAnalyzer';
+import type { DayProposal, ProposalEntry } from '../../analysis/analyzer';
 import { TargetprocessClient }              from '../../targetprocess/client';
 
 export const submitRouter = Router();
