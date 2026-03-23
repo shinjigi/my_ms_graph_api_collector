@@ -6,7 +6,7 @@
 import { Router, Request, Response } from 'express';
 import * as fs   from 'fs/promises';
 import * as path from 'path';
-import type { DayProposal } from '../../analysis/claudeAnalyzer';
+import type { DayProposal } from '../../analysis/analyzer';
 
 export const proposalsRouter = Router();
 
