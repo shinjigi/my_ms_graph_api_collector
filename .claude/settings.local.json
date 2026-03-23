@@ -50,7 +50,15 @@
       "Bash(grep *)",
       "Read(//c/SVN/_GH_shinjigi_WIN/**)",
       "Bash(rm src/analysis/claudeAnalyzer.ts src/analysis/geminiAnalyzer.ts)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(gh api:*)",
+      "Bash(git -C C:/SVN/_GH/_shinjigi_WIN/my_ms_graph_api_collector log --oneline --all -- check_ids.js debug_map.js extract_pins.js find_o13.js map_tooltips.js)",
+      "Bash(git -C C:/SVN/_GH/_shinjigi_WIN/my_ms_graph_api_collector show HEAD:check_ids.js)",
+      "Bash(git filter-repo:*)",
+      "Bash(C:/SVN/_app/python/Conda/Scripts/conda.exe run:*)",
+      "Bash(git stash:*)",
+      "Bash(git remote:*)",
+      "Bash(git push:*)"
     ]
   }
 }
