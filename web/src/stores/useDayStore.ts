@@ -176,6 +176,11 @@ export const useDayStore = defineStore('day', () => {
     function setTpHours(tpId: number, val: number) {
         const u = usToday.value.find(x => x.tpId === tpId);
         if (u) u.tpHours = Math.max(0, +val.toFixed(1));
+        // Bridge to timesheet store so dashboard edits are reflected in the week totals and submit flow.
+        const ts     = useTimesheetStore();
+        const picker = usePickerStore();
+        const dayIdx = picker.selectedDayIdx;
+        if (dayIdx >= 0) ts.setHours(tpId, dayIdx, val);
     }
 
     const dayTotals = computed(() => {
@@ -184,7 +189,7 @@ export const useDayStore = defineStore('day', () => {
         const dayIdx = picker.selectedDayIdx;
         const tp     = dayIdx < 0
             ? 0
-            : +ts.active.reduce((acc, r) => acc + ts.getHours(r.tpId, dayIdx), 0).toFixed(1);
+            : +[...ts.active, ...ts.pinned].reduce((acc, r) => acc + ts.getHours(r.tpId, dayIdx), 0).toFixed(1);
         const zuc    = dayIdx < 0 ? 0 : (ts.days[dayIdx]?.zucHours ?? 0);
         return { tp, zuc, delta: +(zuc - tp).toFixed(1) };
     });
