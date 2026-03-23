@@ -58,7 +58,7 @@ STRUTTURA RICHIESTA:
       "id": number,
       "summary": "Riassunto tecnico complessivo di 3-4 frasi",
       "tags": ["tag1", "tag2", "tag3"],
-      "stakeholder": ["Stakeholder1", "Stakeholder2"],
+      "stakeholders": ["Stakeholder1", "Stakeholder2"],
       "userActivities": {
          "Nome Utente": "Riassunto specifico di cosa ha fatto questa persona basandoti sui suoi log"
       }
