@@ -18,7 +18,8 @@
             </div>
         </div>
         <!-- Teams -->
-        <div class="card bg-base-100 border border-base-300 shadow-sm">
+        <div class="card bg-base-100 border border-base-300 shadow-sm cursor-pointer hover:border-accent/50 transition-colors"
+             @click="navigate('teams')">
             <div class="card-body p-3">
                 <div class="text-xs font-bold text-base-content/50 uppercase mb-2">💬 Teams</div>
                 <div class="grid grid-cols-2 gap-1.5 text-xs mb-2">
@@ -36,11 +37,11 @@
             </div>
         </div>
         <!-- Browser -->
-        <div class="card bg-base-100 border border-base-300 shadow-sm">
+        <div class="card bg-base-100 border border-base-300 shadow-sm hover:border-info/50 transition-colors">
             <div class="card-body p-3">
-                <div class="flex items-center justify-between cursor-pointer select-none" @click="ui.toggleBrowser()">
+                <div class="flex items-center justify-between select-none cursor-pointer" @click="navigate('browser')">
                     <div class="text-xs font-bold text-base-content/50 uppercase">🌐 Browser</div>
-                    <div class="flex items-center gap-1.5 text-xs text-base-content/35">
+                    <div class="flex items-center gap-1.5 text-xs text-base-content/35" @click.stop="ui.toggleBrowser()">
                         <span>{{ BROWSER_TOTAL_VISITS }} visite · {{ BROWSER_TOTAL_DOMAINS }} domini</span>
                         <svg class="w-3 h-3 transition-transform" :class="ui.browserExpanded ? 'rotate-180' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
@@ -66,7 +67,8 @@
             </div>
         </div>
         <!-- Git / SVN -->
-        <div class="card bg-base-100 border border-base-300 shadow-sm">
+        <div class="card bg-base-100 border border-base-300 shadow-sm cursor-pointer hover:border-secondary/50 transition-colors"
+             @click="navigate('activity')">
             <div class="card-body p-3">
                 <div class="text-xs font-bold text-base-content/50 uppercase mb-2">💻 Git · SVN</div>
                 <div class="grid grid-cols-2 gap-1.5 text-xs mb-2">
@@ -86,13 +88,26 @@
 </template>
 
 <script setup lang="ts">
-import { computed }    from 'vue';
-import { useDayStore } from '../../stores/useDayStore';
-import { useUiStore }  from '../../stores/useUiStore';
+import { computed }         from 'vue';
+import { useRouter }        from 'vue-router';
+import { useDayStore }      from '../../stores/useDayStore';
+import { useUiStore }       from '../../stores/useUiStore';
+import { usePickerStore }   from '../../stores/usePickerStore';
 import { BROWSER_DOMAINS, BROWSER_TOTAL_VISITS, BROWSER_TOTAL_DOMAINS, TEAMS_MSG_COUNT } from '../../mock/data';
+import type { ActiveView }  from '../../types';
 
-const day = useDayStore();
-const ui  = useUiStore();
+const day    = useDayStore();
+const ui     = useUiStore();
+const picker = usePickerStore();
+const router = useRouter();
+
+function navigate(view: ActiveView) {
+    const d  = picker.pickerSelected;
+    const yr = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    router.push(`/${view}/${yr}-${mo}-${dd}`);
+}
 
 // Derive email counts from store data
 const emailIn  = computed(() => day.emails.filter(e => e.dir === 'in').length);

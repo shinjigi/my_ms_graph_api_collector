@@ -29,7 +29,8 @@
             </div>
         </div>
         <!-- Commit -->
-        <div class="card bg-base-100 shadow-sm border border-base-300">
+        <div class="card bg-base-100 shadow-sm border border-base-300 cursor-pointer hover:border-secondary/50 transition-colors"
+             @click="navigate('activity')">
             <div class="card-body p-3">
                 <div class="text-xs text-base-content/50 uppercase tracking-wide">Commit</div>
                 <div class="text-xl font-bold text-secondary mt-0.5">{{ commitTotal }}</div>
@@ -40,7 +41,8 @@
             </div>
         </div>
         <!-- Meeting -->
-        <div class="card bg-base-100 shadow-sm border border-base-300">
+        <div class="card bg-base-100 shadow-sm border border-base-300 cursor-pointer hover:border-accent/50 transition-colors"
+             @click="navigate('teams')">
             <div class="card-body p-3">
                 <div class="text-xs text-base-content/50 uppercase tracking-wide">Meeting</div>
                 <div class="text-xl font-bold text-accent mt-0.5">{{ meetingCount }}</div>
@@ -98,13 +100,24 @@
 
 <script setup lang="ts">
 import { computed, watch }      from 'vue';
+import { useRouter }            from 'vue-router';
 import { useDayStore }          from '../../stores/useDayStore';
 import { useAnalysisStore }     from '../../stores/useAnalysisStore';
 import { usePickerStore }       from '../../stores/usePickerStore';
+import type { ActiveView }      from '../../types';
 
 const day      = useDayStore();
 const analysis = useAnalysisStore();
 const picker   = usePickerStore();
+const router   = useRouter();
+
+function navigate(view: ActiveView) {
+    const d  = picker.pickerSelected;
+    const yr = d.getFullYear();
+    const mo = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    router.push(`/${view}/${yr}-${mo}-${dd}`);
+}
 
 // Zucchetti hours derived from store (decimal -> h + m display)
 const zucH = computed(() => Math.floor(day.dayTotals.zuc));
