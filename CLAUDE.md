@@ -55,6 +55,7 @@ Server endpoints for async analysis with job tracking:
   - `getTimesheet.ts` — CLI: full month extraction
 - **VCS** (git, svn): commit history collection
 - **Browser** (chrome, firefox): browsing history via sql.js
+- **Nibol** (desk booking): Playwright automation via `scripts/nibol/` (`npm run nibol:book`, `npm run nibol:calendar`)
 
 ### Auth flow
 
@@ -87,6 +88,20 @@ Server endpoints for async analysis with job tracking:
 - `DayProposal`, `ProposalEntry`, `AnalyzerProvider` — `src/analysis/analyzer.ts`
 - `WeekDayData` — `src/server/routes/week.ts`
 - Frontend view types — `web/src/types/index.ts`
+
+### Directory structure (key paths)
+
+| Path | Purpose |
+|------|---------|
+| `src/` | Backend: collectors, analysis, server |
+| `web/` | Frontend: Vue 3 + Pinia |
+| `scripts/tp/` | Standalone TargetProcess CLI tools (ts-node) |
+| `scripts/nibol/` | Nibol desk booking automation (tsx) |
+| `scripts/` | PowerShell automation, morning task, bootstrap |
+| `docs/` | Documentation and planning |
+| `docs/archive/` | Legacy files (portal.html) |
+| `config/` | `defaults.json` (recurring activities), `hooks.json` |
+| `data/` | Runtime data: raw, aggregated, proposals, kb |
 
 ### Setup helper
 
