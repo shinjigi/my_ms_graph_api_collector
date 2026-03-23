@@ -1,97 +1,94 @@
 /**
  * Gemini analyzer provider using the @google/genai SDK.
  */
-import { GoogleGenAI }  from "@google/genai";
-import type { AnalyzerProvider, ProposalEntry } from "./analyzer";
+import { GoogleGenAI, Type, Schema } from "@google/genai";
+import type { ProposalEntry } from "./analyzer";
+import { BatchAnalyzerProvider } from "./analyzer";
 import { createLogger }   from "../logger";
 import { saveRawResponse } from "../aiRaw";
 
 const log = createLogger("gemini");
 
-/** Structured output schema for Gemini (new SDK — plain string types). */
-const responseSchema = {
-    type: "array",
+/** Structured output schema for Gemini. */
+const schema: Schema = {
+    description: "List of day proposals",
+    type: Type.ARRAY,
     items: {
-        type: "object",
+        type: Type.OBJECT,
         properties: {
-            taskId:        { type: "number",  nullable: true },
-            entityType:    { type: "string",  enum: ["UserStory", "Task", "Bug", "recurring"] },
-            taskName:      { type: "string" },
-            inferredHours: { type: "number" },
-            confidence:    { type: "string",  enum: ["high", "medium", "low"] },
-            reasoning:     { type: "string" },
-            approved:      { type: "boolean" },
+            date: { type: Type.STRING },
+            entries: {
+                type: Type.ARRAY,
+                items: {
+                    type: Type.OBJECT,
+                    properties: {
+                        taskId: { type: Type.INTEGER, nullable: true },
+                        entityType: {
+                            type: Type.STRING,
+                            enum: ["UserStory", "Task", "Bug", "recurring"],
+                        },
+                        taskName: { type: Type.STRING },
+                        inferredHours: { type: Type.NUMBER },
+                        confidence: { type: Type.STRING, enum: ["high", "medium", "low"] },
+                        reasoning: { type: Type.STRING },
+                        approved: { type: Type.BOOLEAN },
+                    },
+                    required: [
+                        "entityType",
+                        "taskName",
+                        "inferredHours",
+                        "confidence",
+                        "reasoning",
+                        "approved",
+                    ],
+                }
+            }
         },
-        required: ["entityType", "taskName", "inferredHours", "confidence", "reasoning", "approved"],
+        required: ["date", "entries"],
     },
-} as const;
+};
 
-export class GeminiProvider implements AnalyzerProvider {
-    readonly name:            string;
+export class GeminiProvider extends BatchAnalyzerProvider {
+    readonly name: string;
     private readonly modelName: string;
 
     constructor() {
-        this.modelName = process.env["GEMINI_MODEL"] ?? "gemini-2.0-flash";
-        this.name      = `gemini:${this.modelName}`;
+        super();
+        this.modelName = process.env["GEMINI_MODEL"] || "gemini-2.0-flash";
+        this.name = `gemini:${this.modelName}`;
     }
 
     isAvailable(): boolean {
         return !!process.env["GEMINI_API_KEY"];
     }
 
-    async analyze(systemPrompt: string, userPrompt: string, context = "analysis"): Promise<ProposalEntry[]> {
+    async analyzeBatch(systemPrompt: string, userPromptBatched: string): Promise<{date: string, entries: ProposalEntry[]}[]> {
         const apiKey = process.env["GEMINI_API_KEY"]!;
-        const genAI  = new GoogleGenAI({ apiKey });
+        const ai = new GoogleGenAI({ apiKey });
 
-        const response = await genAI.models.generateContent({
-            model:    this.modelName,
+        log.info(`[${this.name}] Invio richiesta batch (schema guidato) a Gemini...`);
+        const response = await ai.models.generateContent({
+            model: this.modelName,
             contents: [
-                { role: "user", parts: [{ text: systemPrompt }] },
-                { role: "user", parts: [{ text: userPrompt }] },
+                { role: 'user', parts: [{ text: systemPrompt + '\n\n' + userPromptBatched }] }
             ],
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            config: { responseMimeType: "application/json", responseSchema } as any,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: schema,
+            }
         });
 
-        // Usage metadata
-        const usage       = response.usageMetadata;
-        const inputTokens  = usage?.promptTokenCount;
-        const outputTokens = usage?.candidatesTokenCount;
-        log.debug(`Usage: ${inputTokens ?? "?"} in / ${outputTokens ?? "?"} out`);
+        if (!response.text) throw new Error("Risposta vuota da Gemini");
+        const raw = response.text;
 
-        // Candidate safety / finish reason
-        const candidate    = response.candidates?.[0];
-        const finishReason = candidate?.finishReason;
-
-        if (!candidate) {
-            throw new Error("Gemini: nessun candidato nella risposta — possibile blocco safety o errore interno");
-        }
-        if (finishReason && finishReason !== "STOP") {
-            log.warn(`Gemini finishReason=${finishReason} — risposta potenzialmente incompleta`);
-        }
-
-        const raw = candidate.content?.parts?.[0]?.text ?? "";
-
-        if (!raw) {
-            throw new Error(`Gemini: testo vuoto nella risposta (finishReason=${finishReason ?? "unknown"})`);
-        }
-
-        // Persist raw response before any parsing
-        const rawPath = await saveRawResponse({
-            provider:     this.name,
-            model:        this.modelName,
-            context,
-            stopReason:   finishReason ?? undefined,
-            inputTokens,
-            outputTokens,
-            parsedOk:     false,
+        await saveRawResponse({
+            provider: this.name,
+            model: this.modelName,
+            context: "batch-analysis",
+            parsedOk: true,
             raw,
         });
-        log.debug(`Raw response salvata: ${rawPath}`);
 
-        const parsed = JSON.parse(raw) as ProposalEntry[];
-        void saveRawResponse({ provider: this.name, model: this.modelName, context, stopReason: finishReason ?? undefined, inputTokens, outputTokens, parsedOk: true, raw });
-
-        return parsed;
+        return JSON.parse(raw) as {date: string, entries: ProposalEntry[]}[];
     }
 }
