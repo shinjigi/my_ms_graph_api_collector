@@ -25,32 +25,17 @@
 
         <!-- Activity -->
         <template v-else-if="view === 'activity'">
-            <div class="card bg-base-100 shadow-sm border border-base-300">
-                <div class="card-body p-4">
-                    <div class="card-title text-sm mb-3">Timeline commit</div>
-                    <div class="text-xs text-base-content/40 italic">Activity view — dati reali da API</div>
-                </div>
-            </div>
+            <ActivityView />
         </template>
 
         <!-- Teams -->
         <template v-else-if="view === 'teams'">
-            <div class="card bg-base-100 shadow-sm border border-base-300">
-                <div class="card-body p-4">
-                    <div class="card-title text-sm mb-3">Teams / Chat</div>
-                    <div class="text-xs text-base-content/40 italic">Teams view — dati reali da API</div>
-                </div>
-            </div>
+            <TeamsView />
         </template>
 
         <!-- Browser -->
         <template v-else-if="view === 'browser'">
-            <div class="card bg-base-100 shadow-sm border border-base-300">
-                <div class="card-body p-4">
-                    <div class="card-title text-sm mb-3">Browser history</div>
-                    <div class="text-xs text-base-content/40 italic">Browser view — dati reali da API</div>
-                </div>
-            </div>
+            <BrowserView />
         </template>
     </div>
 </template>
@@ -69,6 +54,9 @@ import TimelinePanel         from '../components/dashboard/TimelinePanel.vue';
 import WorkTpPanel           from '../components/dashboard/WorkTpPanel.vue';
 import SignalsGrid            from '../components/dashboard/SignalsGrid.vue';
 import TimesheetView         from '../components/timesheet/TimesheetView.vue';
+import ActivityView          from '../components/activity/ActivityView.vue';
+import TeamsView             from '../components/teams/TeamsView.vue';
+import BrowserView           from '../components/browser/BrowserView.vue';
 
 const props = defineProps<{ view: string; date: string }>();
 

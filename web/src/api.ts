@@ -85,6 +85,60 @@ export async function pollAnalysisStatus(jobId: string): Promise<AnalysisJobStat
     return res.json();
 }
 
+// --- Signals API ---
+
+export interface CommitsResponse {
+    date:       string;
+    gitCommits: { hash: string; author: string; email: string; date: string; message: string; repo: string }[];
+    svnCommits: { revision: string; author: string; date: string; message: string; paths: string[] }[];
+}
+
+export interface TeamsMessage {
+    id:              string;
+    chatId:          string;
+    chatTopic:       string | null;
+    createdDateTime: string;
+    body:            { contentType: string; content: string };
+    webUrl:          string | null;
+}
+
+export interface TeamsResponse {
+    date:     string;
+    messages: TeamsMessage[];
+}
+
+export interface BrowserDomain {
+    domain: string;
+    visits: number;
+    pct:    number;
+}
+
+export interface BrowserResponse {
+    date:         string;
+    totalVisits:  number;
+    totalDomains: number;
+    byDomain:     BrowserDomain[];
+    visits:       { visitId: string; source: string; url: string; title: string | null; visitTime: string }[];
+}
+
+export async function fetchDayCommits(date: string): Promise<CommitsResponse> {
+    const res = await fetch(`/api/day/${date}/commits`);
+    if (!res.ok) throw new Error(`fetchDayCommits(${date}): ${res.status}`);
+    return res.json();
+}
+
+export async function fetchDayTeams(date: string): Promise<TeamsResponse> {
+    const res = await fetch(`/api/day/${date}/teams`);
+    if (!res.ok) throw new Error(`fetchDayTeams(${date}): ${res.status}`);
+    return res.json();
+}
+
+export async function fetchDayBrowser(date: string): Promise<BrowserResponse> {
+    const res = await fetch(`/api/day/${date}/browser`);
+    if (!res.ok) throw new Error(`fetchDayBrowser(${date}): ${res.status}`);
+    return res.json();
+}
+
 export async function fetchProposal(date: string): Promise<{ proposal: DayProposal; signals: unknown } | null> {
     const res = await fetch(`/api/proposals/${date}`);
     if (res.status === 404) return null;
