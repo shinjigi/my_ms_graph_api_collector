@@ -61,8 +61,9 @@ function extractJson(text: string): unknown {
 }
 
 // ─── Paths ───────────────────────────────────────────────────────────────────
-const KB_DIR  = path.join(process.cwd(), 'data', 'kb');
-const KB_FILE = path.join(KB_DIR, 'us-summaries.json');
+const KB_DIR       = path.join(process.cwd(), 'data', 'kb');
+const KB_FILE      = path.join(KB_DIR, 'us-summaries.json');
+const ENRICHED_DIR = path.join(process.cwd(), 'data', 'raw', 'targetprocess');
 
 // ─── Priority colleagues ──────────────────────────────────────────────────────
 const COLLEAGUES_PRIORITY = new Set([
@@ -94,6 +95,13 @@ export interface EnrichedItem {
     priority: number;
 }
 
+interface EnrichedStore {
+    savedAt:  string;
+    userId:   number;
+    userName: string;
+    items:    EnrichedItem[];
+}
+
 // ─── Provider interface ───────────────────────────────────────────────────────
 export interface KbCollectorProvider {
     readonly name: string;
@@ -116,6 +124,21 @@ export async function saveKb(items: KbEntry[]): Promise<void> {
     await fs.mkdir(KB_DIR, { recursive: true });
     const store: KbStore = { updatedAt: new Date().toISOString(), items };
     await fs.writeFile(KB_FILE, JSON.stringify(store, null, 2), 'utf-8');
+}
+
+async function saveEnriched(items: EnrichedItem[], userId: number, userName: string): Promise<string> {
+    await fs.mkdir(ENRICHED_DIR, { recursive: true });
+    const today   = new Date().toISOString().slice(0, 10);
+    const outPath = path.join(ENRICHED_DIR, `enriched-${today}.json`);
+    const store: EnrichedStore = { savedAt: new Date().toISOString(), userId, userName, items };
+    await fs.writeFile(outPath, JSON.stringify(store, null, 2), 'utf-8');
+    return outPath;
+}
+
+async function loadEnriched(filePath: string): Promise<{ items: EnrichedItem[]; userId: number; userName: string }> {
+    const raw   = await fs.readFile(filePath, 'utf-8');
+    const store = JSON.parse(raw) as EnrichedStore;
+    return { items: store.items, userId: store.userId, userName: store.userName };
 }
 
 // ─── Batch Provider Base ─────────────────────────────────────────────────────
@@ -175,33 +198,34 @@ abstract class BatchKbProvider implements KbCollectorProvider {
     }
 
     protected abstract processBatch(batch: EnrichedItem[], kbMap: Map<number, KbEntry>, batchNum: number): Promise<void>;
+}
 
-    protected applyResults(batch: EnrichedItem[], data: unknown, kbMap: Map<number, KbEntry>): void {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const results: any[] = (data as any)?.results ?? (Array.isArray(data) ? data : []);
-        const batchIds = new Set(batch.map(b => b.item.id));
+/** Maps AI result objects back to enriched items and writes to kbMap. */
+function applyResults(batch: EnrichedItem[], data: unknown, kbMap: Map<number, KbEntry>): void {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const results: any[] = (data as any)?.results ?? (Array.isArray(data) ? data : []);
+    const batchIds = new Set(batch.map(b => b.item.id));
 
-        for (const result of results) {
-            const original = batch.find(b => b.item.id === result.id);
-            if (!original) {
-                logger.warn(`applyResults: ID ${result.id} non presente nel batch — ignorato`);
-                continue;
-            }
-            kbMap.set(result.id, {
-                id:             original.item.id,
-                entityType:     original.item.entityType,
-                name:           original.item.name,
-                summary:        result.summary ?? '',
-                tags:           result.tags ?? [],
-                userActivities: result.userActivities ?? {},
-                cachedAt:       new Date().toISOString(),
-            });
-            batchIds.delete(result.id);
+    for (const result of results) {
+        const original = batch.find(b => b.item.id === result.id);
+        if (!original) {
+            logger.warn(`applyResults: ID ${result.id} non presente nel batch — ignorato`);
+            continue;
         }
+        kbMap.set(result.id, {
+            id:             original.item.id,
+            entityType:     original.item.entityType,
+            name:           original.item.name,
+            summary:        result.summary ?? '',
+            tags:           result.tags ?? [],
+            userActivities: result.userActivities ?? {},
+            cachedAt:       new Date().toISOString(),
+        });
+        batchIds.delete(result.id);
+    }
 
-        if (batchIds.size > 0) {
-            logger.warn(`applyResults: ${batchIds.size} item del batch senza risposta AI — IDs: ${[...batchIds].join(', ')}`);
-        }
+    if (batchIds.size > 0) {
+        logger.warn(`applyResults: ${batchIds.size} item senza risposta AI — IDs: ${[...batchIds].join(', ')}`);
     }
 }
 
@@ -256,7 +280,7 @@ class ClaudeKbProvider extends BatchKbProvider {
         const data = extractJson(raw);
         void saveRawResponse({ provider: 'claude', model: modelName, context, stopReason, inputTokens: message.usage.input_tokens, outputTokens: message.usage.output_tokens, parsedOk: true, raw });
 
-        this.applyResults(batch, data, kbMap);
+        applyResults(batch, data, kbMap);
         await saveKb(Array.from(kbMap.values()));
         logger.info(`Batch Claude ${batchNum} salvato (${batch.length} item).`);
     }
@@ -325,9 +349,49 @@ class GeminiKbProvider extends BatchKbProvider {
         const data = extractJson(raw);
         void saveRawResponse({ provider: 'gemini', model: modelName, context, stopReason: finishReason ?? undefined, inputTokens, outputTokens, parsedOk: true, raw });
 
-        this.applyResults(batch, data, kbMap);
+        applyResults(batch, data, kbMap);
         await saveKb(Array.from(kbMap.values()));
         logger.info(`Batch Gemini ${batchNum} salvato (${batch.length} item).`);
+    }
+}
+
+// ─── Replay provider ─────────────────────────────────────────────────────────
+/**
+ * Offline replay: reads a previously saved raw AI response file and re-runs the
+ * ETL (extractJson → applyResults → saveKb) without any network calls.
+ *
+ * Combine with --from-enriched to get a fully offline run:
+ *   tsx src/targetprocess/collector.ts --update-kb \
+ *     --from-enriched=data/raw/targetprocess/enriched-2026-03-23.json \
+ *     --from-ai-response=data/raw/ai-responses/2026-03-23_175054_gemini_kb-batch-1.json
+ */
+class ReplayProvider implements KbCollectorProvider {
+    readonly name = 'replay';
+    private readonly filePath: string;
+
+    constructor(filePath: string) {
+        this.filePath = filePath;
+    }
+
+    isAvailable(): boolean { return true; }
+
+    async collect(items: EnrichedItem[], kbMap: Map<number, KbEntry>): Promise<void> {
+        const raw    = await fs.readFile(this.filePath, 'utf-8');
+        const record = JSON.parse(raw) as import('../aiRaw').RawResponseRecord;
+
+        logger.info(`Replay da: ${this.filePath}`);
+        logger.info(`  Provider originale : ${record.provider}`);
+        logger.info(`  Model              : ${record.model}`);
+        logger.info(`  Context            : ${record.context}`);
+        logger.info(`  Salvato il         : ${record.savedAt}`);
+        logger.info(`  Token              : ${record.inputTokens ?? '?'} in / ${record.outputTokens ?? '?'} out`);
+        logger.info(`  Stop/finish reason : ${record.stopReason ?? '—'}`);
+        logger.info(`  Parsed ok (orig.)  : ${record.parsedOk}`);
+
+        const data = extractJson(record.raw);
+        applyResults(items, data, kbMap);
+        await saveKb(Array.from(kbMap.values()));
+        logger.info(`Replay completato: ${kbMap.size} entries in KB.`);
     }
 }
 
@@ -349,59 +413,80 @@ function buildProviders(forceProvider?: string): KbCollectorProvider[] {
 
 // ─── CLI entry point ──────────────────────────────────────────────────────────
 async function run(): Promise<void> {
-    const updateKb    = process.argv.includes('--update-kb');
-    const force       = process.argv.includes('--force');
-    const providerArg = process.argv.find(a => a.startsWith('--provider='))?.split('=')[1];
+    const updateKb       = process.argv.includes('--update-kb');
+    const force          = process.argv.includes('--force');
+    const providerArg    = process.argv.find(a => a.startsWith('--provider='))?.split('=')[1];
+    const fromEnriched   = process.argv.find(a => a.startsWith('--from-enriched='))?.split('=').slice(1).join('=');
+    const fromAiResponse = process.argv.find(a => a.startsWith('--from-ai-response='))?.split('=').slice(1).join('=');
 
     if (!updateKb) {
         logger.info('Usage: tsx src/targetprocess/collector.ts --update-kb [--force] [--provider=claude|gemini]');
+        logger.info('       tsx src/targetprocess/collector.ts --update-kb --from-enriched=<path> [--from-ai-response=<path>]');
         process.exit(0);
     }
-
-    const providers = buildProviders(providerArg);
-    const client    = new TargetprocessClient();
-
-    logger.info('Recupero item assegnati da TargetProcess...');
-    const me    = await client.getMe();
-    const items = await client.getMyAssignedOpenItems();
-    logger.info(`Trovati ${items.length} open item.`);
 
     const kb    = await loadKb();
     const kbMap = new Map<number, KbEntry>(kb.items.map(e => [e.id, e]));
 
-    // Filter items that need updating
-    const toProcess: TpOpenItem[] = items.filter(item =>
-        force || !kbMap.has(item.id) || kbMap.get(item.id)!.name !== item.name
-    );
+    // ── Enrichment phase ─────────────────────────────────────────────────────
+    let enriched: EnrichedItem[];
 
-    if (toProcess.length === 0) {
-        logger.info('Nessun item da aggiornare.');
-        return;
+    if (fromEnriched) {
+        logger.info(`Carico enriched da file: ${fromEnriched}`);
+        const loaded = await loadEnriched(fromEnriched);
+        enriched = loaded.items;
+        logger.info(`Caricati ${enriched.length} item (userId=${loaded.userId}, user=${loaded.userName}).`);
+    } else {
+        const client = new TargetprocessClient();
+
+        logger.info('Recupero item assegnati da TargetProcess...');
+        const me    = await client.getMe();
+        const items = await client.getMyAssignedOpenItems();
+        logger.info(`Trovati ${items.length} open item.`);
+
+        // Filter items that need updating
+        const toProcess: TpOpenItem[] = items.filter(item =>
+            force || !kbMap.has(item.id) || kbMap.get(item.id)!.name !== item.name
+        );
+
+        if (toProcess.length === 0) {
+            logger.info('Nessun item da aggiornare.');
+            return;
+        }
+
+        logger.info(`Arricchimento ${toProcess.length} item (stats + log)...`);
+        enriched = [];
+
+        for (const item of toProcess) {
+            const stats = await client.getAssignableStatistics(item.id);
+            const logs  = await client.getTimesByAssignable(item.id);
+
+            const hasMyHours           = stats.some(s => s.userName === me.FullName && s.totalHours > 0);
+            const hasColleagueHours    = stats.some(s => COLLEAGUES_PRIORITY.has(s.userName) && s.totalHours > 0);
+            const hasColleagueAssigned = item.assignments?.some(a => COLLEAGUES_PRIORITY.has(a)) ?? false;
+
+            enriched.push({
+                item,
+                stats,
+                logs,
+                priority: hasMyHours ? 4 : hasColleagueHours ? 3 : hasColleagueAssigned ? 2 : 1,
+            });
+        }
+
+        // High-priority items first (my hours > colleague hours > colleague assigned > rest), then by ID desc
+        enriched.sort((a, b) =>
+            b.priority !== a.priority ? b.priority - a.priority : b.item.id - a.item.id
+        );
+
+        // Persist enriched data before calling AI — enables offline replay
+        const enrichedPath = await saveEnriched(enriched, me.Id, me.FullName);
+        logger.info(`Enriched salvato: ${enrichedPath}`);
     }
 
-    logger.info(`Arricchimento ${toProcess.length} item (stats + log)...`);
-    const enriched: EnrichedItem[] = [];
-
-    for (const item of toProcess) {
-        const stats = await client.getAssignableStatistics(item.id);
-        const logs  = await client.getTimesByAssignable(item.id);
-
-        const hasMyHours           = stats.some(s => s.userName === me.FullName && s.totalHours > 0);
-        const hasColleagueHours    = stats.some(s => COLLEAGUES_PRIORITY.has(s.userName) && s.totalHours > 0);
-        const hasColleagueAssigned = item.assignments?.some(a => COLLEAGUES_PRIORITY.has(a)) ?? false;
-
-        enriched.push({
-            item,
-            stats,
-            logs,
-            priority: hasMyHours ? 4 : hasColleagueHours ? 3 : hasColleagueAssigned ? 2 : 1,
-        });
-    }
-
-    // High-priority items first (my hours > colleague hours > colleague assigned > rest), then by ID desc
-    enriched.sort((a, b) =>
-        b.priority !== a.priority ? b.priority - a.priority : b.item.id - a.item.id
-    );
+    // ── Provider phase ───────────────────────────────────────────────────────
+    const providers = fromAiResponse
+        ? [new ReplayProvider(fromAiResponse)]
+        : buildProviders(providerArg);
 
     logger.info(`Provider chain: ${providers.map(p => p.name).join(' → ')}`);
 
