@@ -149,8 +149,9 @@ export const useTimesheetStore = defineStore('timesheet', () => {
     }
 
     const totalsRow = computed(() => {
+        const allRows = [...active.value, ...pinned.value];
         const tp    = days.value.map((_, i) =>
-            active.value.reduce((acc, r) => acc + getHours(r.tpId, i), 0)
+            allRows.reduce((acc, r) => acc + getHours(r.tpId, i), 0)
         );
         const zuc   = days.value.map(d => d.zucHours);
         const delta = tp.map((t, i) => +((zuc[i] ?? 0) - t).toFixed(1));
@@ -170,14 +171,14 @@ export const useTimesheetStore = defineStore('timesheet', () => {
         })
     );
 
-    /**
-     * Bulk-submits all hoursEdits to TargetProcess.
-     * Returns { submitted, errors } from the API.
-     */
-    async function submitWeekHours(): Promise<{ submitted: number; errors: unknown[] }> {
-        const monday = currentMonday.value;
-        if (!monday) throw new Error('No week loaded');
+    function clearEdits() {
+        hoursEdits.value = {};
+        noteEdits.value  = {};
+    }
 
+    function buildEdits(filterDayIdx?: number): SubmitEdit[] {
+        const monday = currentMonday.value;
+        if (!monday) return [];
         const edits: SubmitEdit[] = [];
         for (const [key, hours] of Object.entries(hoursEdits.value)) {
             if (!hours || hours <= 0) continue;
@@ -185,6 +186,7 @@ export const useTimesheetStore = defineStore('timesheet', () => {
             const tpId   = Number(tpIdStr);
             const dayIdx = Number(dayIdxStr);
             if (dayIdx < 0 || dayIdx > 4) continue;
+            if (filterDayIdx !== undefined && dayIdx !== filterDayIdx) continue;
 
             const mondayDate = new Date(monday);
             mondayDate.setDate(mondayDate.getDate() + dayIdx);
@@ -200,8 +202,44 @@ export const useTimesheetStore = defineStore('timesheet', () => {
                 description: noteEdits.value[key] ?? '',
             });
         }
+        return edits;
+    }
 
-        return submitWeekHoursApi(monday, edits);
+    /**
+     * Bulk-submits all hoursEdits to TargetProcess.
+     * On full success, clears edits and reloads week data.
+     * Returns { submitted, errors } from the API.
+     */
+    async function submitWeekHours(): Promise<{ submitted: number; errors: unknown[] }> {
+        const monday = currentMonday.value;
+        if (!monday) throw new Error('No week loaded');
+        const result = await submitWeekHoursApi(monday, buildEdits());
+        if (result.errors.length === 0) {
+            clearEdits();
+            await fetchWeekData(monday);
+        }
+        return result;
+    }
+
+    /**
+     * Submits only the edits for a single day (0=Mon … 4=Fri).
+     * On full success, clears that day's edits and reloads week data.
+     */
+    async function submitDayHours(dayIdx: number): Promise<{ submitted: number; errors: unknown[] }> {
+        const monday = currentMonday.value;
+        if (!monday) throw new Error('No week loaded');
+        if (dayIdx < 0 || dayIdx > 4) throw new Error('Invalid day index');
+        const result = await submitWeekHoursApi(monday, buildEdits(dayIdx));
+        if (result.errors.length === 0) {
+            for (const key of Object.keys(hoursEdits.value)) {
+                if (key.endsWith(`_${dayIdx}`)) {
+                    delete hoursEdits.value[key];
+                    delete noteEdits.value[key];
+                }
+            }
+            await fetchWeekData(monday);
+        }
+        return result;
     }
 
     return {
@@ -209,7 +247,7 @@ export const useTimesheetStore = defineStore('timesheet', () => {
         loading, error,
         weekData, currentMonday,
         hoursEdits, noteEdits,
-        getHours, getNote, setHours, setNote, fillDay, patchDay, fetchWeekData, submitWeekHours,
+        getHours, getNote, setHours, setNote, fillDay, patchDay, fetchWeekData, submitWeekHours, submitDayHours,
         totalsRow, rendPerDay,
     };
 });

@@ -3,7 +3,19 @@
         <div class="card-body p-3">
             <div class="flex items-center justify-between mb-2">
                 <div class="text-xs font-bold text-base-content/50 uppercase">Lavoro · TP</div>
-                <div class="text-xs text-base-content/30 italic">correlazione da subject</div>
+                <div class="flex items-center gap-2">
+                    <span v-if="submitMsg" class="text-xs" :class="submitMsgCls">{{ submitMsg }}</span>
+                    <button
+                        class="btn btn-xs btn-outline btn-primary gap-1"
+                        :disabled="pendingDayEdits === 0 || submitting"
+                        :title="pendingDayEdits === 0 ? 'Nessuna modifica da inviare' : 'Invia ore a TargetProcess'"
+                        @click="runDaySubmit"
+                    >
+                        <span v-if="submitting" class="loading loading-spinner loading-xs"></span>
+                        <span v-else>Invia a TP</span>
+                        <span v-if="pendingDayEdits > 0" class="badge badge-xs badge-primary">{{ pendingDayEdits }}</span>
+                    </button>
+                </div>
             </div>
 
             <!-- US cards -->
@@ -118,18 +130,56 @@
 </template>
 
 <script setup lang="ts">
-import { computed }       from 'vue';
-import { useDayStore }    from '../../stores/useDayStore';
-import { useUiStore }     from '../../stores/useUiStore';
+import { ref, computed }       from 'vue';
+import { useDayStore }         from '../../stores/useDayStore';
+import { useUiStore }          from '../../stores/useUiStore';
+import { useTimesheetStore }   from '../../stores/useTimesheetStore';
+import { usePickerStore }      from '../../stores/usePickerStore';
 import { stateColor, tpLink } from '../../utils';
-import TimeCellWidget     from '../TimeCellWidget.vue';
-import NoteEdit           from './NoteEdit.vue';
+import TimeCellWidget          from '../TimeCellWidget.vue';
+import NoteEdit                from './NoteEdit.vue';
 import type { UsCard, QuickSortState } from '../../types';
 
 defineProps<{ highlightedUs?: string }>();
 
-const day = useDayStore();
-const ui  = useUiStore();
+const day     = useDayStore();
+const ui      = useUiStore();
+const ts      = useTimesheetStore();
+const picker  = usePickerStore();
+
+const submitting   = ref(false);
+const submitMsg    = ref('');
+const submitMsgCls = ref('text-success');
+
+const pendingDayEdits = computed(() => {
+    const dayIdx = picker.selectedDayIdx;
+    if (dayIdx < 0) return 0;
+    return Object.entries(ts.hoursEdits)
+        .filter(([key, h]) => h > 0 && key.endsWith(`_${dayIdx}`))
+        .length;
+});
+
+async function runDaySubmit() {
+    if (pendingDayEdits.value === 0 || submitting.value) return;
+    submitting.value = true;
+    submitMsg.value  = '';
+    try {
+        const result = await ts.submitDayHours(picker.selectedDayIdx);
+        if (result.errors.length === 0) {
+            submitMsg.value    = `✓ ${result.submitted} ore inviate`;
+            submitMsgCls.value = 'text-success';
+        } else {
+            submitMsg.value    = `⚠ ${result.submitted} ok, ${result.errors.length} err`;
+            submitMsgCls.value = 'text-warning';
+        }
+        setTimeout(() => { submitMsg.value = ''; }, 6000);
+    } catch (err) {
+        submitMsg.value    = `✗ ${(err as Error).message}`;
+        submitMsgCls.value = 'text-error';
+    } finally {
+        submitting.value = false;
+    }
+}
 
 const STATE_ORDER: Record<string, number> = { 'Inception': 0, 'Dev/Unit test': 1, 'Testing': 2 };
 
