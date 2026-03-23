@@ -1,11 +1,11 @@
 /**
  * Claude analyzer providers: Anthropic API, OpenAI-compatible, and CLI.
  */
-import { spawn }         from "node:child_process";
-import Anthropic          from "@anthropic-ai/sdk";
+import { spawn } from "node:child_process";
+import Anthropic from "@anthropic-ai/sdk";
 import type { AnalyzerProvider, ProposalEntry } from "./analyzer";
-import { stripCodeFence } from "./analyzer";
-import { createLogger }   from "../logger";
+import { BatchAnalyzerProvider, stripCodeFence } from "./analyzer";
+import { createLogger } from "../logger";
 import { saveRawResponse } from "../aiRaw";
 
 const log = createLogger("claude");
@@ -86,78 +86,72 @@ async function callOpenAiCompatible(
 
 /** Claude via Anthropic API (direct SDK). */
 export class ClaudeApiProvider implements AnalyzerProvider {
-    readonly name:    string;
-    private readonly backend: "anthropic" | "openai-compat";
-
-    constructor() {
-        if (process.env["CLAUDE_API_KEY"]) {
-            this.backend = "anthropic";
-            this.name    = "claude:anthropic-api";
-        } else {
-            this.backend = "openai-compat";
-            this.name    = "claude:openai-compat";
-        }
-    }
+    readonly name: string = "claude:anthropic-api";
 
     isAvailable(): boolean {
-        return !!process.env["CLAUDE_API_KEY"] || !!process.env["OPENAI_BASE_URL"];
+        return !!process.env["CLAUDE_API_KEY"];
     }
 
     async analyze(systemPrompt: string, userPrompt: string, context = "analysis"): Promise<ProposalEntry[]> {
-        const model = process.env["CLAUDE_MODEL"]
-            ?? process.env["OPENAI_MODEL"]
-            ?? "claude-haiku-4-5-20251001";
+        const model = process.env["CLAUDE_MODEL"] ?? "claude-haiku-4-5-20251001";
+        const anthropic = new Anthropic({ apiKey: process.env["CLAUDE_API_KEY"] });
 
-        let responseText: string;
-        let inputTokens: number | undefined;
-        let outputTokens: number | undefined;
-        let stopReason: string | undefined;
+        log.info(`[${this.name}] Invio richiesta a Anthropic (${model})...`);
+        const message = await anthropic.messages.create({
+            model,
+            max_tokens: 1024 * 8, // More tokens
+            system: systemPrompt,
+            messages: [{ role: "user", content: userPrompt }],
+        });
 
-        if (this.backend === "anthropic") {
-            const anthropic = new Anthropic({ apiKey: process.env["CLAUDE_API_KEY"] });
-            const message   = await anthropic.messages.create({
-                model,
-                max_tokens: 4096,
-                system:     systemPrompt,
-                messages:   [{ role: "user", content: userPrompt }],
-            });
+        const block = message.content[0];
+        if (block.type !== "text") throw new Error("Risposta Claude non testuale");
 
-            const block = message.content[0];
-            if (block.type !== "text") throw new Error("Risposta Claude non testuale");
+        const responseText = block.text;
+        const stopReason = message.stop_reason ?? undefined;
+        const inputTokens = message.usage.input_tokens;
+        const outputTokens = message.usage.output_tokens;
 
-            responseText  = block.text;
-            stopReason    = message.stop_reason ?? undefined;
-            inputTokens   = message.usage.input_tokens;
-            outputTokens  = message.usage.output_tokens;
+        log.debug(`Usage: ${inputTokens} in / ${outputTokens} out — stop: ${stopReason}`);
 
-            log.debug(`Usage: ${inputTokens} in / ${outputTokens} out — stop: ${stopReason}`);
-
-            if (stopReason === "max_tokens") {
-                log.warn("Risposta troncata (max_tokens) — JSON probabilmente incompleto");
-            }
-        } else {
-            responseText = await callOpenAiCompatible(systemPrompt, userPrompt, model);
-        }
-
-        // Persist raw response before any parsing
-        const rawPath = await saveRawResponse({
-            provider:     this.name,
+        // Persist raw response
+        await saveRawResponse({
+            provider: this.name,
             model,
             context,
             stopReason,
             inputTokens,
             outputTokens,
-            parsedOk:     false,   // updated below on success
-            raw:          responseText,
+            parsedOk: true,
+            raw: responseText,
         });
-        log.debug(`Raw response salvata: ${rawPath}`);
 
-        const parsed = JSON.parse(stripCodeFence(responseText)) as ProposalEntry[];
+        return JSON.parse(stripCodeFence(responseText)) as ProposalEntry[];
+    }
+}
 
-        // Mark file as successfully parsed (best-effort update)
-        void saveRawResponse({ provider: this.name, model, context, stopReason, inputTokens, outputTokens, parsedOk: true, raw: responseText });
+/** OpenAI-compatible local model (Ollama, LM Studio, etc). */
+export class OpenAiCompatibleProvider extends BatchAnalyzerProvider {
+    readonly name: string = "openai-compat";
 
-        return parsed;
+    isAvailable(): boolean {
+        return !!process.env["OPENAI_BASE_URL"];
+    }
+
+    async analyzeBatch(systemPrompt: string, userPromptBatched: string): Promise<{date: string, entries: ProposalEntry[]}[]> {
+        const model = process.env["OPENAI_MODEL"] ?? "qwen2.5-coder:3b";
+        log.info(`[${this.name}] Invio batch a endpoint OpenAI-compat (${model})...`);
+        const responseText = await callOpenAiCompatible(systemPrompt, userPromptBatched, model);
+        
+        await saveRawResponse({
+            provider: this.name,
+            model,
+            context: "batch-analysis",
+            parsedOk: true,
+            raw: responseText,
+        });
+        
+        return JSON.parse(stripCodeFence(responseText)) as {date: string, entries: ProposalEntry[]}[];
     }
 }
 
