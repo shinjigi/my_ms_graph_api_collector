@@ -1,5 +1,5 @@
 <template>
-    <div class="grid grid-cols-5 gap-2 mb-4">
+    <div class="grid grid-cols-6 gap-2 mb-4">
         <!-- Ore Zuc -->
         <div class="card bg-base-100 shadow-sm border border-base-300">
             <div class="card-body p-3">
@@ -55,16 +55,58 @@
                 <div class="text-xs text-base-content/40 mt-0.5">Ricevute · {{ emailOut }} inviate</div>
             </div>
         </div>
+        <!-- AI Proposal -->
+        <div class="card bg-base-100 shadow-sm border border-base-300">
+            <div class="card-body p-3">
+                <div class="text-xs text-base-content/50 uppercase tracking-wide">AI Proposal</div>
+                <template v-if="analysis.isRunning">
+                    <div class="flex items-center gap-2 mt-1">
+                        <span class="loading loading-spinner loading-sm text-secondary"></span>
+                        <span class="text-xs text-base-content/50">Analisi in corso...</span>
+                    </div>
+                    <div class="text-xs text-base-content/30 mt-0.5">
+                        {{ analysis.status?.dates?.length ?? 1 }} giorni
+                    </div>
+                </template>
+                <template v-else-if="analysis.error">
+                    <div class="text-sm font-bold text-error mt-0.5">Errore</div>
+                    <div class="text-xs text-error/70 mt-0.5 truncate" :title="analysis.error">{{ analysis.error }}</div>
+                </template>
+                <template v-else-if="analysis.proposal">
+                    <div class="flex items-baseline gap-1 mt-0.5">
+                        <span class="text-xl font-bold text-secondary">{{ analysis.proposal.entries.length }}</span>
+                        <span class="text-xs text-base-content/40">entries</span>
+                    </div>
+                    <div class="text-xs text-base-content/40 mt-0.5 truncate"
+                         :title="analysis.provider ?? ''">
+                        {{ providerShort }} · {{ analysis.lastRun }}
+                    </div>
+                </template>
+                <template v-else>
+                    <div class="text-sm text-base-content/30 mt-1">Nessuna proposta</div>
+                    <div class="text-xs text-base-content/20 mt-0.5">per questo giorno</div>
+                </template>
+                <button class="btn btn-xs btn-outline btn-secondary mt-1 w-full"
+                        :disabled="analysis.isRunning"
+                        @click="runAnalysis">
+                    {{ analysis.proposal ? 'Ri-analizza' : 'Analizza' }}
+                </button>
+            </div>
+        </div>
     </div>
 </template>
 
 <script setup lang="ts">
-import { computed }    from 'vue';
-import { useDayStore } from '../../stores/useDayStore';
+import { computed, watch }      from 'vue';
+import { useDayStore }          from '../../stores/useDayStore';
+import { useAnalysisStore }     from '../../stores/useAnalysisStore';
+import { usePickerStore }       from '../../stores/usePickerStore';
 
-const day = useDayStore();
+const day      = useDayStore();
+const analysis = useAnalysisStore();
+const picker   = usePickerStore();
 
-// Zucchetti hours derived from store (decimal → h + m display)
+// Zucchetti hours derived from store (decimal -> h + m display)
 const zucH = computed(() => Math.floor(day.dayTotals.zuc));
 const zucM = computed(() => Math.round((day.dayTotals.zuc - zucH.value) * 60));
 
@@ -80,4 +122,31 @@ const commitTotal  = computed(() => gitCount.value + svnCount.value);
 const meetingCount = computed(() => day.tlEvents.filter(ev => ev.type === 'meeting').length);
 const emailTotal   = computed(() => day.emails.length);
 const emailOut     = computed(() => day.emails.filter(e => e.dir === 'out').length);
+
+// Shorten provider name for display
+const providerShort = computed(() => {
+    const p = analysis.provider;
+    if (!p) return '';
+    if (p.startsWith('claude:'))  return 'Claude';
+    if (p.startsWith('gemini:')) return 'Gemini';
+    return p;
+});
+
+function selectedDateStr(): string {
+    const d = picker.pickerSelected;
+    const yr  = d.getFullYear();
+    const mo  = String(d.getMonth() + 1).padStart(2, '0');
+    const dd  = String(d.getDate()).padStart(2, '0');
+    return `${yr}-${mo}-${dd}`;
+}
+
+function runAnalysis() {
+    const force = !!analysis.proposal;
+    analysis.runDay(selectedDateStr(), force);
+}
+
+// Load existing proposal when selected day changes
+watch(() => picker.pickerSelected, () => {
+    analysis.loadProposal(selectedDateStr());
+}, { immediate: true });
 </script>
