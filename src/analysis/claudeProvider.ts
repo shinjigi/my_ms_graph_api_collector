@@ -3,9 +3,8 @@
  */
 import { spawn } from "node:child_process";
 import Anthropic from "@anthropic-ai/sdk";
-import type { AnalyzerProvider } from "./analyzer";
-import type { ProposalEntry } from "./analyzer";
-import { stripCodeFence } from "./analyzer";
+import type { AnalyzerProvider, ProposalEntry } from "./analyzer";
+import { BatchAnalyzerProvider, stripCodeFence } from "./analyzer";
 
 /** Calls the local `claude` CLI (Claude Code subscription) in non-interactive mode. */
 function callClaudeCli(
@@ -75,46 +74,39 @@ async function callOpenAiCompatible(
 
 /** Claude via Anthropic API (direct SDK). */
 export class ClaudeApiProvider implements AnalyzerProvider {
-    readonly name: string;
-    private readonly backend: "anthropic" | "openai-compat";
-
-    constructor() {
-        if (process.env["CLAUDE_API_KEY"]) {
-            this.backend = "anthropic";
-            this.name = "claude:anthropic-api";
-        } else {
-            this.backend = "openai-compat";
-            this.name = "claude:openai-compat";
-        }
-    }
+    readonly name: string = "claude:anthropic-api";
 
     isAvailable(): boolean {
-        return !!process.env["CLAUDE_API_KEY"] || !!process.env["OPENAI_BASE_URL"];
+        return !!process.env["CLAUDE_API_KEY"];
     }
 
     async analyze(systemPrompt: string, userPrompt: string): Promise<ProposalEntry[]> {
-        const model = process.env["CLAUDE_MODEL"]
-            ?? process.env["OPENAI_MODEL"]
-            ?? "claude-haiku-4-5-20251001";
+        const model = process.env["CLAUDE_MODEL"] ?? "claude-haiku-4-5-20251001";
+        const anthropic = new Anthropic({ apiKey: process.env["CLAUDE_API_KEY"] });
+        const message = await anthropic.messages.create({
+            model,
+            max_tokens: 1024 * 8, // Need more tokens potentially
+            system: systemPrompt,
+            messages: [{ role: "user", content: userPrompt }],
+        });
+        const block = message.content[0];
+        if (block.type !== "text") throw new Error("Risposta Claude non testuale");
+        return JSON.parse(stripCodeFence(block.text)) as ProposalEntry[];
+    }
+}
 
-        let responseText: string;
+/** OpenAI-compatible local model (Ollama, LM Studio, etc). */
+export class OpenAiCompatibleProvider extends BatchAnalyzerProvider {
+    readonly name: string = "openai-compat";
 
-        if (this.backend === "anthropic") {
-            const anthropic = new Anthropic({ apiKey: process.env["CLAUDE_API_KEY"] });
-            const message = await anthropic.messages.create({
-                model,
-                max_tokens: 1024,
-                system: systemPrompt,
-                messages: [{ role: "user", content: userPrompt }],
-            });
-            const block = message.content[0];
-            if (block.type !== "text") throw new Error("Risposta Claude non testuale");
-            responseText = block.text;
-        } else {
-            responseText = await callOpenAiCompatible(systemPrompt, userPrompt, model);
-        }
+    isAvailable(): boolean {
+        return !!process.env["OPENAI_BASE_URL"];
+    }
 
-        return JSON.parse(stripCodeFence(responseText)) as ProposalEntry[];
+    async analyzeBatch(systemPrompt: string, userPromptBatched: string): Promise<{date: string, entries: ProposalEntry[]}[]> {
+        const model = process.env["OPENAI_MODEL"] ?? "qwen2.5-coder:3b";
+        const responseText = await callOpenAiCompatible(systemPrompt, userPromptBatched, model);
+        return JSON.parse(stripCodeFence(responseText)) as {date: string, entries: ProposalEntry[]}[];
     }
 }
 

@@ -1,44 +1,55 @@
 /**
- * Gemini analyzer provider using Google Generative AI SDK.
+ * Gemini analyzer provider using Google GenAI SDK.
  */
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
-import type { ResponseSchema } from "@google/generative-ai";
-import type { AnalyzerProvider, ProposalEntry } from "./analyzer";
+import { GoogleGenAI, Type, Schema } from "@google/genai";
+import type { ProposalEntry } from "./analyzer";
+import { BatchAnalyzerProvider } from "./analyzer";
 
 /** Structured output schema for Gemini. */
-const schema = {
-    description: "List of time allocation entries",
-    type: SchemaType.ARRAY,
+const schema: Schema = {
+    description: "List of day proposals",
+    type: Type.ARRAY,
     items: {
-        type: SchemaType.OBJECT,
+        type: Type.OBJECT,
         properties: {
-            taskId: { type: SchemaType.NUMBER, nullable: true },
-            entityType: {
-                type: SchemaType.STRING,
-                enum: ["UserStory", "Task", "Bug", "recurring"],
-            },
-            taskName: { type: SchemaType.STRING },
-            inferredHours: { type: SchemaType.NUMBER },
-            confidence: { type: SchemaType.STRING, enum: ["high", "medium", "low"] },
-            reasoning: { type: SchemaType.STRING },
-            approved: { type: SchemaType.BOOLEAN },
+            date: { type: Type.STRING },
+            entries: {
+                type: Type.ARRAY,
+                items: {
+                    type: Type.OBJECT,
+                    properties: {
+                        taskId: { type: Type.INTEGER, nullable: true }, // NUMBER/INTEGER
+                        entityType: {
+                            type: Type.STRING,
+                            enum: ["UserStory", "Task", "Bug", "recurring"],
+                        },
+                        taskName: { type: Type.STRING },
+                        inferredHours: { type: Type.NUMBER },
+                        confidence: { type: Type.STRING, enum: ["high", "medium", "low"] },
+                        reasoning: { type: Type.STRING },
+                        approved: { type: Type.BOOLEAN },
+                    },
+                    required: [
+                        "entityType",
+                        "taskName",
+                        "inferredHours",
+                        "confidence",
+                        "reasoning",
+                        "approved",
+                    ],
+                }
+            }
         },
-        required: [
-            "entityType",
-            "taskName",
-            "inferredHours",
-            "confidence",
-            "reasoning",
-            "approved",
-        ],
+        required: ["date", "entries"],
     },
-} as const;
+};
 
-export class GeminiProvider implements AnalyzerProvider {
+export class GeminiProvider extends BatchAnalyzerProvider {
     readonly name: string;
     private readonly modelName: string;
 
     constructor() {
+        super();
         this.modelName = process.env["GEMINI_MODEL"] || "gemini-2.0-flash";
         this.name = `gemini:${this.modelName}`;
     }
@@ -47,20 +58,22 @@ export class GeminiProvider implements AnalyzerProvider {
         return !!process.env["GEMINI_API_KEY"];
     }
 
-    async analyze(systemPrompt: string, userPrompt: string): Promise<ProposalEntry[]> {
+    async analyzeBatch(systemPrompt: string, userPromptBatched: string): Promise<{date: string, entries: ProposalEntry[]}[]> {
         const apiKey = process.env["GEMINI_API_KEY"]!;
-        const genAI = new GoogleGenerativeAI(apiKey);
+        const ai = new GoogleGenAI({ apiKey });
 
-        const model = genAI.getGenerativeModel({
+        const response = await ai.models.generateContent({
             model: this.modelName,
-            generationConfig: {
+            contents: [
+                { role: 'user', parts: [{ text: systemPrompt + '\n\n' + userPromptBatched }] }
+            ],
+            config: {
                 responseMimeType: "application/json",
-                responseSchema: schema as unknown as ResponseSchema,
-            },
+                responseSchema: schema,
+            }
         });
 
-        const result = await model.generateContent([systemPrompt, userPrompt]);
-        const text = result.response.text();
-        return JSON.parse(text) as ProposalEntry[];
+        if (!response.text) throw new Error("Risposta vuota da Gemini");
+        return JSON.parse(response.text) as {date: string, entries: ProposalEntry[]}[];
     }
 }
