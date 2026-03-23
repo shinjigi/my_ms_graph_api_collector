@@ -85,7 +85,8 @@ export interface DefaultsConfig {
 export interface AnalyzerProvider {
     readonly name: string;
     isAvailable(): boolean;
-    analyze(systemPrompt: string, userPrompt: string): Promise<ProposalEntry[]>;
+    /** context: human-readable label for the raw-response file (e.g. "analysis-2026-03-23"). */
+    analyze(systemPrompt: string, userPrompt: string, context?: string): Promise<ProposalEntry[]>;
 }
 
 // ─── Shared utilities ───────────────────────────────────────────────
@@ -216,7 +217,7 @@ export async function analyzeDay(
 
         try {
             log.info(`[${provider.name}] analisi in corso...`);
-            const entries = await provider.analyze(system, user);
+            const entries = await provider.analyze(system, user, `analysis-${day.date}`);
             const totalHours = entries.reduce((s, e) => s + e.inferredHours, 0);
 
             return {

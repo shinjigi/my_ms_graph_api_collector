@@ -17,6 +17,7 @@ import * as dotenv from 'dotenv';
 dotenv.config();
 
 import { createLogger }        from '../logger';
+import { saveRawResponse }     from '../aiRaw';
 import { TargetprocessClient } from './client';
 import { AnalysisPrompts }     from './prompts';
 import type { TpOpenItem, TpUserStat, TpTimeEntry } from './types';
@@ -139,11 +140,12 @@ abstract class BatchKbProvider implements KbCollectorProvider {
         const flush = async (): Promise<void> => {
             if (batch.length === 0) return;
             totalBatches++;
+            const batchNum = totalBatches;
             try {
-                await withRetry(() => this.processBatch(batch, kbMap));
+                await withRetry(() => this.processBatch(batch, kbMap, batchNum));
             } catch (err) {
                 failedBatches++;
-                logger.error(`[${this.name}] batch ${totalBatches} fallito: ${(err as Error).message}`);
+                logger.error(`[${this.name}] batch ${batchNum} fallito: ${(err as Error).message}`);
             }
             batch       = [];
             batchTokens = 0;
@@ -172,13 +174,19 @@ abstract class BatchKbProvider implements KbCollectorProvider {
         }
     }
 
-    protected abstract processBatch(batch: EnrichedItem[], kbMap: Map<number, KbEntry>): Promise<void>;
+    protected abstract processBatch(batch: EnrichedItem[], kbMap: Map<number, KbEntry>, batchNum: number): Promise<void>;
 
-    protected applyResults(batch: EnrichedItem[], data: any, kbMap: Map<number, KbEntry>): void {
-        const results = data.results ?? data ?? [];
+    protected applyResults(batch: EnrichedItem[], data: unknown, kbMap: Map<number, KbEntry>): void {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const results: any[] = (data as any)?.results ?? (Array.isArray(data) ? data : []);
+        const batchIds = new Set(batch.map(b => b.item.id));
+
         for (const result of results) {
             const original = batch.find(b => b.item.id === result.id);
-            if (!original) continue;
+            if (!original) {
+                logger.warn(`applyResults: ID ${result.id} non presente nel batch — ignorato`);
+                continue;
+            }
             kbMap.set(result.id, {
                 id:             original.item.id,
                 entityType:     original.item.entityType,
@@ -188,6 +196,11 @@ abstract class BatchKbProvider implements KbCollectorProvider {
                 userActivities: result.userActivities ?? {},
                 cachedAt:       new Date().toISOString(),
             });
+            batchIds.delete(result.id);
+        }
+
+        if (batchIds.size > 0) {
+            logger.warn(`applyResults: ${batchIds.size} item del batch senza risposta AI — IDs: ${[...batchIds].join(', ')}`);
         }
     }
 }
@@ -204,9 +217,10 @@ class ClaudeKbProvider extends BatchKbProvider {
         return !!process.env['CLAUDE_API_KEY'];
     }
 
-    protected async processBatch(batch: EnrichedItem[], kbMap: Map<number, KbEntry>): Promise<void> {
+    protected async processBatch(batch: EnrichedItem[], kbMap: Map<number, KbEntry>, batchNum: number): Promise<void> {
         const client    = new Anthropic({ apiKey: process.env['CLAUDE_API_KEY']! });
         const modelName = (process.env['CLAUDE_MODEL'] ?? 'claude-haiku-4-5-20251001').replace(/['"]/g, '').trim();
+        const context   = `kb-batch-${batchNum}`;
 
         const prompt = AnalysisPrompts.getBatchAnalysisPrompt(batch);
         logger.info(`Batch Claude ${batch.length} item (~${Math.ceil(prompt.length / 4)} token)...`);
@@ -217,13 +231,34 @@ class ClaudeKbProvider extends BatchKbProvider {
             messages:   [{ role: 'user', content: prompt }],
         });
 
-        const block = message.content[0];
-        const raw   = block.type === 'text' ? block.text.trim() : '{}';
-        const data  = extractJson(raw);
+        const block      = message.content[0];
+        const raw        = block.type === 'text' ? block.text.trim() : '{}';
+        const stopReason = message.stop_reason ?? undefined;
+
+        logger.debug(`Usage: ${message.usage.input_tokens} in / ${message.usage.output_tokens} out — stop: ${stopReason}`);
+        if (stopReason === 'max_tokens') {
+            logger.warn(`Batch Claude ${batchNum}: risposta troncata (max_tokens) — JSON probabilmente incompleto`);
+        }
+
+        // Persist raw before parsing
+        const rawPath = await saveRawResponse({
+            provider:     'claude',
+            model:        modelName,
+            context,
+            stopReason,
+            inputTokens:  message.usage.input_tokens,
+            outputTokens: message.usage.output_tokens,
+            parsedOk:     false,
+            raw,
+        });
+        logger.debug(`Raw response salvata: ${rawPath}`);
+
+        const data = extractJson(raw);
+        void saveRawResponse({ provider: 'claude', model: modelName, context, stopReason, inputTokens: message.usage.input_tokens, outputTokens: message.usage.output_tokens, parsedOk: true, raw });
 
         this.applyResults(batch, data, kbMap);
         await saveKb(Array.from(kbMap.values()));
-        logger.info(`Batch Claude salvato (${batch.length} item).`);
+        logger.info(`Batch Claude ${batchNum} salvato (${batch.length} item).`);
     }
 }
 
@@ -239,9 +274,10 @@ class GeminiKbProvider extends BatchKbProvider {
         return !!process.env['GEMINI_API_KEY'];
     }
 
-    protected async processBatch(batch: EnrichedItem[], kbMap: Map<number, KbEntry>): Promise<void> {
+    protected async processBatch(batch: EnrichedItem[], kbMap: Map<number, KbEntry>, batchNum: number): Promise<void> {
         const genAI     = new GoogleGenAI({ apiKey: process.env['GEMINI_API_KEY']! });
         const modelName = (process.env['GEMINI_MODEL'] ?? 'gemini-2.0-flash').replace(/['"]/g, '').trim();
+        const context   = `kb-batch-${batchNum}`;
 
         const prompt = AnalysisPrompts.getBatchAnalysisPrompt(batch);
         logger.info(`Batch Gemini ${batch.length} item (~${Math.ceil(prompt.length / 4)} token)...`);
@@ -253,12 +289,45 @@ class GeminiKbProvider extends BatchKbProvider {
             config:   { responseMimeType: 'application/json' } as any,
         });
 
-        const raw  = response.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';
+        const usage        = response.usageMetadata;
+        const inputTokens  = usage?.promptTokenCount;
+        const outputTokens = usage?.candidatesTokenCount;
+        const candidate    = response.candidates?.[0];
+        const finishReason = candidate?.finishReason;
+
+        logger.debug(`Usage: ${inputTokens ?? '?'} in / ${outputTokens ?? '?'} out — finish: ${finishReason ?? 'unknown'}`);
+
+        if (!candidate) {
+            throw new Error(`Gemini batch ${batchNum}: nessun candidato — possibile blocco safety`);
+        }
+        if (finishReason && finishReason !== 'STOP') {
+            logger.warn(`Batch Gemini ${batchNum}: finishReason=${finishReason} — risposta potenzialmente incompleta`);
+        }
+
+        const raw = candidate.content?.parts?.[0]?.text ?? '';
+        if (!raw) {
+            throw new Error(`Gemini batch ${batchNum}: testo vuoto (finishReason=${finishReason ?? 'unknown'})`);
+        }
+
+        // Persist raw before parsing
+        const rawPath = await saveRawResponse({
+            provider:     'gemini',
+            model:        modelName,
+            context,
+            stopReason:   finishReason ?? undefined,
+            inputTokens,
+            outputTokens,
+            parsedOk:     false,
+            raw,
+        });
+        logger.debug(`Raw response salvata: ${rawPath}`);
+
         const data = extractJson(raw);
+        void saveRawResponse({ provider: 'gemini', model: modelName, context, stopReason: finishReason ?? undefined, inputTokens, outputTokens, parsedOk: true, raw });
 
         this.applyResults(batch, data, kbMap);
         await saveKb(Array.from(kbMap.values()));
-        logger.info(`Batch Gemini salvato (${batch.length} item).`);
+        logger.info(`Batch Gemini ${batchNum} salvato (${batch.length} item).`);
     }
 }
 

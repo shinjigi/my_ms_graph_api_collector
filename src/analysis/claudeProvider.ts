@@ -1,21 +1,26 @@
 /**
  * Claude analyzer providers: Anthropic API, OpenAI-compatible, and CLI.
  */
-import { spawn } from "node:child_process";
-import Anthropic from "@anthropic-ai/sdk";
-import type { AnalyzerProvider } from "./analyzer";
-import type { ProposalEntry } from "./analyzer";
+import { spawn }         from "node:child_process";
+import Anthropic          from "@anthropic-ai/sdk";
+import type { AnalyzerProvider, ProposalEntry } from "./analyzer";
 import { stripCodeFence } from "./analyzer";
+import { createLogger }   from "../logger";
+import { saveRawResponse } from "../aiRaw";
+
+const log = createLogger("claude");
 
 /** Calls the local `claude` CLI (Claude Code subscription) in non-interactive mode. */
 function callClaudeCli(
     systemPrompt: string,
-    userPrompt: string,
-    model: string,
+    userPrompt:   string,
+    model:        string,
 ): Promise<string> {
     return new Promise((resolve, reject) => {
-        // Unset CLAUDECODE to allow subprocess invocation outside an active session
-        const env = { ...process.env, CLAUDECODE: undefined };
+        // Remove CLAUDECODE so the subprocess can run outside an active session
+        const env = { ...process.env };
+        delete env["CLAUDECODE"];
+
         const proc = spawn("claude", ["-p", "--model", model], {
             env,
             stdio: ["pipe", "pipe", "pipe"],
@@ -31,7 +36,13 @@ function callClaudeCli(
             if (code !== 0) reject(new Error(`claude CLI exited with code ${code}`));
             else resolve(Buffer.concat(chunks).toString("utf-8").trim());
         });
-        proc.on("error", reject);
+        proc.on("error", (err) => {
+            if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+                reject(new Error("claude CLI non trovato — installa Claude Code o disabilita il provider CLI"));
+            } else {
+                reject(err);
+            }
+        });
     });
 }
 
@@ -41,25 +52,25 @@ function callClaudeCli(
  */
 async function callOpenAiCompatible(
     systemPrompt: string,
-    userPrompt: string,
-    model: string,
+    userPrompt:   string,
+    model:        string,
 ): Promise<string> {
     const baseUrl = process.env["OPENAI_BASE_URL"]!;
-    const apiKey = process.env["OPENAI_API_KEY"] ?? "ollama";
+    const apiKey  = process.env["OPENAI_API_KEY"] ?? "ollama";
 
     const response = await fetch(`${baseUrl}/chat/completions`, {
         method: "POST",
         headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
+            "Content-Type":  "application/json",
+            "Authorization": `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
             model,
             messages: [
                 { role: "system", content: systemPrompt },
-                { role: "user", content: userPrompt },
+                { role: "user",   content: userPrompt },
             ],
-            max_tokens: 1024,
+            max_tokens: 4096,
         }),
     });
 
@@ -75,16 +86,16 @@ async function callOpenAiCompatible(
 
 /** Claude via Anthropic API (direct SDK). */
 export class ClaudeApiProvider implements AnalyzerProvider {
-    readonly name: string;
+    readonly name:    string;
     private readonly backend: "anthropic" | "openai-compat";
 
     constructor() {
         if (process.env["CLAUDE_API_KEY"]) {
             this.backend = "anthropic";
-            this.name = "claude:anthropic-api";
+            this.name    = "claude:anthropic-api";
         } else {
             this.backend = "openai-compat";
-            this.name = "claude:openai-compat";
+            this.name    = "claude:openai-compat";
         }
     }
 
@@ -92,29 +103,61 @@ export class ClaudeApiProvider implements AnalyzerProvider {
         return !!process.env["CLAUDE_API_KEY"] || !!process.env["OPENAI_BASE_URL"];
     }
 
-    async analyze(systemPrompt: string, userPrompt: string): Promise<ProposalEntry[]> {
+    async analyze(systemPrompt: string, userPrompt: string, context = "analysis"): Promise<ProposalEntry[]> {
         const model = process.env["CLAUDE_MODEL"]
             ?? process.env["OPENAI_MODEL"]
             ?? "claude-haiku-4-5-20251001";
 
         let responseText: string;
+        let inputTokens: number | undefined;
+        let outputTokens: number | undefined;
+        let stopReason: string | undefined;
 
         if (this.backend === "anthropic") {
             const anthropic = new Anthropic({ apiKey: process.env["CLAUDE_API_KEY"] });
-            const message = await anthropic.messages.create({
+            const message   = await anthropic.messages.create({
                 model,
-                max_tokens: 1024,
-                system: systemPrompt,
-                messages: [{ role: "user", content: userPrompt }],
+                max_tokens: 4096,
+                system:     systemPrompt,
+                messages:   [{ role: "user", content: userPrompt }],
             });
+
             const block = message.content[0];
             if (block.type !== "text") throw new Error("Risposta Claude non testuale");
-            responseText = block.text;
+
+            responseText  = block.text;
+            stopReason    = message.stop_reason ?? undefined;
+            inputTokens   = message.usage.input_tokens;
+            outputTokens  = message.usage.output_tokens;
+
+            log.debug(`Usage: ${inputTokens} in / ${outputTokens} out — stop: ${stopReason}`);
+
+            if (stopReason === "max_tokens") {
+                log.warn("Risposta troncata (max_tokens) — JSON probabilmente incompleto");
+            }
         } else {
             responseText = await callOpenAiCompatible(systemPrompt, userPrompt, model);
         }
 
-        return JSON.parse(stripCodeFence(responseText)) as ProposalEntry[];
+        // Persist raw response before any parsing
+        const rawPath = await saveRawResponse({
+            provider:     this.name,
+            model,
+            context,
+            stopReason,
+            inputTokens,
+            outputTokens,
+            parsedOk:     false,   // updated below on success
+            raw:          responseText,
+        });
+        log.debug(`Raw response salvata: ${rawPath}`);
+
+        const parsed = JSON.parse(stripCodeFence(responseText)) as ProposalEntry[];
+
+        // Mark file as successfully parsed (best-effort update)
+        void saveRawResponse({ provider: this.name, model, context, stopReason, inputTokens, outputTokens, parsedOk: true, raw: responseText });
+
+        return parsed;
     }
 }
 
@@ -126,9 +169,22 @@ export class ClaudeCliProvider implements AnalyzerProvider {
         return true;
     }
 
-    async analyze(systemPrompt: string, userPrompt: string): Promise<ProposalEntry[]> {
-        const model = process.env["CLAUDE_MODEL"] ?? "claude-haiku-4-5-20251001";
+    async analyze(systemPrompt: string, userPrompt: string, context = "analysis-cli"): Promise<ProposalEntry[]> {
+        const model        = process.env["CLAUDE_MODEL"] ?? "claude-haiku-4-5-20251001";
         const responseText = await callClaudeCli(systemPrompt, userPrompt, model);
-        return JSON.parse(stripCodeFence(responseText)) as ProposalEntry[];
+
+        const rawPath = await saveRawResponse({
+            provider: this.name,
+            model,
+            context,
+            parsedOk: false,
+            raw:      responseText,
+        });
+        log.debug(`Raw response salvata: ${rawPath}`);
+
+        const parsed = JSON.parse(stripCodeFence(responseText)) as ProposalEntry[];
+        void saveRawResponse({ provider: this.name, model, context, parsedOk: true, raw: responseText });
+
+        return parsed;
     }
 }
