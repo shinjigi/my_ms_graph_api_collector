@@ -17,6 +17,9 @@ import type { SvnCommit }         from '../collectors/vcs/svn';
 import type { GitCommit }         from '../collectors/vcs/git';
 import type { BrowserVisit }      from '../collectors/browser/history';
 import { hhmmToHours }            from '../targetprocess/format';
+import { createLogger }           from '../logger';
+
+const log = createLogger('aggregator');
 
 const RAW_DIR      = path.join(process.cwd(), 'data', 'raw');
 const AGG_DIR      = path.join(process.cwd(), 'data', 'aggregated');
@@ -149,7 +152,7 @@ export async function aggregateSingleDay(date: string, zDay: ZucchettiDay): Prom
 }
 
 async function run(): Promise<void> {
-    console.log('Aggregazione dati raw → aggregated...');
+    log.info('Aggregazione dati raw → aggregated...');
 
     await fs.mkdir(AGG_DIR, { recursive: true });
     const sinceDate = process.env['COLLECT_SINCE'] ?? '2025-01-01';
@@ -164,13 +167,13 @@ async function run(): Promise<void> {
     const firefoxBrows = await loadDirMonthly<BrowserVisit>(FIREFOX_DIR);
     const browser      = [...chromeBrows, ...firefoxBrows];
 
-    console.log(`  Zucchetti: ${zuccDays.length} giorni`);
-    console.log(`  Calendar: ${calendar.length} eventi`);
-    console.log(`  Email: ${emails.length}`);
-    console.log(`  Teams: ${teams.length} messaggi`);
-    console.log(`  SVN: ${svn.length} commit`);
-    console.log(`  Git: ${git.length} commit`);
-    console.log(`  Browser: ${browser.length} visite`);
+    log.debug(`Zucchetti: ${zuccDays.length} giorni`);
+    log.debug(`Calendar: ${calendar.length} eventi`);
+    log.debug(`Email: ${emails.length}`);
+    log.debug(`Teams: ${teams.length} messaggi`);
+    log.debug(`SVN: ${svn.length} commit`);
+    log.debug(`Git: ${git.length} commit`);
+    log.debug(`Browser: ${browser.length} visite`);
 
     // Build date-indexed maps for fast lookup
     const calByDate     = new Map<string, CalendarEventRaw[]>();
@@ -255,10 +258,10 @@ async function run(): Promise<void> {
         written++;
     }
 
-    console.log(`\nAggregazione completata: ${written} giorni scritti in ${AGG_DIR}`);
+    log.info(`Aggregazione completata: ${written} giorni scritti in ${AGG_DIR}`);
 }
 
 run().catch((err: Error) => {
-    console.error('Errore aggregazione:', err.message);
+    log.error(`Errore aggregazione: ${err.message}`);
     process.exit(1);
 });

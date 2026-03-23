@@ -5,6 +5,10 @@
 import * as dotenv from 'dotenv';
 dotenv.config();
 
+import { createLogger } from './logger';
+
+const log = createLogger('collect');
+
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { createGraphClient } = require('./graphClient') as {
     createGraphClient: () => Promise<import('@microsoft/microsoft-graph-client').Client>;
@@ -22,49 +26,49 @@ async function run(): Promise<void> {
     const forceFlag = process.argv.includes('--force');
     const dateArg   = process.argv.find(a => a.startsWith('--date='))?.split('=')[1];
 
-    console.log(
-        'Avvio raccolta dati...' +
+    log.info(
+        'Avvio raccolta dati' +
         (dateArg ? ` (giorno: ${dateArg})` : '') +
         (forceFlag ? ' [--force]' : '')
     );
 
     // Microsoft Graph collectors (require device code auth on first run)
-    console.log('\n[Graph] Autenticazione...');
+    log.info('[Graph] Autenticazione...');
     const client = await createGraphClient();
 
     const calPaths = await collectGraphCalendar(client, dateArg, forceFlag);
-    calPaths.forEach(p => console.log(`[Graph] Calendario → ${p}`));
+    calPaths.forEach(p => log.info(`[Graph] Calendario → ${p}`));
 
     const emailPaths = await collectGraphEmail(client, dateArg, forceFlag);
-    emailPaths.forEach(p => console.log(`[Graph] Email → ${p}`));
+    emailPaths.forEach(p => log.info(`[Graph] Email → ${p}`));
 
     const teamsPaths = await collectGraphTeams(client, dateArg, forceFlag);
-    teamsPaths.forEach(p => console.log(`[Graph] Teams → ${p}`));
+    teamsPaths.forEach(p => log.info(`[Graph] Teams → ${p}`));
 
     // SVN commits
-    console.log('\n[SVN] Raccolta commit...');
+    log.info('[SVN] Raccolta commit...');
     const svnPaths = await collectSvnCommits(forceFlag);
-    svnPaths.forEach(p => console.log(`[SVN] Commit → ${p}`));
+    svnPaths.forEach(p => log.info(`[SVN] Commit → ${p}`));
 
     // Git commits
-    console.log('\n[Git] Raccolta commit...');
+    log.info('[Git] Raccolta commit...');
     const gitPaths = await collectGitCommits(forceFlag);
-    gitPaths.forEach(p => console.log(`[Git] Commit → ${p}`));
+    gitPaths.forEach(p => log.info(`[Git] Commit → ${p}`));
 
     // Zucchetti timesheet (collects from COLLECT_SINCE month by month)
-    console.log('\n[Zucchetti] Raccolta cartellino...');
+    log.info('[Zucchetti] Raccolta cartellino...');
     const zuccPaths = await collectZucchetti(forceFlag);
-    zuccPaths.forEach(p => console.log(`[Zucchetti] → ${p}`));
+    zuccPaths.forEach(p => log.info(`[Zucchetti] → ${p}`));
 
     // Browser history (Chrome + Firefox)
-    console.log('\n[Browser] Raccolta cronologia...');
+    log.info('[Browser] Raccolta cronologia...');
     const browserPaths = await collectBrowserHistory(forceFlag);
-    browserPaths.forEach(p => console.log(`[Browser] → ${p}`));
+    browserPaths.forEach(p => log.info(`[Browser] → ${p}`));
 
-    console.log('\nRaccolta completata ✅');
+    log.info('Raccolta completata.');
 }
 
 run().catch((error: Error) => {
-    console.error('Errore durante la raccolta:', error.message);
+    log.error(`Errore durante la raccolta: ${error.message}`);
     process.exit(1);
 });

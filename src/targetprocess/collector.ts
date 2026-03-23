@@ -16,9 +16,48 @@ import * as dotenv from 'dotenv';
 
 dotenv.config();
 
+import { createLogger }        from '../logger';
 import { TargetprocessClient } from './client';
 import { AnalysisPrompts }     from './prompts';
 import type { TpOpenItem, TpUserStat, TpTimeEntry } from './types';
+
+const logger = createLogger('collector');
+
+// ─── Resilience helpers ───────────────────────────────────────────────────────
+
+/** Retry with exponential backoff; detects HTTP 429 / rate-limit messages. */
+async function withRetry<T>(
+    fn:          () => Promise<T>,
+    maxAttempts  = 3,
+    baseDelayMs  = 2_000,
+): Promise<T> {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        try {
+            return await fn();
+        } catch (err) {
+            if (attempt === maxAttempts) throw err;
+            const msg         = ((err as Error).message ?? '').toLowerCase();
+            const isRateLimit = msg.includes('429') || msg.includes('rate limit') || msg.includes('too many');
+            const delay       = isRateLimit ? 60_000 : baseDelayMs * Math.pow(2, attempt - 1);
+            logger.warn(`Tentativo ${attempt}/${maxAttempts} fallito: ${(err as Error).message}. Retry tra ${delay}ms...`);
+            await new Promise(r => setTimeout(r, delay));
+        }
+    }
+    throw new Error('unreachable');
+}
+
+/** Extract JSON from an AI response, stripping markdown fences and using regex as fallback. */
+function extractJson(text: string): unknown {
+    const attempts: (() => unknown)[] = [
+        ()  => JSON.parse(text),
+        ()  => JSON.parse(text.replace(/```json\s*/g, '').replace(/```/g, '').trim()),
+        ()  => { const m = text.match(/(\{[\s\S]*\}|\[[\s\S]*\])/); if (m) return JSON.parse(m[1]); throw new Error('no match'); },
+    ];
+    for (const attempt of attempts) {
+        try { return attempt(); } catch { /* try next */ }
+    }
+    throw new Error(`Impossibile estrarre JSON dalla risposta: ${text.slice(0, 120)}...`);
+}
 
 // ─── Paths ───────────────────────────────────────────────────────────────────
 const KB_DIR  = path.join(process.cwd(), 'data', 'kb');
@@ -78,103 +117,66 @@ export async function saveKb(items: KbEntry[]): Promise<void> {
     await fs.writeFile(KB_FILE, JSON.stringify(store, null, 2), 'utf-8');
 }
 
-// ─── Claude provider ──────────────────────────────────────────────────────────
-class ClaudeKbProvider implements KbCollectorProvider {
-    readonly name = 'claude';
+// ─── Batch Provider Base ─────────────────────────────────────────────────────
+abstract class BatchKbProvider implements KbCollectorProvider {
+    abstract readonly name: string;
+    
+    protected readonly maxTpm:       number;
+    protected readonly tpmThreshold = 0.8;
 
-    isAvailable(): boolean {
-        return !!process.env['CLAUDE_API_KEY'];
+    constructor(maxTpm: number) {
+        this.maxTpm = maxTpm;
     }
+
+    abstract isAvailable(): boolean;
 
     async collect(items: EnrichedItem[], kbMap: Map<number, KbEntry>): Promise<void> {
-        const client = new Anthropic({ apiKey: process.env['CLAUDE_API_KEY']! });
-        const model  = process.env['CLAUDE_MODEL'] ?? 'claude-haiku-4-5-20251001';
+        let batch:        EnrichedItem[] = [];
+        let batchTokens   = 0;
+        let totalBatches  = 0;
+        let failedBatches = 0;
 
-        for (const { item } of items) {
-            console.log(`  [claude] #${item.id} — ${item.name}`);
-            const message = await client.messages.create({
-                model,
-                max_tokens: 200,
-                messages: [{
-                    role:    'user',
-                    content: 'Summarize this work item in 2-3 sentences. Focus on what it is and what needs to be done. Be concise and technical.\n\n' +
-                             `Type: ${item.entityType}\nID: #${item.id}\nName: ${item.name}\nProject: ${item.projectName}\n` +
-                             `Parent: ${item.parentName ?? 'N/A'}\nState: ${item.stateName}`,
-                }],
-            });
-
-            const block = message.content[0];
-            kbMap.set(item.id, {
-                id:             item.id,
-                entityType:     item.entityType,
-                name:           item.name,
-                summary:        block.type === 'text' ? block.text.trim() : '',
-                tags:           [],
-                userActivities: {},
-                cachedAt:       new Date().toISOString(),
-            });
-        }
-    }
-}
-
-// ─── Gemini provider ──────────────────────────────────────────────────────────
-class GeminiKbProvider implements KbCollectorProvider {
-    readonly name = 'gemini';
-
-    private readonly maxTpm       = Number.parseInt(process.env['GEMINI_MODEL_MAX_TPM'] ?? '1000000');
-    private readonly tpmThreshold = 0.8;
-
-    isAvailable(): boolean {
-        return !!process.env['GEMINI_API_KEY'];
-    }
-
-    async collect(items: EnrichedItem[], kbMap: Map<number, KbEntry>): Promise<void> {
-        const genAI     = new GoogleGenAI({ apiKey: process.env['GEMINI_API_KEY']! });
-        const modelName = (process.env['GEMINI_MODEL'] ?? 'gemini-2.0-flash').replace(/['"]/g, '').trim();
-
-        let batch:       EnrichedItem[] = [];
-        let batchTokens = 0;
+        const flush = async (): Promise<void> => {
+            if (batch.length === 0) return;
+            totalBatches++;
+            try {
+                await withRetry(() => this.processBatch(batch, kbMap));
+            } catch (err) {
+                failedBatches++;
+                logger.error(`[${this.name}] batch ${totalBatches} fallito: ${(err as Error).message}`);
+            }
+            batch       = [];
+            batchTokens = 0;
+        };
 
         for (let i = 0; i < items.length; i++) {
             const entry      = items[i];
             const itemTokens = Math.ceil(JSON.stringify(entry).length / 4);
 
             if (batch.length > 0 && batchTokens + itemTokens > this.maxTpm * this.tpmThreshold) {
-                await this.processBatch(batch, genAI, modelName, kbMap);
+                await flush();
                 await new Promise(r => setTimeout(r, 10_000));
-                batch       = [];
-                batchTokens = 0;
             }
 
             batch.push(entry);
             batchTokens += itemTokens;
+        }
 
-            if (i === items.length - 1) {
-                await this.processBatch(batch, genAI, modelName, kbMap);
-            }
+        await flush();
+
+        if (failedBatches > 0 && failedBatches === totalBatches) {
+            throw new Error(`Tutti i batch falliti (${failedBatches}/${totalBatches})`);
+        }
+        if (failedBatches > 0) {
+            logger.warn(`[${this.name}] ${failedBatches}/${totalBatches} batch falliti — risultati parziali salvati.`);
         }
     }
 
-    private async processBatch(
-        batch:     EnrichedItem[],
-        genAI:     GoogleGenAI,
-        modelName: string,
-        kbMap:     Map<number, KbEntry>,
-    ): Promise<void> {
-        const prompt = AnalysisPrompts.getBatchAnalysisPrompt(batch);
-        console.log(`  [gemini] batch ${batch.length} item (~${Math.ceil(prompt.length / 4)} token)...`);
+    protected abstract processBatch(batch: EnrichedItem[], kbMap: Map<number, KbEntry>): Promise<void>;
 
-        const response = await genAI.models.generateContent({
-            model:    modelName,
-            contents: [{ role: 'user', parts: [{ text: prompt }] }],
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            config:   { responseMimeType: 'application/json' } as any,
-        });
-
-        const text = response.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';
-        const data = JSON.parse(text.replace(/```json|```/g, ''));
-
-        for (const result of (data.results ?? data ?? [])) {
+    protected applyResults(batch: EnrichedItem[], data: any, kbMap: Map<number, KbEntry>): void {
+        const results = data.results ?? data ?? [];
+        for (const result of results) {
             const original = batch.find(b => b.item.id === result.id);
             if (!original) continue;
             kbMap.set(result.id, {
@@ -187,10 +189,76 @@ class GeminiKbProvider implements KbCollectorProvider {
                 cachedAt:       new Date().toISOString(),
             });
         }
+    }
+}
 
-        // Intermediate save after each batch for resilience against rate-limit interruptions
+// ─── Claude provider ──────────────────────────────────────────────────────────
+class ClaudeKbProvider extends BatchKbProvider {
+    readonly name = 'claude';
+
+    constructor() {
+        super(Number.parseInt(process.env['CLAUDE_MODEL_MAX_TPM'] ?? '200000'));
+    }
+
+    isAvailable(): boolean {
+        return !!process.env['CLAUDE_API_KEY'];
+    }
+
+    protected async processBatch(batch: EnrichedItem[], kbMap: Map<number, KbEntry>): Promise<void> {
+        const client    = new Anthropic({ apiKey: process.env['CLAUDE_API_KEY']! });
+        const modelName = (process.env['CLAUDE_MODEL'] ?? 'claude-haiku-4-5-20251001').replace(/['"]/g, '').trim();
+
+        const prompt = AnalysisPrompts.getBatchAnalysisPrompt(batch);
+        logger.info(`Batch Claude ${batch.length} item (~${Math.ceil(prompt.length / 4)} token)...`);
+
+        const message = await client.messages.create({
+            model:      modelName,
+            max_tokens: 4000,
+            messages:   [{ role: 'user', content: prompt }],
+        });
+
+        const block = message.content[0];
+        const raw   = block.type === 'text' ? block.text.trim() : '{}';
+        const data  = extractJson(raw);
+
+        this.applyResults(batch, data, kbMap);
         await saveKb(Array.from(kbMap.values()));
-        console.log(`  [gemini] batch salvato.`);
+        logger.info(`Batch Claude salvato (${batch.length} item).`);
+    }
+}
+
+// ─── Gemini provider ──────────────────────────────────────────────────────────
+class GeminiKbProvider extends BatchKbProvider {
+    readonly name = 'gemini';
+
+    constructor() {
+        super(Number.parseInt(process.env['GEMINI_MODEL_MAX_TPM'] ?? '1000000'));
+    }
+
+    isAvailable(): boolean {
+        return !!process.env['GEMINI_API_KEY'];
+    }
+
+    protected async processBatch(batch: EnrichedItem[], kbMap: Map<number, KbEntry>): Promise<void> {
+        const genAI     = new GoogleGenAI({ apiKey: process.env['GEMINI_API_KEY']! });
+        const modelName = (process.env['GEMINI_MODEL'] ?? 'gemini-2.0-flash').replace(/['"]/g, '').trim();
+
+        const prompt = AnalysisPrompts.getBatchAnalysisPrompt(batch);
+        logger.info(`Batch Gemini ${batch.length} item (~${Math.ceil(prompt.length / 4)} token)...`);
+
+        const response = await genAI.models.generateContent({
+            model:    modelName,
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            config:   { responseMimeType: 'application/json' } as any,
+        });
+
+        const raw  = response.candidates?.[0]?.content?.parts?.[0]?.text ?? '{}';
+        const data = extractJson(raw);
+
+        this.applyResults(batch, data, kbMap);
+        await saveKb(Array.from(kbMap.values()));
+        logger.info(`Batch Gemini salvato (${batch.length} item).`);
     }
 }
 
@@ -217,17 +285,17 @@ async function run(): Promise<void> {
     const providerArg = process.argv.find(a => a.startsWith('--provider='))?.split('=')[1];
 
     if (!updateKb) {
-        console.log('Usage: tsx src/targetprocess/collector.ts --update-kb [--force] [--provider=claude|gemini]');
+        logger.info('Usage: tsx src/targetprocess/collector.ts --update-kb [--force] [--provider=claude|gemini]');
         process.exit(0);
     }
 
     const providers = buildProviders(providerArg);
     const client    = new TargetprocessClient();
 
-    console.log('Fetching assigned open items from TargetProcess...');
+    logger.info('Recupero item assegnati da TargetProcess...');
     const me    = await client.getMe();
     const items = await client.getMyAssignedOpenItems();
-    console.log(`Found ${items.length} open items.`);
+    logger.info(`Trovati ${items.length} open item.`);
 
     const kb    = await loadKb();
     const kbMap = new Map<number, KbEntry>(kb.items.map(e => [e.id, e]));
@@ -238,11 +306,11 @@ async function run(): Promise<void> {
     );
 
     if (toProcess.length === 0) {
-        console.log('Nothing to update.');
+        logger.info('Nessun item da aggiornare.');
         return;
     }
 
-    console.log(`Enriching ${toProcess.length} items (fetching stats + logs)...`);
+    logger.info(`Arricchimento ${toProcess.length} item (stats + log)...`);
     const enriched: EnrichedItem[] = [];
 
     for (const item of toProcess) {
@@ -266,22 +334,22 @@ async function run(): Promise<void> {
         b.priority !== a.priority ? b.priority - a.priority : b.item.id - a.item.id
     );
 
-    console.log(`Provider chain: ${providers.map(p => p.name).join(' → ')}`);
+    logger.info(`Provider chain: ${providers.map(p => p.name).join(' → ')}`);
 
     for (const provider of providers) {
         if (!provider.isAvailable()) {
-            console.log(`[${provider.name}] non disponibile, skip`);
+            logger.warn(`[${provider.name}] non disponibile, skip`);
             continue;
         }
 
         try {
-            console.log(`[${provider.name}] in corso...`);
+            logger.info(`[${provider.name}] avvio raccolta...`);
             await provider.collect(enriched, kbMap);
             await saveKb(Array.from(kbMap.values()));
-            console.log(`\nKB aggiornata: ${kbMap.size} entries totali. Scritto in ${KB_FILE}`);
+            logger.info(`KB aggiornata: ${kbMap.size} entries totali → ${KB_FILE}`);
             return;
         } catch (err) {
-            console.error(`[${provider.name}] errore: ${(err as Error).message}`);
+            logger.error(`[${provider.name}] errore: ${(err as Error).message}`);
         }
     }
 
@@ -289,6 +357,6 @@ async function run(): Promise<void> {
 }
 
 run().catch((err: Error) => {
-    console.error('Errore:', err.message);
+    logger.error(err.message);
     process.exit(1);
 });

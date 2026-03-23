@@ -18,6 +18,9 @@ dotenv.config();
 
 import type { AggregatedDay } from "./aggregator";
 import { SYSTEM_PROMPT, userInstruction } from "./prompts";
+import { createLogger } from "../logger";
+
+const log = createLogger("analyzer");
 
 // ─── Paths ──────────────────────────────────────────────────────────
 export const AGG_DIR = path.join(process.cwd(), "data", "aggregated");
@@ -207,12 +210,12 @@ export async function analyzeDay(
     let lastError: Error | null = null;
     for (const provider of providers) {
         if (!provider.isAvailable()) {
-            console.log(`    [${provider.name}] non disponibile, skip`);
+            log.warn(`[${provider.name}] non disponibile, skip`);
             continue;
         }
 
         try {
-            console.log(`    [${provider.name}] in corso...`);
+            log.info(`[${provider.name}] analisi in corso...`);
             const entries = await provider.analyze(system, user);
             const totalHours = entries.reduce((s, e) => s + e.inferredHours, 0);
 
@@ -227,7 +230,7 @@ export async function analyzeDay(
         } catch (err) {
             lastError = err as Error;
             const msg = lastError.message;
-            console.error(`    [${provider.name}] errore: ${msg}`);
+            log.error(`[${provider.name}] errore: ${msg}`);
 
             // Fatal errors — do not try next provider
             if (msg.includes("credit balance is too low")) {
@@ -254,10 +257,7 @@ async function run(): Promise<void> {
     try {
         kbItems = await loadKb();
     } catch {
-        console.error(
-            "[FATAL] KB mancante: data/kb/us-summaries.json non trovato.\n" +
-            "Esegui prima: npm run kb:update",
-        );
+        log.error("[FATAL] KB mancante: data/kb/us-summaries.json non trovato. Esegui prima: npm run kb:update");
         process.exit(1);
     }
 
@@ -265,7 +265,7 @@ async function run(): Promise<void> {
     const providers = buildProviders(providerArg);
     const sinceDate = process.env["COLLECT_SINCE"] ?? "2025-01-01";
 
-    console.log(`Provider chain: ${providers.map((p) => p.name).join(" → ")}`);
+    log.info(`Provider chain: ${providers.map((p) => p.name).join(" → ")}`);
 
     await fs.mkdir(PROPOSALS_DIR, { recursive: true });
 
@@ -299,38 +299,30 @@ async function run(): Promise<void> {
             continue;
         }
 
-        console.log(
-            `  Analisi ${date} (target ${day.oreTarget.toFixed(2)}h, ${day.calendar.length} eventi, ${day.gitCommits.length} commit git)...`,
-        );
+        log.info(`Analisi ${date} (target ${day.oreTarget.toFixed(2)}h, ${day.calendar.length} eventi, ${day.gitCommits.length} commit git)...`);
 
         try {
             const proposal = await analyzeDay(day, kbItems, defaults, providers);
             await fs.writeFile(propPath, JSON.stringify(proposal, null, 2), "utf-8");
-            console.log(
-                `    → ${proposal.entries.length} entries, totale ${proposal.totalHours}h [${proposal.provider}]`,
-            );
+            log.info(`  → ${proposal.entries.length} entries, totale ${proposal.totalHours}h [${proposal.provider}]`);
             processed++;
         } catch (err) {
             const msg = (err as Error).message;
-            console.error(`    Errore per ${date}: ${msg}`);
+            log.error(`Errore per ${date}: ${msg}`);
             if (msg.includes("credit balance is too low")) {
-                console.error(
-                    "\n[FATAL] Credito Anthropic esaurito. Interruzione processo.",
-                );
+                log.error("[FATAL] Credito Anthropic esaurito. Interruzione processo.");
                 process.exit(1);
             }
         }
     }
 
-    console.log(
-        `\nAnalisi completata: ${processed} giorni analizzati, ${skipped} saltati.`,
-    );
+    log.info(`Analisi completata: ${processed} giorni analizzati, ${skipped} saltati.`);
 }
 
 // Only run when executed directly (not when imported)
 if (require.main === module) {
     run().catch((err: Error) => {
-        console.error("Errore analyzer:", err.message);
+        log.error(`Errore analyzer: ${err.message}`);
         process.exit(1);
     });
 }
