@@ -64,14 +64,8 @@ export function parseZucchettiLocation(day: ZucchettiDay): 'office' | 'smart' | 
 
 export function isWorkday(day: ZucchettiDay): boolean {
     const orario = (day.orario ?? '').toUpperCase();
-
-    // Weekend markers
-    if (orario === 'DOM' || orario === 'SAB') return false;
-
-    // Empty hOrd means holiday or full-day leave
-    if (!day.hOrd || day.hOrd.trim() === '') return false;
-
-    return true;
+    // DOM/SAB = weekend, FES = public holiday — future days have empty hOrd but are valid workdays
+    return orario !== 'DOM' && orario !== 'SAB' && orario !== 'FES';
 }
 
 /** Reads all *.json files from a directory (excluding .meta.json) and concatenates their arrays. */
@@ -129,7 +123,8 @@ export async function aggregateSingleDay(date: string, zDay: ZucchettiDay): Prom
     ]);
 
     const workday   = isWorkday(zDay);
-    const oreTarget = workday ? hhmmToHours(zDay.hOrd) : 0;
+    const rawOre    = zDay.hOrd ? hhmmToHours(zDay.hOrd) : null;
+    const oreTarget = workday ? (rawOre ?? 8) : 0;
 
     const bundle: AggregatedDay = {
         date,
@@ -237,7 +232,8 @@ async function run(): Promise<void> {
         const date      = zDay.date;
         if (date < sinceDate) continue;
         const workday   = isWorkday(zDay);
-        const oreTarget = workday ? hhmmToHours(zDay.hOrd) : 0;
+        const rawOre    = zDay.hOrd ? hhmmToHours(zDay.hOrd) : null;
+        const oreTarget = workday ? (rawOre ?? 8) : 0;
 
         const bundle: AggregatedDay = {
             date,
