@@ -1,4 +1,4 @@
-import { nibolBookDesk } from '../src/collectors/nibol';
+import { nibolBookDesk } from '../../src/collectors/nibol';
 import * as dotenv from 'dotenv';
 
 dotenv.config();

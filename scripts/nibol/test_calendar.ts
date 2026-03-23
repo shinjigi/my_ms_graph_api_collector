@@ -1,4 +1,4 @@
-import { nibolFetchCalendarData } from '../src/collectors/nibol';
+import { nibolFetchCalendarData } from '../../src/collectors/nibol';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
