@@ -9,70 +9,133 @@
 ```
 my_ms_graph_api_collector/
 ├── src/
-│   ├── index.ts                      # collect entrypoint (npm run collect)
-│   ├── graphClient.js                # MSAL device-code auth + Graph client (CJS)
+│   ├── index.ts                        # collect entrypoint (npm run collect)
+│   ├── graphClient.js                  # MSAL device-code auth + Graph client (CJS)
 │   ├── collectors/
-│   │   ├── utils.ts                  # shared: mergeByKey, skip/force logic, .meta.json
-│   │   ├── graph-calendar.ts         # /me/calendarView → data/raw/graph-calendar/
-│   │   ├── graph-email.ts            # /me/messages    → data/raw/graph-email/
-│   │   ├── graph-teams.ts            # /me/chats/*/messages → data/raw/graph-teams/
-│   │   ├── git-commits.ts            # git log (GIT_ROOTS) → data/raw/git/
-│   │   ├── svn-commits.ts            # svn log (SVN_URL)   → data/raw/svn/
-│   │   ├── zucchetti.ts              # Playwright scraper  → data/raw/zucchetti/
-│   │   ├── browser-history.ts        # SQLite (Chrome+Firefox) → data/raw/browser-*/
-│   │   └── nibol.ts                  # Playwright — desk booking
+│   │   ├── utils.ts                    # shared: mergeByKey, skip/force, .meta.json
+│   │   ├── graph/
+│   │   │   ├── calendar.ts             # /me/calendarView → data/raw/graph-calendar/
+│   │   │   ├── email.ts                # /me/messages    → data/raw/graph-email/
+│   │   │   └── teams.ts                # /me/chats/*/messages → data/raw/graph-teams/
+│   │   ├── vcs/
+│   │   │   ├── git.ts                  # git log (GIT_ROOTS) → data/raw/git/
+│   │   │   └── svn.ts                  # svn log (SVN_URL)   → data/raw/svn/
+│   │   ├── zucchetti/
+│   │   │   ├── index.ts                # collector orchestrator
+│   │   │   ├── session.ts              # shared Playwright login + navigation
+│   │   │   ├── scraper.ts              # scrapeCartellino, scrapeSingleDay
+│   │   │   ├── updateData.ts           # submit activity requests to Zucchetti
+│   │   │   └── getTimesheet.ts         # CLI: full month extraction
+│   │   ├── browser/
+│   │   │   └── history.ts              # SQLite (Chrome+Firefox) → data/raw/browser-*/
+│   │   └── nibol/
+│   │       └── index.ts                # Playwright — desk booking + calendar fetch
 │   ├── analysis/
-│   │   ├── aggregator.ts             # npm run aggregate → data/aggregated/
-│   │   └── claudeAnalyzer.ts         # npm run analyze   → data/proposals/
+│   │   ├── aggregator.ts               # npm run aggregate → data/aggregated/
+│   │   ├── analyzer.ts                 # orchestrator + fallback chain (Claude → Gemini → CLI)
+│   │   ├── prompts.ts                  # prompt templates
+│   │   ├── claudeProvider.ts           # Anthropic API + OpenAI-compat backends
+│   │   └── geminiProvider.ts           # Google Generative AI SDK
 │   ├── server/
-│   │   ├── app.ts                    # Express server (port 3001)
+│   │   ├── app.ts                      # Express server (port 3001)
 │   │   └── routes/
-│   │       ├── proposals.ts          # GET/PATCH /api/proposals/:date
-│   │       ├── submit.ts             # POST /api/submit/:date
-│   │       └── hooks.ts              # POST /api/hooks/{zucchetti,nibol}
+│   │       ├── week.ts                 # GET /api/week/:date + POST submit
+│   │       ├── analyze.ts              # POST /api/analyze/:date (async + job tracking)
+│   │       ├── proposals.ts            # GET/PATCH /api/proposals/:date
+│   │       ├── submit.ts               # POST /api/submit/:date (proposal-based)
+│   │       ├── zucchetti.ts            # GET /api/zucchetti/*
+│   │       └── hooks.ts                # POST /api/hooks/{zucchetti,nibol}
 │   └── targetprocess/
-│       ├── client.ts                 # TargetProcess REST v1 client
-│       ├── collector.ts              # KB update (npm run kb:update)
-│       ├── format.ts                 # hhmmToHours, parseTpDate helpers
-│       └── types.ts                  # TP entity interfaces
-├── web/                              # Vue 3 + Vite + Pinia — Activity Portal
+│       ├── client.ts                   # TargetProcess REST v1 client
+│       ├── collector.ts                # KB update (npm run kb:update)
+│       ├── collectorGemini.ts          # KB update via Gemini
+│       ├── prompts.ts                  # TP AI prompts
+│       ├── format.ts                   # hhmmToHours, parseTpDate helpers
+│       └── types.ts                    # TP entity interfaces
+├── web/                                # Vue 3 + Vite + Pinia — Activity Portal
 │   └── src/
-│       ├── App.vue                   # root: sidebar + day-picker header + views
-│       ├── main.ts                   # Vite entry — registers Pinia + style.css
-│       ├── style.css                 # DaisyUI v5 / Tailwind v4 custom classes
-│       ├── types/index.ts            # shared TypeScript interfaces
-│       ├── mock/data.ts              # mock data + WORKDAY_HOURS / HALF_WORKDAY_HOURS
+│       ├── App.vue                     # root: sidebar + day-picker header + views
+│       ├── router/index.ts             # hash-history router — /:view/:date
+│       ├── views/PortalView.vue        # view switcher (dashboard/timesheet/activity/teams/browser)
+│       ├── types/index.ts              # shared TypeScript interfaces
+│       ├── api.ts                      # fetch wrappers for all /api/* endpoints
 │       ├── stores/
-│       │   ├── usePickerStore.ts     # month/day selection, localStorage persistence
-│       │   ├── useTimesheetStore.ts  # weekly timesheet, hoursEdits, fillDay()
-│       │   ├── useDayStore.ts        # day view: US cards, timeline, quick log
-│       │   └── useUiStore.ts         # view switching, UI toggles
+│       │   ├── usePickerStore.ts       # month/day selection, localStorage persistence
+│       │   ├── useTimesheetStore.ts    # week data, hoursEdits, submit(Week|Day)Hours
+│       │   ├── useDayStore.ts          # day view: US cards, timeline, quick log
+│       │   ├── useUiStore.ts           # view state, filter/sort for quickLog + pinned
+│       │   └── useAnalysisStore.ts     # AI analysis job tracking
 │       └── components/
 │           ├── layout/
-│           │   ├── AppSidebar.vue    # left nav (5 views)
+│           │   ├── AppSidebar.vue      # left nav (5 views)
 │           │   └── DayPickerHeader.vue # month nav + scrollable day buttons
 │           ├── dashboard/
-│           │   ├── StatStrip.vue     # 5 KPI cards (commits, meetings, email, …)
-│           │   ├── WeekStrip.vue     # 5 week-day cards with rend status
-│           │   ├── DayHeader.vue     # selected day title + location badge
-│           │   ├── TimelinePanel.vue # hour-by-hour event timeline
-│           │   ├── WorkTpPanel.vue   # US cards + quick log (filter/sort/search)
-│           │   ├── SignalsGrid.vue   # 2×2: email, Teams, browser, git/svn
-│           │   ├── TimeCellWidget.vue # − value + widget with smart ±increment
-│           │   └── NoteEdit.vue      # inline note editor
-│           └── timesheet/
-│               ├── TimesheetView.vue # toolbar: WE toggle, quick-fill, Verifica
-│               ├── TimesheetTable.vue # weekly table with colgroup sync
-│               ├── TsRow.vue         # single timesheet row
-│               ├── TsNoteCell.vue    # per-cell floating note editor
-│               └── TimeCellWidget.vue # reused from dashboard/
-├── data/                             # gitignored — runtime data
-├── zucchetti_automation/             # Playwright scripts (plain JS)
-├── scripts/                          # one-off test/utility scripts
+│           │   ├── StatStrip.vue       # 6 KPI cards — Commit/Meeting cards navigate to detail views
+│           │   ├── WeekStrip.vue       # 5 week-day cards with rend status
+│           │   ├── TimelinePanel.vue   # hour-by-hour event timeline
+│           │   ├── WorkTpPanel.vue     # US cards + "Invia a TP" + Log rapido (filter/sort/search)
+│           │   ├── SignalsGrid.vue     # 2×2: email, Teams→/teams, browser→/browser, git→/activity
+│           │   └── NoteEdit.vue        # inline note editor
+│           ├── timesheet/
+│           │   ├── TsHeader.vue        # column headers (Mon-Fri + weekend)
+│           │   ├── TsTotals.vue        # Ore TP / Zuc / Delta rows (includes pinned in sum)
+│           │   ├── TsTpBar.vue         # toolbar: Verifica, Analizza, Invia a TP
+│           │   ├── TimesheetTable.vue  # active rows + pinned section with filter/sort toolbar
+│           │   ├── TsRow.vue           # single timesheet row
+│           │   └── TsNoteCell.vue      # per-cell floating note editor
+│           └── TimeCellWidget.vue      # − value + smart ±0.5 increment (shared)
+├── scripts/
+│   ├── tp/                             # Standalone TP CLI tools (ts-node)
+│   ├── nibol/                          # Nibol desk booking scripts (tsx)
+│   ├── morning-automation.ps1          # Daily 08:30 Windows Task Scheduler automation
+│   ├── schedule-morning.ps1            # One-time setup: register the scheduled task
+│   ├── bootstrap-env.ps1               # Generate .env from Azure App Registration
+│   └── test-nibol.ts                   # Nibol connection test
+├── docs/
+│   ├── OPERATOR.md                     # Operator runbook — 10 use cases
+│   ├── DATA-STRATEGY.md                # Collection + aggregation + analysis strategy
+│   ├── azure-guide.md                  # Azure App Registration setup
+│   ├── plans/                          # Implementation planning docs
+│   └── archive/                        # Legacy files (portal.html)
+├── config/
+│   ├── defaults.json                   # Recurring activities for timesheet
+│   └── hooks.json                      # Automation hook configuration
+├── data/                               # gitignored — runtime data (raw/aggregated/proposals/kb)
 ├── .env.example
 ├── CLAUDE.md
+├── DEVELOPER.md
 └── package.json
 ```
+
+---
+
+## Scripts reference
+
+| Category | Script | When to run |
+|----------|--------|-------------|
+| **Pipeline** | `npm run collect` | Fetch all raw data from all sources |
+| | `npm run collect -- --date=YYYY-MM-DD` | Fetch a single day only |
+| | `npm run collect -- --force` | Re-fetch ignoring skip cache |
+| | `npm run aggregate` | Build per-day `data/aggregated/` bundles |
+| | `npm run analyze -- --date=YYYY-MM-DD` | AI analysis for one day (Claude→Gemini→CLI) |
+| | `npm run analyze:claude / :gemini / :cli` | Force a specific AI provider |
+| | `npm run all` | Full pipeline: collect → aggregate → analyze → serve |
+| **Server / Dev** | `npm run serve` | Express API server on port 3001 |
+| | `cd web && npm run dev` | Vite dev server on port 5173 (proxies /api → 3001) |
+| **Operator CLI** | `npm run zucchetti:get` | Extract current month timesheet from Zucchetti |
+| | `npm run zucchetti:get:date` | Extract a specific month (edit script for dates) |
+| | `npm run nibol:book` | Book desk for today |
+| | `npm run nibol:book:date` | Book desk for a specific date |
+| | `npm run nibol:calendar` | Fetch/test Nibol calendar data |
+| | `npm run nibol:status` | Test Nibol connectivity |
+| **TP CLI** | `npm run tp:log-time` | Log time entry to TargetProcess |
+| | `npm run tp:projects` | List TP projects |
+| | `npm run tp:userstories` | List TP user stories |
+| | `npm run tp:us-detail` | Get TP user story detail |
+| **AI Knowledge Base** | `npm run kb:update` | Update TP US knowledge base (Claude) |
+| | `npm run kb:update:gemini` | Update KB via Gemini |
+| | `npm run kb:update:gemini:force` | Force full KB rebuild |
+| **Scheduled** | `scripts/morning-automation.ps1` | Runs automatically at 08:30 on weekdays via Task Scheduler (smart working + Nibol booking) |
 
 ---
 
