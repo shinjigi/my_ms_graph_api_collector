@@ -14,6 +14,7 @@
     "analyze:cli": "tsx src/analysis/analyzer.ts --provider=cli",
     "kb:update": "tsx src/targetprocess/collector.ts --update-kb",
     "kb:update:force": "tsx src/targetprocess/collector.ts --update-kb --force",
+    "kb:update:force:replay": "tsx src/targetprocess/collector.ts --update-kb --force --from-enriched=data/raw/targetprocess/enriched-2026-03-23.json --from-ai-response=data/raw/ai-responses/2026-03-23_175054_gemini_kb-batch-1.json",
     "kb:update:gemini": "tsx src/targetprocess/collector.ts --update-kb --provider=gemini",
     "kb:update:gemini:force": "tsx src/targetprocess/collector.ts --update-kb --provider=gemini --force",
     "serve": "tsx src/server/app.ts",
