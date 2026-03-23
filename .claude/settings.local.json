@@ -47,7 +47,10 @@
       "Bash(curl -s \"http://localhost:3001/api/week/2025-08-11\")",
       "Bash(curl -s \"http://localhost:3001/api/week/2025-08-11/tp-hours\")",
       "Bash(git commit:*)",
-      "Bash(grep *)"
+      "Bash(grep *)",
+      "Read(//c/SVN/_GH_shinjigi_WIN/**)",
+      "Bash(rm src/analysis/claudeAnalyzer.ts src/analysis/geminiAnalyzer.ts)",
+      "Bash(cd:*)"
     ]
   }
 }
