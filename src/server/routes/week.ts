@@ -108,10 +108,10 @@ function parseZucchettiLocation(day: ZucchettiDay): string {
 }
 
 function isWorkday(day: ZucchettiDay): boolean {
+    // Zucchetti marks non-workdays explicitly via the "orario" field.
+    // Future or unfilled days have an empty hOrd — do NOT treat that as non-workday.
     const orario = (day.orario ?? '').toUpperCase();
-    if (orario === 'DOM' || orario === 'SAB' || orario === 'FES') return false;
-    if (!day.hOrd || day.hOrd.trim() === '') return false;
-    return true;
+    return orario !== 'DOM' && orario !== 'SAB' && orario !== 'FES';
 }
 
 // Italian public holidays (month 0-indexed, day 1-indexed)
@@ -167,7 +167,8 @@ weekRouter.get('/:date', async (req: Request, res: Response) => {
         const isWeekday = dow >= 1 && dow <= 5;
         const holiday   = findHoliday(d);
         const isWd      = agg?.isWorkday ?? (zuccDay ? isWorkday(zuccDay) : (isWeekday && !holiday));
-        const oreTarget = agg?.oreTarget   ?? (zuccDay && isWd ? hhmmToHours(zuccDay.hOrd) : 0);
+        const rawOre    = zuccDay?.hOrd ? hhmmToHours(zuccDay.hOrd) : null;
+        const oreTarget = agg?.oreTarget   ?? (isWd ? (rawOre ?? 8) : 0);
         const location  = agg?.location    ?? (zuccDay && isWd ? parseZucchettiLocation(zuccDay) : 'unknown');
 
         const dayData: WeekDayData = {
