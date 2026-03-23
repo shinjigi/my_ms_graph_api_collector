@@ -1,36 +1,24 @@
 /**
- * Gemini analyzer provider using Google Generative AI SDK.
+ * Gemini analyzer provider using the @google/genai SDK.
  */
-import { GoogleGenerativeAI, SchemaType } from "@google/generative-ai";
-import type { ResponseSchema } from "@google/generative-ai";
+import { GoogleGenAI } from "@google/genai";
 import type { AnalyzerProvider, ProposalEntry } from "./analyzer";
 
-/** Structured output schema for Gemini. */
-const schema = {
-    description: "List of time allocation entries",
-    type: SchemaType.ARRAY,
+/** Structured output schema for Gemini (new SDK — plain string types). */
+const responseSchema = {
+    type: "array",
     items: {
-        type: SchemaType.OBJECT,
+        type: "object",
         properties: {
-            taskId: { type: SchemaType.NUMBER, nullable: true },
-            entityType: {
-                type: SchemaType.STRING,
-                enum: ["UserStory", "Task", "Bug", "recurring"],
-            },
-            taskName: { type: SchemaType.STRING },
-            inferredHours: { type: SchemaType.NUMBER },
-            confidence: { type: SchemaType.STRING, enum: ["high", "medium", "low"] },
-            reasoning: { type: SchemaType.STRING },
-            approved: { type: SchemaType.BOOLEAN },
+            taskId:        { type: "number",  nullable: true },
+            entityType:    { type: "string",  enum: ["UserStory", "Task", "Bug", "recurring"] },
+            taskName:      { type: "string" },
+            inferredHours: { type: "number" },
+            confidence:    { type: "string",  enum: ["high", "medium", "low"] },
+            reasoning:     { type: "string" },
+            approved:      { type: "boolean" },
         },
-        required: [
-            "entityType",
-            "taskName",
-            "inferredHours",
-            "confidence",
-            "reasoning",
-            "approved",
-        ],
+        required: ["entityType", "taskName", "inferredHours", "confidence", "reasoning", "approved"],
     },
 } as const;
 
@@ -39,7 +27,7 @@ export class GeminiProvider implements AnalyzerProvider {
     private readonly modelName: string;
 
     constructor() {
-        this.modelName = process.env["GEMINI_MODEL"] || "gemini-2.0-flash";
+        this.modelName = process.env["GEMINI_MODEL"] ?? "gemini-2.0-flash";
         this.name = `gemini:${this.modelName}`;
     }
 
@@ -49,18 +37,22 @@ export class GeminiProvider implements AnalyzerProvider {
 
     async analyze(systemPrompt: string, userPrompt: string): Promise<ProposalEntry[]> {
         const apiKey = process.env["GEMINI_API_KEY"]!;
-        const genAI = new GoogleGenerativeAI(apiKey);
+        const genAI  = new GoogleGenAI({ apiKey });
 
-        const model = genAI.getGenerativeModel({
-            model: this.modelName,
-            generationConfig: {
+        const response = await genAI.models.generateContent({
+            model:    this.modelName,
+            contents: [
+                { role: "user", parts: [{ text: systemPrompt }] },
+                { role: "user", parts: [{ text: userPrompt }] },
+            ],
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            config: {
                 responseMimeType: "application/json",
-                responseSchema: schema as unknown as ResponseSchema,
-            },
+                responseSchema,
+            } as any,
         });
 
-        const result = await model.generateContent([systemPrompt, userPrompt]);
-        const text = result.response.text();
+        const text = response.candidates?.[0]?.content?.parts?.[0]?.text ?? "[]";
         return JSON.parse(text) as ProposalEntry[];
     }
 }
