@@ -48,15 +48,14 @@ function extractJson(output: string): ZucchettiDay[] {
   return Array.isArray(parsed) ? parsed : parsed.days;
 }
 
-async function collectMonth(
-  year: number,
-  month: number,
-): Promise<ZucchettiDay[]> {
+async function collectRange(
+  start: string,
+  end: string,
+): Promise<ZucchettiDay[][]> {
   const scriptPath = path.join(__dirname, "getTimesheet.ts");
-
   const output = await runScript(scriptPath, [
-    `--month=${month}`,
-    `--year=${year}`,
+    `--start=${start}`,
+    `--end=${end}`,
   ]);
 
   return extractJson(output);
