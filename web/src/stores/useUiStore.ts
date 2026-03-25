@@ -1,34 +1,19 @@
-import { defineStore }          from 'pinia';
-import { ref, watch }           from 'vue';
+import { defineStore }  from 'pinia';
+import { ref }          from 'vue';
 import type { ActiveView, QuickSortState } from '../types';
-import { loadJson }             from '../utils';
-
-const persisted = loadJson<{ weVisible: boolean; quickSort: QuickSortState; pinnedSort: QuickSortState }>('portal_ui', {
-    weVisible:   true,
-    quickSort:   { field: 'state', dir: 1 },
-    pinnedSort:  { field: 'state', dir: 1 },
-});
 
 export const useUiStore = defineStore('ui', () => {
     const activeView      = ref<ActiveView>('dashboard');
-    const weVisible       = ref(persisted.weVisible);
+    const weVisible       = ref(true);
     const browserExpanded = ref(false);
     const quickFilterSignals  = ref(false);
     const quickSearch         = ref('');
-    const quickSort           = ref<QuickSortState>(persisted.quickSort);
+    const quickSort           = ref<QuickSortState>({ field: 'state', dir: 1 });
     const pinnedFilterSignals = ref(false);
     const pinnedSearch        = ref('');
-    const pinnedSort          = ref<QuickSortState>(persisted.pinnedSort ?? { field: 'state', dir: 1 });
+    const pinnedSort          = ref<QuickSortState>({ field: 'state', dir: 1 });
     const aiChatOpen      = ref(false);
     const emailModalId    = ref<number | null>(null);
-
-    watch([weVisible, quickSort, pinnedSort], () => {
-        localStorage.setItem('portal_ui', JSON.stringify({
-            weVisible:   weVisible.value,
-            quickSort:   quickSort.value,
-            pinnedSort:  pinnedSort.value,
-        }));
-    }, { deep: true });
 
     function setView(v: ActiveView) { activeView.value = v; }
     function toggleWE()             { weVisible.value = !weVisible.value; }
@@ -61,4 +46,9 @@ export const useUiStore = defineStore('ui', () => {
         setView, toggleWE, toggleBrowser, toggleAiChat,
         openEmail, closeEmail, sortQuick, sortPinned,
     };
+}, {
+    persist: {
+        key:  'portal_ui',
+        pick: ['weVisible', 'quickSort', 'pinnedSort'],
+    },
 });

@@ -9,8 +9,12 @@
         "strict":            true,
         "skipLibCheck":      true,
         "outDir":            "dist",
-        "resolveJsonModule": true
+        "resolveJsonModule": true,
+        "baseUrl":           ".",
+        "paths": {
+            "@shared/*": ["shared/*"]
+        }
     },
-    "include": ["src/**/*.ts"],
+    "include": ["src/**/*.ts", "shared/**/*.ts"],
     "exclude": ["node_modules", "web", "tp", "dist", "zucchetti_automation"]
 }

@@ -1,8 +1,7 @@
 import { defineStore }          from 'pinia';
-import { ref, computed, watch } from 'vue';
+import { ref, computed }        from 'vue';
 import { DAYS, TS_ACTIVE, TS_PINNED, DAYABB_IT, MONTH_IT } from '../mock/data';
 import { fetchWeek, fetchTpWeekHours, submitWeekHours as submitWeekHoursApi } from '../api';
-import { loadJson }             from '../utils';
 import type { Day, TsRow, ApiWeekResponse, ApiTpWeekResponse, SubmitEdit, WeekDayResponse } from '../types';
 
 export const useTimesheetStore = defineStore('timesheet', () => {
@@ -15,11 +14,8 @@ export const useTimesheetStore = defineStore('timesheet', () => {
     const weekData    = ref<ApiWeekResponse | null>(null);
     const currentMonday = ref<string>('');
 
-    const hoursEdits = ref<Record<string, number>>(loadJson('portal_hours', {}));
-    const noteEdits  = ref<Record<string, string>>(loadJson('portal_ts_notes', {}));
-
-    watch(hoursEdits, val => localStorage.setItem('portal_hours',    JSON.stringify(val)), { deep: true });
-    watch(noteEdits,  val => localStorage.setItem('portal_ts_notes', JSON.stringify(val)), { deep: true });
+    const hoursEdits = ref<Record<string, number>>({});
+    const noteEdits  = ref<Record<string, string>>({});
 
     /**
      * Fetch week data from backend and populate days/active/pinned.
@@ -250,4 +246,9 @@ export const useTimesheetStore = defineStore('timesheet', () => {
         getHours, getNote, setHours, setNote, fillDay, patchDay, fetchWeekData, submitWeekHours, submitDayHours,
         totalsRow, rendPerDay,
     };
+}, {
+    persist: [
+        { key: 'portal_hours',    pick: ['hoursEdits'] },
+        { key: 'portal_ts_notes', pick: ['noteEdits']  },
+    ],
 });

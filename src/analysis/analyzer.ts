@@ -17,6 +17,8 @@ import * as dotenv from "dotenv";
 dotenv.config();
 
 import type { AggregatedDay } from "./aggregator";
+import type { ProposalEntry, DayProposal } from "@shared/analysis";
+import type { KbEntry, KbStore } from "@shared/kb";
 import { SYSTEM_PROMPT, userInstruction } from "./prompts";
 import { createLogger } from "../logger";
 
@@ -38,35 +40,6 @@ export const DEFAULTS_FILE = path.join(
 );
 
 // ─── Types ──────────────────────────────────────────────────────────
-export interface ProposalEntry {
-  taskId: number | null;
-  entityType: "UserStory" | "Task" | "Bug" | "recurring";
-  taskName: string;
-  inferredHours: number;
-  confidence: "high" | "medium" | "low";
-  reasoning: string;
-  approved: boolean;
-}
-
-export interface DayProposal {
-  date: string;
-  oreTarget: number;
-  totalHours: number;
-  entries: ProposalEntry[];
-  generatedAt: string;
-  provider?: string;
-}
-
-export interface KbEntry {
-  id: number;
-  entityType: string;
-  name: string;
-  summary: string;
-}
-
-export interface KbStore {
-  items: KbEntry[];
-}
 
 export interface DefaultActivity {
   id: string;
@@ -316,7 +289,7 @@ async function run(): Promise<void> {
   if (weekArg) {
     const [yearStr, weekStr] = weekArg.split("-");
     const year = Number.parseInt(yearStr, 10);
-    const week = parseInt(weekStr.replace("W", ""), 10);
+    const week = Number.parseInt(weekStr.replace("W", ""), 10);
     const date = new Date(year, 0, 1 + (week - 1) * 7);
     const day = date.getDay();
     const start = new Date(date);
@@ -391,7 +364,7 @@ async function run(): Promise<void> {
     } catch (err) {
       const msg = (err as Error).message;
       console.error(
-        `    Errore batch per le date da ${currentBatch[0]?.date} a ${currentBatch[currentBatch.length - 1]?.date}: ${msg}`,
+        `    Errore batch per le date da ${currentBatch[0]?.date} a ${currentBatch.at(-1)?.date}: ${msg}`,
       );
       if (msg.includes("credit balance is too low")) {
         console.error(

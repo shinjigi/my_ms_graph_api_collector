@@ -14,11 +14,3 @@ export function tpLink(id: number): string {
     return `https://your-org.tpondemand.com/entity/${id}`;
 }
 
-export function loadJson<T>(key: string, fallback: T): T {
-    try {
-        const raw = localStorage.getItem(key);
-        return raw ? JSON.parse(raw) : fallback;
-    } catch {
-        return fallback;
-    }
-}

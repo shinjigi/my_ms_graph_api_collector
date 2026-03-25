@@ -29,7 +29,11 @@
     "nibol:book": "tsx scripts/nibol/book_desk.ts",
     "nibol:book:date": "tsx scripts/nibol/book_desk.ts --date=2026-03-23",
     "nibol:calendar": "tsx scripts/nibol/test_calendar.ts",
-    "nibol:status": "tsx scripts/test-nibol.ts"
+    "nibol:status": "tsx scripts/test-nibol.ts",
+    "type-check": "tsc --noEmit",
+    "type-check:watch": "tsc --noEmit --watch",
+    "check": "npm run lint && npm run type-check",
+    "lint": "eslint ."
   },
   "keywords": [
     "microsoft-graph",
@@ -58,12 +62,17 @@
     "xml2js": "^0.6.2"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.1",
     "@types/node": "^25.4.0",
     "@types/sql.js": "^1.4.9",
+    "eslint": "^10.1.0",
+    "eslint-config-prettier": "^10.1.8",
+    "prettier": "^3.8.1",
     "ts-node": "^10.9.2",
     "tsx": "^4.19.3",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.57.2"
   }
 }
