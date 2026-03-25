@@ -21,6 +21,17 @@ import type { ProposalEntry, DayProposal } from "@shared/analysis";
 import type { KbEntry, KbStore } from "@shared/kb";
 import { SYSTEM_PROMPT, userInstruction } from "./prompts";
 import { createLogger } from "../logger";
+import {
+  ClaudeApiProvider,
+  ClaudeCliProvider,
+  OpenAiCompatibleProvider,
+} from "./claudeProvider";
+import { GeminiProvider } from "./geminiProvider";
+export {
+  AnalyzerProvider,
+  BatchAnalyzerProvider,
+  stripCodeFence,
+} from "./base";
 
 const log = createLogger("analyzer");
 
@@ -54,44 +65,8 @@ export interface DefaultsConfig {
   recurringActivities: DefaultActivity[];
 }
 
-// ─── Provider interface ─────────────────────────────────────────────
-export interface AnalyzerProvider {
-  readonly name: string;
-  isAvailable(): boolean;
-  /** context: human-readable label for the raw-response file (e.g. "analysis-2026-03-23"). */
-  analyze(
-    systemPrompt: string,
-    userPrompt: string,
-    context?: string,
-  ): Promise<ProposalEntry[]>;
-}
-
-export abstract class BatchAnalyzerProvider implements AnalyzerProvider {
-  abstract readonly name: string;
-  abstract isAvailable(): boolean;
-
-  async analyze(
-    _systemPrompt: string,
-    _userPrompt: string,
-  ): Promise<ProposalEntry[]> {
-    throw new Error(
-      "BatchAnalyzerProvider cannot be called via simple analyze()",
-    );
-  }
-
-  abstract analyzeBatch(
-    systemPrompt: string,
-    userPromptBatched: string,
-  ): Promise<{ date: string; entries: ProposalEntry[] }[]>;
-}
-
 // ─── Shared utilities ───────────────────────────────────────────────
-export function stripCodeFence(text: string): string {
-  return text
-    .replace(/^```(?:json)?\s*/m, "")
-    .replace(/\s*```\s*$/m, "")
-    .trim();
-}
+import { AnalyzerProvider, BatchAnalyzerProvider } from "./base";
 
 export async function loadKb(): Promise<KbEntry[]> {
   const raw = await fs.readFile(KB_FILE, "utf-8");
@@ -182,14 +157,6 @@ export function buildUserPromptBatched(
 
 // ─── Provider chain ─────────────────────────────────────────────────
 export function buildProviders(forceProvider?: string): AnalyzerProvider[] {
-  // Lazy imports to avoid circular deps at module level
-  const { ClaudeApiProvider, ClaudeCliProvider, OpenAiCompatibleProvider } =
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    require("./claudeProvider") as typeof import("./claudeProvider");
-  const { GeminiProvider } =
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    require("./geminiProvider") as typeof import("./geminiProvider");
-
   const all: Record<string, AnalyzerProvider> = {
     claude: new ClaudeApiProvider(),
     ollama: new OpenAiCompatibleProvider(),

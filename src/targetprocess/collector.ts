@@ -8,8 +8,8 @@
  *   tsx src/targetprocess/collector.ts --update-kb --force
  *   tsx src/targetprocess/collector.ts --update-kb --provider=claude|gemini
  */
-import * as fs from "fs/promises";
-import * as path from "path";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
 import * as dotenv from "dotenv";
@@ -62,12 +62,12 @@ function extractJson(text: string): unknown {
     () =>
       JSON.parse(
         text
-          .replace(/```json\s*/g, "")
-          .replace(/```/g, "")
+          .replaceAll(/```json\s*/g, "")
+          .replaceAll("```", "")
           .trim(),
       ),
     () => {
-      const m = text.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+      const m = new RegExp(/(\{[\s\S]*\}|\[[\s\S]*\])/).exec(text);
       if (m) return JSON.parse(m[1]);
       throw new Error("no match");
     },
@@ -101,8 +101,6 @@ const COLLEAGUES_PRIORITY = new Set([
   "Marcella Nardone",
   "Matteo D'Amario",
 ]);
-
-export type { KbEntry, KbStore };
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -208,8 +206,8 @@ abstract class BatchKbProvider implements KbCollectorProvider {
       batchTokens = 0;
     };
 
-    for (let i = 0; i < items.length; i++) {
-      const entry = items[i];
+    for (const element of items) {
+      const entry = element;
       const itemTokens = Math.ceil(JSON.stringify(entry).length / 4);
 
       if (
@@ -316,7 +314,7 @@ class ClaudeKbProvider extends BatchKbProvider {
     const modelName = (
       process.env["CLAUDE_MODEL"] ?? "claude-haiku-4-5-20251001"
     )
-      .replace(/['"]/g, "")
+      .replaceAll(/['"]/g, "")
       .trim();
     const context = `kb-batch-${batchNum}`;
 
@@ -394,7 +392,7 @@ class GeminiKbProvider extends BatchKbProvider {
   ): Promise<void> {
     const genAI = new GoogleGenAI({ apiKey: process.env["GEMINI_API_KEY"]! });
     const modelName = (process.env["GEMINI_MODEL"] ?? "gemini-2.0-flash")
-      .replace(/['"]/g, "")
+      .replaceAll(/['"]/g, "")
       .trim();
     const context = `kb-batch-${batchNum}`;
 
@@ -406,8 +404,7 @@ class GeminiKbProvider extends BatchKbProvider {
     const response = await genAI.models.generateContent({
       model: modelName,
       contents: [{ role: "user", parts: [{ text: prompt }] }],
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      config: { responseMimeType: "application/json" } as any,
+      config: { responseMimeType: "application/json" },
     });
 
     const usage = response.usageMetadata;

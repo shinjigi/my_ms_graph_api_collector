@@ -4,10 +4,10 @@
 import { spawn } from "node:child_process";
 import Anthropic from "@anthropic-ai/sdk";
 import {
-  AnalyzerProvider,
-  BatchAnalyzerProvider,
-  stripCodeFence,
-} from "./analyzer";
+    AnalyzerProvider,
+    BatchAnalyzerProvider,
+    stripCodeFence,
+} from "./base";
 import { createLogger } from "../logger";
 import { saveRawResponse } from "../aiRaw";
 import { ProposalEntry } from "@shared/analysis";
