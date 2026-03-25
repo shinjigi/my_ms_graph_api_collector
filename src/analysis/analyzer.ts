@@ -170,6 +170,19 @@ export function buildProviders(forceProvider?: string): AnalyzerProvider[] {
   return [all["claude"], all["ollama"], all["gemini"], all["cli"]];
 }
 
+/** Truncate KB items to fit within a character budget (for small-context providers). */
+function fitKbItems(items: KbEntry[], budgetChars: number): KbEntry[] {
+  let total = 0;
+  const result: KbEntry[] = [];
+  for (const item of items) {
+    const est = (item.name.length + (item.summary?.length ?? 0) + 40);
+    if (total + est > budgetChars) break;
+    result.push(item);
+    total += est;
+  }
+  return result;
+}
+
 // ─── Core analysis ──────────────────────────────────────────────────
 export async function analyzeBatch(
   batch: AggregatedDay[],
@@ -177,14 +190,23 @@ export async function analyzeBatch(
   defaults: DefaultsConfig,
   providers: AnalyzerProvider[],
 ): Promise<DayProposal[]> {
-  const system      = buildSystemPrompt();
-  const user        = buildUserPromptBatched(batch, kbItems, defaults);
-  const promptChars = system.length + user.length;
-
-  log.info(`Batch di ${batch.length} giorni — prompt ~${promptChars} chars`);
+  const system = buildSystemPrompt();
 
   let lastError: Error | null = null;
   for (const provider of providers) {
+    // Fit KB items within 60% of the provider's budget — leave the rest for day data + response
+    const kbBudgetChars  = Math.floor(provider.maxInputChars * 0.6);
+    const kbItemsForProvider = fitKbItems(kbItems, kbBudgetChars);
+    if (kbItemsForProvider.length < kbItems.length) {
+      log.warn(
+        `[${provider.name}] KB ridotto: ${kbItemsForProvider.length}/${kbItems.length} items (budget ${kbBudgetChars} chars)`,
+      );
+    }
+
+    const user        = buildUserPromptBatched(batch, kbItemsForProvider, defaults);
+    const promptChars = system.length + user.length;
+    log.info(`Batch di ${batch.length} giorni — prompt ~${promptChars} chars (KB: ${kbItemsForProvider.length} items)`);
+
     if (promptChars > provider.maxInputChars) {
       log.warn(
         `[${provider.name}] prompt (${promptChars} chars) supera il limite (${provider.maxInputChars} chars) — tentativo comunque`,

@@ -57,6 +57,9 @@ async function callOpenAiCompatible(
     const baseUrl = process.env["OPENAI_BASE_URL"]!;
     const apiKey  = process.env["OPENAI_API_KEY"] ?? "ollama";
 
+    // Generous timeout for local CPU models (prefill + generation can take 10+ minutes)
+    const timeoutMs = Number(process.env["OPENAI_REQUEST_TIMEOUT_MS"] ?? 900_000);
+
     const response = await fetch(`${baseUrl}/chat/completions`, {
         method:  "POST",
         headers: {
@@ -70,7 +73,9 @@ async function callOpenAiCompatible(
                 { role: "user",   content: userPrompt   },
             ],
             max_tokens: 4096,
+            stream:     false,
         }),
+        signal: AbortSignal.timeout(timeoutMs),
     });
 
     if (!response.ok) {
@@ -205,7 +210,8 @@ export class OpenAiCompatibleProvider implements AnalyzerProvider {
     ): Promise<{ date: string; entries: ProposalEntry[] }[]> {
         const model       = process.env["OPENAI_MODEL"] ?? "qwen2.5-coder:3b";
         const promptChars = systemPrompt.length + userPromptBatched.length;
-        log.info(`[${this.name}] Invio batch a endpoint OpenAI-compat (${model}) — prompt ~${promptChars} chars...`);
+        const timeoutSec  = Math.round(Number(process.env["OPENAI_REQUEST_TIMEOUT_MS"] ?? 900_000) / 1000);
+        log.info(`[${this.name}] Invio batch a endpoint OpenAI-compat (${model}) — prompt ~${promptChars} chars, timeout ${timeoutSec}s...`);
 
         const responseText = await callOpenAiCompatible(systemPrompt, userPromptBatched, model);
 
