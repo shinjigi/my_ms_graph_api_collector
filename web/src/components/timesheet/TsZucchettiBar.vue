@@ -39,11 +39,12 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { useTimesheetStore } from '../../stores/useTimesheetStore';
-import { usePickerStore } from '../../stores/usePickerStore';
-import { submitZucchettiRequest } from '../../api';
+import { ref, computed }          from 'vue';
+import { useTimesheetStore }       from '../../stores/useTimesheetStore';
+import { usePickerStore }          from '../../stores/usePickerStore';
+import { submitZucchettiRequest }  from '../../api';
 import { DAYABB_IT, WORKDAY_HOURS, HALF_WORKDAY_HOURS } from '../../mock/data';
+import type { WeekDayResponse }    from '../../types';
 
 const ts     = useTimesheetStore();
 const picker = usePickerStore();
@@ -89,7 +90,9 @@ async function doAction(type: string, fullDay: boolean, tpHours: number, hours?:
             msgCls.value = result.skipped ? 'text-warning' : 'text-success';
 
             if (result.dayUpdate) {
-                ts.patchDay(picker.selectedDayIdx, result.dayUpdate);
+                // dayUpdate is WeekDayData (shared type with unknown[] arrays);
+                // at runtime the backend sends the fully typed structure — safe cast.
+                ts.patchDay(picker.selectedDayIdx, result.dayUpdate as unknown as WeekDayResponse);
             }
             if (result.scrapeError) {
                 console.warn('[TsZucchettiBar] Post-submit scrape failed:', result.scrapeError);

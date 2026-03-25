@@ -18,13 +18,13 @@ export interface BrowserVisit {
     date:      string;         // YYYY-MM-DD
 }
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+ 
 type SqlJsStatic = import('sql.js').SqlJsStatic;
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+ 
 type Database    = import('sql.js').Database;
 
 async function loadSqlJs(): Promise<SqlJsStatic> {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
+     
     const initSqlJs = require('sql.js') as (opts?: { locateFile?: (f: string) => string }) => Promise<SqlJsStatic>;
     return initSqlJs({
         locateFile: (f: string) => path.join(path.dirname(require.resolve('sql.js')), f),

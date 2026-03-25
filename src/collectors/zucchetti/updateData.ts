@@ -3,7 +3,8 @@ import { parseArgs } from 'node:util';
 import { startZucchettiSession } from './session';
 import { scrapeSingleDay, validateDay, patchRawZucchettiFile } from './scraper';
 import { aggregateSingleDay } from '../../analysis/aggregator';
-import type { WeekDayData } from '../../server/routes/week';
+import type { WeekDayData } from '@shared/week';
+import type { ZucchettiRequestResult } from '@shared/submit';
 
 // Zucchetti valid giustificativi mapped to the HTML select options
 const validActivities = [
@@ -33,14 +34,6 @@ export interface ZucchettiRequestParams {
     minutes?: number;
     headless?: boolean;
     scrapeAfterSubmit?: boolean;
-}
-
-export interface ZucchettiRequestResult {
-    success:      boolean;
-    message:      string;
-    skipped?:     boolean;       // true if activity already existed
-    scrapeError?: string;        // non-null if post-submit scrape failed
-    dayUpdate?:   WeekDayData;   // re-aggregated day data for frontend
 }
 
 /**
@@ -279,8 +272,8 @@ if (require.main === module || process.argv[1]?.includes('updateData')) {
         date:     values.date as string,
         type:     values.type as string,
         fullDay:  values['full-day'] as boolean,
-        hours:    parseInt(values.hours as string, 10),
-        minutes:  parseInt(values.minutes as string, 10),
+        hours:    Number.parseInt(values.hours as string, 10),
+        minutes:  Number.parseInt(values.minutes as string, 10),
         // headless resolved from ZUCCHETTI_HEADLESS env var (default true)
     }).then(result => {
         console.log(result.success ? `OK: ${result.message}` : `FAIL: ${result.message}`);

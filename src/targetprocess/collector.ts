@@ -21,6 +21,7 @@ import { saveRawResponse } from "../aiRaw";
 import { TargetprocessClient } from "./client";
 import { AnalysisPrompts } from "./prompts";
 import type { TpOpenItem, TpUserStat, TpTimeEntry } from "./types";
+import type { KbEntry, KbStore } from "@shared/kb";
 
 const logger = createLogger("collector");
 
@@ -101,23 +102,9 @@ const COLLEAGUES_PRIORITY = new Set([
   "Matteo D'Amario",
 ]);
 
-// ─── Types ───────────────────────────────────────────────────────────────────
-export interface KbEntry {
-  id: number;
-  entityType: string;
-  projectName: string;
-  name: string;
-  summary: string;
-  tags: string[];
-  userActivities: Record<string, string>;
-  stakeholders: string[];
-  cachedAt: string;
-}
+export type { KbEntry, KbStore };
 
-interface KbStore {
-  updatedAt: string;
-  items: KbEntry[];
-}
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface EnrichedItem {
   item: TpOpenItem;

@@ -21,15 +21,6 @@ function todayMidnight(): Date {
     return d;
 }
 
-function loadPersisted(): { selectedDay: string; month: string } | null {
-    try {
-        const raw = localStorage.getItem('portal_picker');
-        return raw ? JSON.parse(raw) : null;
-    } catch {
-        return null;
-    }
-}
-
 function localDateStr(d: Date): string {
     const yr  = d.getFullYear();
     const mo  = String(d.getMonth() + 1).padStart(2, '0');
@@ -38,25 +29,12 @@ function localDateStr(d: Date): string {
 }
 
 export const usePickerStore = defineStore('picker', () => {
-    const persisted = loadPersisted();
     const router = useRouter();
 
-    const pickerToday    = ref<Date>(todayMidnight());
-    const pickerSelected = ref<Date>(
-        persisted?.selectedDay ? new Date(persisted.selectedDay) : todayMidnight()
-    );
-    const pickerMonth    = ref<Date>(
-        persisted?.month
-            ? new Date(persisted.month)
-            : new Date(pickerToday.value.getFullYear(), pickerToday.value.getMonth(), 1)
-    );
-
-    function persistPicker() {
-        localStorage.setItem('portal_picker', JSON.stringify({
-            selectedDay: pickerSelected.value.toISOString(),
-            month:       pickerMonth.value.toISOString(),
-        }));
-    }
+    const today          = todayMidnight();
+    const pickerToday    = ref<Date>(today);
+    const pickerSelected = ref<Date>(todayMidnight());
+    const pickerMonth    = ref<Date>(new Date(today.getFullYear(), today.getMonth(), 1));
 
     const monthLabel = computed(() =>
         `${MONTH_IT[pickerMonth.value.getMonth()]} ${pickerMonth.value.getFullYear()}`
@@ -120,19 +98,16 @@ export const usePickerStore = defineStore('picker', () => {
     function setFromDate(date: Date) {
         pickerSelected.value = date;
         pickerMonth.value    = new Date(date.getFullYear(), date.getMonth(), 1);
-        persistPicker();
     }
 
     function prevMonth() {
         const m = pickerMonth.value;
         pickerMonth.value = new Date(m.getFullYear(), m.getMonth() - 1, 1);
-        persistPicker();
     }
 
     function nextMonth() {
         const m = pickerMonth.value;
         pickerMonth.value = new Date(m.getFullYear(), m.getMonth() + 1, 1);
-        persistPicker();
     }
 
     function goToday() {
@@ -144,6 +119,24 @@ export const usePickerStore = defineStore('picker', () => {
     return {
         pickerToday, pickerSelected, pickerMonth,
         monthLabel, daysInMonth, selectedDayIdx, todayDayIdx,
-        selectDay, setFromDate, prevMonth, nextMonth, goToday, persistPicker,
+        selectDay, setFromDate, prevMonth, nextMonth, goToday,
     };
+}, {
+    persist: {
+        key:  'portal_picker',
+        pick: ['pickerSelected', 'pickerMonth'],
+        serializer: {
+            serialize: (s: Record<string, unknown>) => JSON.stringify({
+                pickerSelected: (s['pickerSelected'] as Date).toISOString(),
+                pickerMonth:    (s['pickerMonth']    as Date).toISOString(),
+            }),
+            deserialize: (raw: string) => {
+                const p = JSON.parse(raw) as { pickerSelected: string; pickerMonth: string };
+                return {
+                    pickerSelected: new Date(p.pickerSelected),
+                    pickerMonth:    new Date(p.pickerMonth),
+                };
+            },
+        },
+    },
 });

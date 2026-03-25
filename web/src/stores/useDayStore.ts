@@ -3,26 +3,15 @@ import { ref, computed, watch }  from 'vue';
 import { US_TODAY_DEFAULT, TL_EVENTS, EMAILS, WORKDAY_HOURS } from '../mock/data';
 import { usePickerStore }        from './usePickerStore';
 import { useTimesheetStore }     from './useTimesheetStore';
-import { loadJson, stateColor }  from '../utils';
+import { stateColor }            from '../utils';
 import type { UsCard, QuickLogItem, TlEvent, Email, TlEventType } from '../types';
 
 export const useDayStore = defineStore('day', () => {
-    const usToday  = ref<UsCard[]>([
-        ...US_TODAY_DEFAULT.map(u => ({ ...u })),
-        ...loadJson<UsCard[]>('portal_us_extra', []),
-    ]);
+    const usExtra  = ref<UsCard[]>([]);
+    const usToday  = ref<UsCard[]>(US_TODAY_DEFAULT.map(u => ({ ...u })));
     const tlEvents = ref<TlEvent[]>(TL_EVENTS);
     const emails   = ref<Email[]>(EMAILS);
-    const usNotes  = ref<Record<number, string>>(loadJson('portal_us_notes', {}));
-
-    watch(usNotes, val => localStorage.setItem('portal_us_notes', JSON.stringify(val)), { deep: true });
-
-    function persistExtra() {
-        const ts      = useTimesheetStore();
-        const tsIds   = new Set([...ts.active, ...ts.pinned].map(r => r.tpId));
-        const extra   = usToday.value.filter(u => !tsIds.has(u.tpId));
-        localStorage.setItem('portal_us_extra', JSON.stringify(extra));
-    }
+    const usNotes  = ref<Record<number, string>>({});
 
     function loadDay(date: string) {
         const ts     = useTimesheetStore();
@@ -119,7 +108,7 @@ export const useDayStore = defineStore('day', () => {
 
             // Preserve user-added items not managed by TP
             const tsIds  = new Set([...ts.active, ...ts.pinned].map(r => r.tpId));
-            const extras = loadJson<UsCard[]>('portal_us_extra', []).filter(u => !tsIds.has(u.tpId));
+            const extras = usExtra.value.filter(u => !tsIds.has(u.tpId));
 
             if (activeTasks.length > 0) {
                 usToday.value = [...activeTasks, ...extras];
@@ -160,13 +149,14 @@ export const useDayStore = defineStore('day', () => {
         const ts  = useTimesheetStore();
         const src = [...ts.active, ...ts.pinned].find(r => r.tpId === tpId);
         if (!src) return;
-        usToday.value.push({
+        const item: UsCard = {
             us: src.us, tpId: src.tpId, state: src.state,
             tpHours: 0, zucHours: WORKDAY_HOURS,
             emails: 0, commits: 0, meetings: 0,
             color: stateColor(src.state), note: '',
-        });
-        persistExtra();
+        };
+        usToday.value.push(item);
+        usExtra.value.push(item);
     }
 
     function setUsNote(tpId: number, text: string) {
@@ -195,8 +185,13 @@ export const useDayStore = defineStore('day', () => {
     });
 
     return {
-        usToday, tlEvents, emails, usNotes,
+        usExtra, usToday, tlEvents, emails, usNotes,
         quickLog, dayTotals,
         loadDay, addToWorkToday, setUsNote, setTpHours,
     };
+}, {
+    persist: [
+        { key: 'portal_us_notes',  pick: ['usNotes']  },
+        { key: 'portal_us_extra',  pick: ['usExtra']  },
+    ],
 });
