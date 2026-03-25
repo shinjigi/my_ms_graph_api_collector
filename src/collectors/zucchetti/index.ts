@@ -93,7 +93,7 @@ export async function collectZucchetti(
   // Optimization: find the first month that needs collection
   const meta = await readMeta(ZUCC_DIR);
 
-  let startMonthDate = new Date(
+  const startMonthDate = new Date(
     sinceStr.length === 7 ? `${sinceStr}-01` : sinceStr,
   );
   const endMonthDate = new Date(endStr.length === 7 ? `${endStr}-01` : endStr);
