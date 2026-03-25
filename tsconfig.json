@@ -13,7 +13,8 @@
         "baseUrl":           ".",
         "paths": {
             "@shared/*": ["shared/*"]
-        }
+        },
+        "sourceMap": true,
     },
     "include": ["src/**/*.ts", "shared/**/*.ts"],
     "exclude": ["node_modules", "web", "tp", "dist", "zucchetti_automation"]
