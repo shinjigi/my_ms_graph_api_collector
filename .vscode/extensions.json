@@ -1,6 +1,7 @@
 {
-    "recommendations": [
-        "ms-vscode.powershell",
-        "vue.volar"
-    ]
+  "recommendations": [
+    "ms-vscode.powershell",
+    "vue.volar",
+    "yoavbls.pretty-ts-errors"
+  ]
 }
