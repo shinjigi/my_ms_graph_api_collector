@@ -15,6 +15,7 @@
     "analyze:claude": "tsx src/analysis/analyzer.ts --provider=claude",
     "analyze:gemini": "tsx src/analysis/analyzer.ts --provider=gemini",
     "analyze:cli": "tsx src/analysis/analyzer.ts --provider=cli",
+    "analyze:ollama": "tsx src/analysis/analyzer.ts --provider=ollama",
     "kb:update": "tsx src/targetprocess/collector.ts --update-kb",
     "kb:update:force": "tsx src/targetprocess/collector.ts --update-kb --force",
     "kb:update:force:replay": "tsx src/targetprocess/collector.ts --update-kb --force --from-enriched=data/raw/targetprocess/enriched-2026-03-23.json --from-ai-response=data/raw/ai-responses/2026-03-23_175054_gemini_kb-batch-1.json",

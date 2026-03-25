@@ -26,11 +26,7 @@ import {
   OpenAiCompatibleProvider,
 } from "./claudeProvider";
 import { GeminiProvider } from "./geminiProvider";
-export {
-  AnalyzerProvider,
-  BatchAnalyzerProvider,
-  stripCodeFence,
-} from "./base";
+export { AnalyzerProvider, stripCodeFence } from "./base";
 
 const log = createLogger("analyzer");
 
@@ -65,7 +61,7 @@ export interface DefaultsConfig {
 }
 
 // ─── Shared utilities ───────────────────────────────────────────────
-import { AnalyzerProvider, BatchAnalyzerProvider } from "./base";
+import { AnalyzerProvider } from "./base";
 import { AggregatedDay } from "@shared/aggregator";
 
 export async function loadKb(): Promise<KbEntry[]> {
@@ -181,46 +177,41 @@ export async function analyzeBatch(
   defaults: DefaultsConfig,
   providers: AnalyzerProvider[],
 ): Promise<DayProposal[]> {
-  const system = buildSystemPrompt();
-  const user = buildUserPromptBatched(batch, kbItems, defaults);
+  const system      = buildSystemPrompt();
+  const user        = buildUserPromptBatched(batch, kbItems, defaults);
+  const promptChars = system.length + user.length;
+
+  log.info(`Batch di ${batch.length} giorni — prompt ~${promptChars} chars`);
 
   let lastError: Error | null = null;
   for (const provider of providers) {
-    if (!provider.isAvailable()) {
+    if (!(await provider.isAvailable())) {
       log.warn(`[${provider.name}] non disponibile, skip`);
       continue;
     }
 
+    if (promptChars > provider.maxInputChars) {
+      log.warn(
+        `[${provider.name}] prompt (${promptChars} chars) supera il limite del provider (${provider.maxInputChars} chars) — skip`,
+      );
+      continue;
+    }
+
     try {
-      log.info(`[${provider.name}] in corso per ${batch.length} giorni...`);
+      log.info(`[${provider.name}] avvio analisi per ${batch.length} giorni...`);
+      const results = await provider.analyzeBatch(system, user);
 
-      let results: { date: string; entries: ProposalEntry[] }[];
-      if ("analyzeBatch" in provider) {
-        results = await (provider as BatchAnalyzerProvider).analyzeBatch(
-          system,
-          user,
-        );
-      } else {
-        // fallback to single day queries sequentially!
-        results = [];
-        for (const day of batch) {
-          const singleSystem = buildSystemPrompt();
-          const singleUser = buildUserPromptBatched([day], kbItems, defaults);
-          const entries = await provider.analyze(singleSystem, singleUser);
-          results.push({ date: day.date, entries });
-        }
-      }
-
+      log.info(`[${provider.name}] analisi completata — ${results.length} giorni restituiti`);
       return results.map((r) => {
-        const day = batch.find((d) => d.date === r.date)!;
+        const day        = batch.find((d) => d.date === r.date)!;
         const totalHours = r.entries.reduce((s, e) => s + e.inferredHours, 0);
         return {
-          date: r.date,
-          oreTarget: day?.oreTarget ?? 0,
-          totalHours: Math.round(totalHours * 100) / 100,
-          entries: r.entries,
+          date:        r.date,
+          oreTarget:   day?.oreTarget ?? 0,
+          totalHours:  Math.round(totalHours * 100) / 100,
+          entries:     r.entries,
           generatedAt: new Date().toISOString(),
-          provider: provider.name,
+          provider:    provider.name,
         };
       });
     } catch (err) {
@@ -279,10 +270,29 @@ async function run(): Promise<void> {
   }
 
   const defaults = await loadDefaults();
-  const providers = buildProviders(providerArg);
-  const sinceDate = process.env["COLLECT_SINCE"] ?? "2025-01-01";
+  const allProviders = buildProviders(providerArg);
+  const sinceDate    = process.env["COLLECT_SINCE"] ?? "2025-01-01";
 
-  log.info(`Provider chain: ${providers.map((p) => p.name).join(" → ")}`);
+  log.info(`Provider configurati: ${allProviders.map((p) => p.name).join(", ")}`);
+  log.info("Verifica disponibilità provider...");
+
+  const providers: AnalyzerProvider[] = [];
+  for (const p of allProviders) {
+    const ok = await p.isAvailable();
+    if (ok) {
+      log.info(`  ✓ ${p.name} — max ${p.maxInputChars.toLocaleString()} chars per batch`);
+      providers.push(p);
+    } else {
+      log.warn(`  ✗ ${p.name} — non disponibile`);
+    }
+  }
+
+  if (providers.length === 0) {
+    log.error("[FATAL] Nessun provider disponibile. Controlla le variabili d'ambiente.");
+    process.exit(1);
+  }
+
+  log.info(`Provider attivi: ${providers.map((p) => p.name).join(" → ")}`);
 
   await fs.mkdir(PROPOSALS_DIR, { recursive: true });
 
@@ -302,7 +312,10 @@ async function run(): Promise<void> {
   let processed = 0;
   let skipped = 0;
 
-  const maxTpm = 30000;
+  // Use the most restrictive provider's char budget to avoid oversized prompts
+  const maxInputChars = Math.min(...providers.map((p) => p.maxInputChars));
+  log.info(`Batch budget: ${maxInputChars.toLocaleString()} chars (provider più restrittivo: ${providers.find((p) => p.maxInputChars === maxInputChars)?.name})`);
+
   let currentBatch: AggregatedDay[] = [];
   let currentTokens = 0;
 
@@ -368,16 +381,17 @@ async function run(): Promise<void> {
     }
 
     log.info(
-      `  Accodo ${date} (target ${day.oreTarget.toFixed(2)}h, ${day.calendar.length} eventi, ${day.gitCommits.length} commit)...`,
+      `  Accodo ${date} — target ${day.oreTarget.toFixed(2)}h, ${day.calendar.length} eventi, ${day.gitCommits.length} commit, ~${aggRaw.length} chars`,
     );
 
-    const estTokens = Math.ceil(aggRaw.length / 4);
-    if (currentTokens + estTokens > maxTpm && currentBatch.length > 0) {
+    const estChars = aggRaw.length;
+    if (currentTokens + estChars > maxInputChars && currentBatch.length > 0) {
+      log.debug(`Batch pieno (${currentTokens} + ${estChars} > ${maxInputChars}) — flush`);
       await processBatch();
     }
 
     currentBatch.push(day);
-    currentTokens += estTokens;
+    currentTokens += estChars;
   }
 
   await processBatch();
