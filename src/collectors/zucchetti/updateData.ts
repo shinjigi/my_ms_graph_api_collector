@@ -1,5 +1,8 @@
 import { Page, Frame } from 'playwright';
 import { parseArgs } from 'node:util';
+import { createLogger } from "../../logger";
+
+const log = createLogger("zucchetti-update");
 import { startZucchettiSession } from './session';
 import { scrapeSingleDay, validateDay, patchRawZucchettiFile } from './scraper';
 import { aggregateSingleDay } from '../../analysis/aggregator';
@@ -41,7 +44,7 @@ export interface ZucchettiRequestParams {
  * patch the raw Zucchetti file, re-aggregate the day, and return WeekDayData.
  */
 async function postSubmitScrape(page: Page, targetDate: string): Promise<WeekDayData> {
-    console.log(`[zucchetti] Post-submit scrape for ${targetDate}...`);
+    log.info(`Post-submit scrape for ${targetDate}...`);
     const scraped = await scrapeSingleDay(page, targetDate);
     if (!scraped) throw new Error(`Day ${targetDate} not found in Cartellino grid.`);
 
@@ -91,7 +94,7 @@ export async function submitZucchettiRequest(params: ZucchettiRequestParams): Pr
 
     try {
         // Check if activity already exists (and is NOT cancelled)
-        console.log(`[zucchetti] Checking existing activities for ${targetDate}...`);
+        log.info(`Checking existing activities for ${targetDate}...`);
         const dayCell = newPage.locator('td.richieste').filter({ has: newPage.locator(`span[onclick*="${targetDate}"]`) }).first();
 
         if (await dayCell.count() > 0) {
@@ -103,7 +106,7 @@ export async function submitZucchettiRequest(params: ZucchettiRequestParams): Pr
                 if (rowText.toUpperCase().includes(matchedActivity.toUpperCase())) {
                     const isCancelled = await row.locator('span[title="Cancellata"]').count() > 0;
                     if (!isCancelled) {
-                        console.log(`[zucchetti] Activity already exists for ${targetDate}. Skipping.`);
+                        log.info(`Activity already exists for ${targetDate}. Skipping.`);
                         const result: ZucchettiRequestResult = {
                             success: true,
                             message: `"${matchedActivity}" already exists for ${targetDate}.`,
@@ -124,7 +127,7 @@ export async function submitZucchettiRequest(params: ZucchettiRequestParams): Pr
         }
 
         // Click "Nuova richiesta" for target date
-        console.log(`[zucchetti] Submitting "${matchedActivity}" for ${targetDate}...`);
+        log.info(`Submitting "${matchedActivity}" for ${targetDate}...`);
         await newPage.locator(`span[title="Nuova richiesta"][onclick*="${targetDate}"]`).click();
 
         // Wait for modal and select activity
@@ -151,7 +154,7 @@ export async function submitZucchettiRequest(params: ZucchettiRequestParams): Pr
             }
 
             await dropdown.selectOption({ label: matchedActivity });
-            console.log(`[zucchetti] Selected "${matchedActivity}".`);
+            log.info(`Selected "${matchedActivity}".`);
             await (targetFrame as Page).waitForTimeout(3000);
 
             // Handle duration — Zucchetti has TWO "Giornata intera" checkboxes:
@@ -159,7 +162,7 @@ export async function submitZucchettiRequest(params: ZucchettiRequestParams): Pr
             //   cPeriodoBox (visible) — the standard full-day checkbox
             // We must target the VISIBLE one (cPeriodoBox) first.
             if (isFullDay) {
-                console.log('[zucchetti] Checking "Giornata intera" (cPeriodoBox)...');
+                log.info('Checking "Giornata intera" (cPeriodoBox)...');
                 const checked = await targetFrame.evaluate(() => {
                     // Find the visible checkbox div — cPeriodoBox is visible for standard activities
                     const cpDiv = document.querySelector<HTMLDivElement>('div[id$="_cPeriodoBox_div"]');
@@ -185,14 +188,14 @@ export async function submitZucchettiRequest(params: ZucchettiRequestParams): Pr
                 });
 
                 if (checked) {
-                    console.log(`[zucchetti] Checked via ${checked}.`);
+                    log.info(`Checked via ${checked}.`);
                 } else {
                     throw new Error('Could not find any visible "Giornata intera" checkbox.');
                 }
                 // Wait for Zucchetti JS to react to the checkbox change
                 await (targetFrame as Page).waitForTimeout(1000);
             } else {
-                console.log(`[zucchetti] Setting time to ${hours}:${minutes}...`);
+                log.info(`Setting time to ${hours}:${minutes}...`);
                 // qtahh/qtamm inputs may be hidden — use evaluate for reliability
                 await targetFrame.evaluate(({ h, m }: { h: number; m: number }) => {
                     const hInput = document.querySelector<HTMLInputElement>('input[id$="_qtahh"]');
@@ -211,7 +214,7 @@ export async function submitZucchettiRequest(params: ZucchettiRequestParams): Pr
             }
 
             // Click "Invia"
-            console.log('[zucchetti] Clicking Invia...');
+            log.info('Clicking Invia...');
             const inviaBtn = targetFrame.locator('input[id$="_InvioButton"]').first();
             await inviaBtn.waitFor({ state: 'visible', timeout: 10000 });
             await inviaBtn.click({ force: true });
@@ -222,12 +225,12 @@ export async function submitZucchettiRequest(params: ZucchettiRequestParams): Pr
         }
 
         // Verification
-        console.log('[zucchetti] Verifying submission...');
+        log.info('Verifying submission...');
         const result: ZucchettiRequestResult = { success: true, message: '' };
         try {
             await newPage.waitForTimeout(3000);
             await newPage.waitForSelector(`text=${matchedActivity}`, { state: 'visible', timeout: 15000 });
-            console.log(`[zucchetti] Verified "${matchedActivity}" on timesheet for ${targetDate}.`);
+            log.info(`Verified "${matchedActivity}" on timesheet for ${targetDate}.`);
             result.message = `"${matchedActivity}" submitted for ${targetDate}.`;
         } catch {
             await newPage.screenshot({ path: 'verification_fyi.png', fullPage: true });
@@ -240,7 +243,7 @@ export async function submitZucchettiRequest(params: ZucchettiRequestParams): Pr
                 result.dayUpdate = await postSubmitScrape(newPage, targetDate);
             } catch (err) {
                 result.scrapeError = (err as Error).message;
-                console.warn(`[zucchetti] Post-submit scrape failed: ${result.scrapeError}`);
+                log.warn(`Post-submit scrape failed: ${result.scrapeError}`);
             }
         }
 
@@ -264,7 +267,7 @@ if (require.main === module || process.argv[1]?.includes('updateData')) {
     const { values } = parseArgs({ options: cliOptions, args: process.argv.slice(2), strict: false });
 
     if (!values.date) {
-        console.error('Usage: npm run zucchetti:update -- --date=YYYY-MM-DD [--full-day=true] [--type="SMART WORKING"] [--hours=4] [--minutes=30]');
+        log.error('Usage: npm run zucchetti:update -- --date=YYYY-MM-DD [--full-day=true] [--type="SMART WORKING"] [--hours=4] [--minutes=30]');
         process.exit(1);
     }
 
@@ -276,10 +279,10 @@ if (require.main === module || process.argv[1]?.includes('updateData')) {
         minutes:  Number.parseInt(values.minutes as string, 10),
         // headless resolved from ZUCCHETTI_HEADLESS env var (default true)
     }).then(result => {
-        console.log(result.success ? `OK: ${result.message}` : `FAIL: ${result.message}`);
+        log.info(result.success ? `OK: ${result.message}` : `FAIL: ${result.message}`);
         process.exit(result.success ? 0 : 1);
     }).catch(err => {
-        console.error('Fatal:', err);
+        log.error('Fatal:', err);
         process.exit(1);
     });
 }

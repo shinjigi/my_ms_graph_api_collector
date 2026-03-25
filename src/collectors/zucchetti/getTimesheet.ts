@@ -1,6 +1,9 @@
 import { parseArgs } from 'node:util';
+import { createLogger } from "../../logger";
 import { startZucchettiSession } from './session';
 import { scrapeCartellino, validateDay } from './scraper';
+
+const log = createLogger("zucchetti-collector");
 import type { TimesheetData } from './scraper';
 
 const options = {
@@ -30,7 +33,7 @@ if (values.date) {
 
 void (async () => {
     // Use shared session for login + Cartellino navigation
-    const session = await startZucchettiSession(false);
+    const session = await startZucchettiSession();
     const { browser, page: newPage } = session;
 
     const waitStable = async () => {
@@ -60,11 +63,11 @@ void (async () => {
 
     for (let i = 0; i < monthsToScrape.length; i++) {
         const { month, year } = monthsToScrape[i];
-        console.log(`Processing ${month}/${year}...`);
+        log.info(`Processing ${month}/${year}...`);
 
         if (i === 0) {
             // First month: use dropdowns
-            console.log(`Setting target period to ${month}/${year} via dropdowns...`);
+            log.info(`Setting target period to ${month}/${year} via dropdowns...`);
             const yearSelect = newPage.locator('select[id$="_TxtAnno"]').filter({ visible: true }).first();
             await yearSelect.selectOption(year.toString());
             await waitStable();
@@ -76,27 +79,27 @@ void (async () => {
             // Subsequent months: use navigation buttons (requested)
             // But we need to know if we are going forward or backward.
             // Since we sorted them forward, we use BtnMeseNext.
-            console.log(`Navigating to next month via button...`);
+            log.info(`Navigating to next month via button...`);
             const nextBtn = newPage.locator('a[id$="_BtnMeseNext"]').filter({ visible: true }).first();
             await nextBtn.click();
             await waitStable();
             await newPage.waitForTimeout(3000); // Added safety wait
         }
 
-        console.log("Extracting timesheet data...");
+        log.info("Extracting timesheet data...");
         const { header, days } = await scrapeCartellino(newPage);
         const validatedData = days.map(d => validateDay(d));
         allResults.push({ month, year, header, days: validatedData });
     }
 
-    console.log("--- START JSON ---");
+    console.info("--- START JSON ---");
     // If multiple months, return as array of months
     if (allResults.length === 1) {
-        console.log(JSON.stringify({ header: allResults[0].header, days: allResults[0].days }, null, 2));
+        console.info(JSON.stringify({ header: allResults[0].header, days: allResults[0].days }, null, 2));
     } else {
-        console.log(JSON.stringify(allResults, null, 2));
+        console.info(JSON.stringify(allResults, null, 2));
     }
-    console.log("--- END JSON ---");
+    console.info("--- END JSON ---");
 
     await browser.close();
 })();

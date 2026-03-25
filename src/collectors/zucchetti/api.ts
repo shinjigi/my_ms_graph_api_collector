@@ -1,7 +1,7 @@
-/**
- * Zucchetti API Module
- */
 import { ZucchettiSession } from "./session";
+import { createLogger } from "../../logger";
+
+const log = createLogger("zucchetti-api");
 
 export interface ZucchettiApiRawResponse {
   Fields: string[];
@@ -36,9 +36,9 @@ export async function fetchZucchettiTimesheet(
     HHMM: "N",
   });
 
-  console.log(`  [API] ── fetchZucchettiTimesheet ──`);
-  console.log(`  [API] URL: ${url}`);
-  console.log(`  [API] Params:
+  log.info("── fetchZucchettiTimesheet ──");
+  log.info(`URL: ${url}`);
+  log.info(`Params:
     rows=300, startrow=0, count=false
     sqlcmd=rows:hfpr_fcartellino3
     IDCOMPANY="${session.idCompany}" ${session.idCompany ? "✅" : "⚠️  VUOTO"}
@@ -46,8 +46,8 @@ export async function fetchZucchettiTimesheet(
     Anno="${year}" Mese="${month}"
     m_cCheck="${session.m_cCheck}"  ${session.m_cCheck ? "✅" : "⚠️  VUOTO"}
     isclientdb=false, Visualiz='', LaFlexi=N, HHMM=N`);
-  console.log(
-    `  [API] Cookie header (primi 200 char): ${session.cookies.slice(0, 200)}...`,
+  log.info(
+    `Cookie header (primi 200 char): ${session.cookies.slice(0, 200)}...`,
   );
 
   let response: Response;
@@ -63,23 +63,23 @@ export async function fetchZucchettiTimesheet(
       body: params.toString(),
     });
   } catch (fetchErr) {
-    console.error(
-      `  [API] ❌ Errore di rete durante fetch: ${(fetchErr as Error).message}`,
+    log.error(
+      `❌ Errore di rete durante fetch: ${(fetchErr as Error).message}`,
     );
     throw fetchErr;
   }
 
-  console.log(
-    `  [API] Response: status=${response.status} statusText="${response.statusText}"`,
+  log.info(
+    `Response: status=${response.status} statusText="${response.statusText}"`,
   );
-  console.log(`  [API] Content-Type: ${response.headers.get("content-type")}`);
+  log.info(`Content-Type: ${response.headers.get("content-type")}`);
 
   if (!response.ok) {
     const body = await response
       .text()
       .catch(() => "(impossibile leggere body)");
-    console.error(
-      `  [API] ❌ HTTP ${response.status} – body (primi 500 char):\n${body.slice(0, 500)}`,
+    log.error(
+      `❌ HTTP ${response.status} – body (primi 500 char):\n${body.slice(0, 500)}`,
     );
     throw new Error(
       `Zucchetti API error: ${response.status} – ${body.slice(0, 200)}`,
@@ -87,16 +87,16 @@ export async function fetchZucchettiTimesheet(
   }
 
   const responseText = await response.text();
-  console.log(
-    `  [API] Response body (primi 300 char): ${responseText.slice(0, 300)}`,
+  log.info(
+    `Response body (primi 300 char): ${responseText.slice(0, 300)}`,
   );
 
   let parsed: ZucchettiApiRawResponse;
   try {
     parsed = JSON.parse(responseText) as ZucchettiApiRawResponse;
   } catch (jsonErr) {
-    console.error(
-      `  [API] ❌ Risposta non è JSON valido. Body completo:\n${responseText.slice(0, 1000)}`,
+    log.error(
+      `❌ Risposta non è JSON valido. Body completo:\n${responseText.slice(0, 1000)}`,
     );
     throw new Error(
       `Zucchetti: risposta non JSON – ${(jsonErr as Error).message}`,
@@ -106,19 +106,19 @@ export async function fetchZucchettiTimesheet(
 
   const fields = parsed.Fields ?? [];
   const data = parsed.Data ?? [];
-  console.log(
-    `  [API] Fields ricevuti (${fields.length}): [${fields.join(", ")}]`,
+  log.info(
+    `Fields ricevuti (${fields.length}): [${fields.join(", ")}]`,
   );
-  console.log(`  [API] Righe dati ricevute: ${data.length}`);
+  log.info(`Righe dati ricevute: ${data.length}`);
 
   if (data.length > 0) {
-    console.log(`  [API] Prima riga (campione): ${JSON.stringify(data[0])}`);
+    log.info(`Prima riga (campione): ${JSON.stringify(data[0])}`);
   } else {
-    console.warn(`  [API] ⚠️  Nessuna riga dati ricevuta! Possibili cause:`);
-    console.warn(`  [API]    - m_cCheck non valido o sessione scaduta`);
-    console.warn(`  [API]    - IDCOMPANY / IDEMPLOY errati o vuoti`);
-    console.warn(`  [API]    - Anno/Mese fuori range o non autorizzati`);
-    console.warn(`  [API]    - sqlcmd errato per questa versione di Zucchetti`);
+    log.warn("⚠️  Nessuna riga dati ricevuta! Possibili cause:");
+    log.warn("   - m_cCheck non valido o sessione scaduta");
+    log.warn("   - IDCOMPANY / IDEMPLOY errati o vuoti");
+    log.warn("   - Anno/Mese fuori range o non autorizzati");
+    log.warn("   - sqlcmd errato per questa versione di Zucchetti");
   }
 
   // Verifica campi attesi
@@ -135,14 +135,14 @@ export async function fetchZucchettiTimesheet(
   ];
   const missingFields = expectedFields.filter((f) => !fields.includes(f));
   if (missingFields.length > 0) {
-    console.warn(
-      `  [API] ⚠️  Campi ATTESI ma NON trovati nella risposta: [${missingFields.join(", ")}]`,
+    log.warn(
+      `⚠️  Campi ATTESI ma NON trovati nella risposta: [${missingFields.join(", ")}]`,
     );
-    console.warn(
-      `  [API]    Campi effettivamente presenti: [${fields.join(", ")}]`,
+    log.warn(
+      `   Campi effettivamente presenti: [${fields.join(", ")}]`,
     );
   } else {
-    console.log(`  [API] Tutti i campi attesi sono presenti ✅`);
+    log.info("Tutti i campi attesi sono presenti ✅");
   }
 
   return parsed;
@@ -156,13 +156,13 @@ export function mapRawToZucchettiDays(
 ): ZucchettiDay[] {
   const { Fields, Data } = raw;
 
-  console.log(`  [MAP] ── mapRawToZucchettiDays ──`);
-  console.log(`  [MAP] Fields: [${Fields.join(", ")}]`);
-  console.log(`  [MAP] Righe da mappare: ${Data.length}`);
+  log.info("── mapRawToZucchettiDays ──");
+  log.info(`Fields: [${Fields.join(", ")}]`);
+  log.info(`Righe da mappare: ${Data.length}`);
 
   if (Data.length === 0) {
-    console.warn(
-      `  [MAP] ⚠️  Nessuna riga da mappare – output sarà un array vuoto.`,
+    log.warn(
+      "⚠️  Nessuna riga da mappare – output sarà un array vuoto.",
     );
     return [];
   }
@@ -171,8 +171,8 @@ export function mapRawToZucchettiDays(
     const getField = (name: string) => {
       const idx = Fields.indexOf(name);
       if (idx === -1 && rowIdx === 0) {
-        console.warn(
-          `  [MAP] ⚠️  Campo "${name}" non trovato nei Fields (riga ${rowIdx})`,
+        log.warn(
+          `⚠️  Campo "${name}" non trovato nei Fields (riga ${rowIdx})`,
         );
       }
       return idx !== -1 ? String(row[idx] ?? "") : "";
@@ -204,8 +204,8 @@ export function mapRawToZucchettiDays(
 
     // Log di una riga campione ogni 5 righe (per non spammare)
     if (rowIdx === 0 || rowIdx % 5 === 0) {
-      console.log(
-        `  [MAP] Riga ${rowIdx.toString().padStart(2)}: date="${date}" dow="${dayOfWeek}" orario="${orario}" hOrd="${hOrd}" hEcc="${hEcc}" timbrature="${timbrature}" giust=[${giustificativi.map((g) => g.text).join("|")}]`,
+      log.info(
+        `Riga ${rowIdx.toString().padStart(2)}: date="${date}" dow="${dayOfWeek}" orario="${orario}" hOrd="${hOrd}" hEcc="${hEcc}" timbrature="${timbrature}" giust=[${giustificativi.map((g) => g.text).join("|")}]`,
       );
     }
 
@@ -223,11 +223,11 @@ export function mapRawToZucchettiDays(
   });
 
   const daysWithData = results.filter((d) => d.date);
-  console.log(
-    `  [MAP] Giorni mappati con DATA valorizzata: ${daysWithData.length} / ${results.length}`,
+  log.info(
+    `Giorni mappati con DATA valorizzata: ${daysWithData.length} / ${results.length}`,
   );
-  console.log(
-    `  [MAP] Range date: ${daysWithData[0]?.date ?? "n/a"} → ${daysWithData.at(-1)?.date ?? "n/a"}`,
+  log.info(
+    `Range date: ${daysWithData[0]?.date ?? "n/a"} → ${daysWithData.at(-1)?.date ?? "n/a"}`,
   );
 
   return results;
