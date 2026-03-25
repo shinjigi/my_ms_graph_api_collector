@@ -256,7 +256,7 @@ async function run(): Promise<void> {
   if (weekArg) {
     const [yearStr, weekStr] = weekArg.split("-");
     const year = Number.parseInt(yearStr, 10);
-    const week = Number.parseInt(weekStr.replace("W", ""), 10);
+    const week = Number.parseInt(weekStr.replaceAll("W", ""), 10);
     const date = new Date(year, 0, 1 + (week - 1) * 7);
     const day = date.getDay();
     const start = new Date(date);
@@ -288,9 +288,9 @@ async function run(): Promise<void> {
 
   const aggFiles = (await fs.readdir(AGG_DIR).catch(() => [] as string[]))
     .filter((f) => /^\d{4}-\d{2}-\d{2}\.json$/.test(f))
-    .filter((f) => f.replace(".json", "") >= sinceDate)
+    .filter((f) => f.replaceAll(".json", "") >= sinceDate)
     .filter((f) => {
-      const dateStr = f.replace(".json", "");
+      const dateStr = f.replaceAll(".json", "");
       if (dateArg && dateStr !== dateArg) return false;
       if (startDateArg && dateStr < startDateArg) return false;
       if (endDateArg && dateStr > endDateArg) return false;
@@ -346,7 +346,7 @@ async function run(): Promise<void> {
   };
 
   for (const file of aggFiles) {
-    const date = file.replace(".json", "");
+    const date = file.replaceAll(".json", "");
     const propPath = path.join(PROPOSALS_DIR, file);
 
     if (!force) {

@@ -41,7 +41,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onMounted } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useUiStore }        from '../stores/useUiStore';
 import { usePickerStore }    from '../stores/usePickerStore';
@@ -77,9 +77,9 @@ watch(() => [props.view, props.date] as const, ([newView, newDate]) => {
     // Sync picker — parse date as local (YYYY-MM-DD has no time, treat as local midnight)
     const parts = newDate.match(/^(\d{4})-(\d{2})-(\d{2})$/);
     if (parts) {
-        const yr  = parseInt(parts[1], 10);
-        const mo  = parseInt(parts[2], 10) - 1;
-        const d   = parseInt(parts[3], 10);
+        const yr  = Number.parseInt(parts[1], 10);
+        const mo  = Number.parseInt(parts[2], 10) - 1;
+        const d   = Number.parseInt(parts[3], 10);
         const current = picker.pickerSelected;
         if (current.getFullYear() !== yr || current.getMonth() !== mo || current.getDate() !== d) {
             picker.setFromDate(new Date(yr, mo, d));
