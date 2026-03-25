@@ -2,7 +2,7 @@
  * Gemini analyzer provider using the @google/genai SDK.
  */
 import { GoogleGenAI, Type, Schema } from "@google/genai";
-import { BatchAnalyzerProvider } from "./analyzer";
+import { BatchAnalyzerProvider } from "./base";
 import { createLogger } from "../logger";
 import { saveRawResponse } from "../aiRaw";
 import { ProposalEntry } from "@shared/analysis";
