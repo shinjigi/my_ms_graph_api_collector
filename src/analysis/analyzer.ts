@@ -215,10 +215,20 @@ export async function analyzeBatch(
 
     try {
       log.info(`[${provider.name}] avvio analisi per ${batch.length} giorni...`);
+      const t0      = Date.now();
       const results = await provider.analyzeBatch(system, user);
+      const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
 
-      log.info(`[${provider.name}] analisi completata — ${results.length} giorni restituiti`);
-      return results.map((r) => {
+      const batchDates   = new Set(batch.map((d) => d.date));
+      const validResults = results.filter((r) => batchDates.has(r.date));
+      if (validResults.length < results.length) {
+        log.warn(
+          `[${provider.name}] scartati ${results.length - validResults.length} risultati con date fuori dal batch (allucinazioni: ${results.filter((r) => !batchDates.has(r.date)).map((r) => r.date).join(", ")})`,
+        );
+      }
+
+      log.info(`[${provider.name}] analisi completata in ${elapsed}s — ${validResults.length}/${results.length} giorni validi`);
+      return validResults.map((r) => {
         const day        = batch.find((d) => d.date === r.date)!;
         const totalHours = r.entries.reduce((s, e) => s + e.inferredHours, 0);
         return {
