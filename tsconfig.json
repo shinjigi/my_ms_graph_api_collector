@@ -1,21 +1,22 @@
 {
-    "compilerOptions": {
-        "target":            "ES2022",
-        "module":            "CommonJS",
-        "moduleResolution":  "node",
-        "esModuleInterop":   true,
-        "allowJs":           true,
-        "checkJs":           false,
-        "strict":            true,
-        "skipLibCheck":      true,
-        "outDir":            "dist",
-        "resolveJsonModule": true,
-        "baseUrl":           ".",
-        "paths": {
-            "@shared/*": ["shared/*"]
-        },
-        "sourceMap": true,
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022"], // <--- Aggiungi questa riga
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "esModuleInterop": true,
+    "allowJs": true,
+    "checkJs": false,
+    "strict": true,
+    "skipLibCheck": true,
+    "outDir": "dist",
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "@shared/*": ["shared/*"]
     },
-    "include": ["src/**/*.ts", "shared/**/*.ts"],
-    "exclude": ["node_modules", "web", "tp", "dist", "zucchetti_automation"]
+    "sourceMap": true
+  },
+  "include": ["src/**/*.ts", "shared/**/*.ts", "scripts/**/*.ts"],
+  "exclude": ["node_modules", "web", "dist", "zucchetti_automation"]
 }
