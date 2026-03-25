@@ -253,9 +253,6 @@ export async function nibolFetchCalendarData(range?: { start: string, end: strin
     const page = await context.newPage();
 
     try {
-        // If range.start is provided, we could try to navigate to that specific month
-        // For now, we assume the default view or the user will navigate if needed.
-        // We navigate to /calendar which usually shows the current month.
         console.log(`Navigating to calendar: ${NIBOL_URL}/calendar`);
         await page.goto(`${NIBOL_URL}/calendar`, { waitUntil: 'load', timeout: 60000 });
 
@@ -267,102 +264,122 @@ export async function nibolFetchCalendarData(range?: { start: string, end: strin
             await page.goto(`${NIBOL_URL}/calendar`, { waitUntil: 'load', timeout: 60000 });
         }
 
-        console.log('Waiting for bookings grid to load...');
-        await page.waitForSelector('table, .CalendarTable_container__1hJ2Y', { timeout: 30000 }).catch(() => console.log('Table not found, proceeding anyway...'));
-        await page.waitForTimeout(3000);
+        const allBookings: NibolBooking[] = [];
         
-        await page.screenshot({ path: 'data/calendar_debug.png', fullPage: true });
+        // Define target range
+        const now = new Date();
+        const start = range ? new Date(range.start) : new Date(process.env['COLLECT_SINCE'] ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`);
+        const end = range ? new Date(range.end) : now;
 
-        // 1. Extract period (e.g. "March 2026") from the H3 header
-        const periodText = await page.locator('h3').filter({ hasText: /202\d/ }).first().textContent().catch(() => '');
-        console.log('Detected Period:', periodText);
-        
-        let targetMonth = new Date().getMonth();
-        let targetYear = new Date().getFullYear();
-        
-        if (periodText) {
-            const match = periodText.match(/(\w+)\s+(\d{4})/);
-            if (match) {
-                const monthName = match[1];
-                targetYear = parseInt(match[2], 10);
-                const date = new Date(`${monthName} 1, ${targetYear}`);
-                if (!isNaN(date.getTime())) {
-                    targetMonth = date.getMonth();
+        console.log(`Collection range: ${start.toISOString().slice(0, 7)} to ${end.toISOString().slice(0, 7)}`);
+
+        // Helper to get current displayed month/year
+        const getDisplayedPeriod = async () => {
+            const periodText = await page.locator('h3').filter({ hasText: /202\d/ }).first().textContent().catch(() => '');
+            if (periodText) {
+                const match = periodText.match(/(\w+)\s+(\d{4})/);
+                if (match) {
+                    const monthName = match[1];
+                    const year = parseInt(match[2], 10);
+                    const date = new Date(`${monthName} 1, ${year}`);
+                    return { month: date.getMonth(), year };
                 }
             }
+            return null;
+        };
+
+        // Navigation buttons
+        const prevBtn = page.locator('button.ant-btn').filter({ has: page.locator('svg path[d="M18.5 12H6M6 12L12 6M6 12L12 18"]') });
+        const nextBtn = page.locator('button.ant-btn').filter({ has: page.locator('svg path[d="M6 12H18.5M18.5 12L12.5 6M18.5 12L12.5 18"]') });
+
+        // 1. Navigate to start month
+        let displayed = await getDisplayedPeriod();
+        if (!displayed) throw new Error("Could not detect displayed period on Nibol calendar");
+
+        let displayedDate = new Date(displayed.year, displayed.month, 1);
+        let startDate     = new Date(start.getFullYear(), start.getMonth(), 1);
+        let endDate       = new Date(end.getFullYear(), end.getMonth(), 1);
+
+        console.log(`Currently at ${displayedDate.toISOString().slice(0, 7)}, moving to ${startDate.toISOString().slice(0, 7)}...`);
+
+        while (displayedDate.getTime() > startDate.getTime()) {
+            await prevBtn.click();
+            await page.waitForTimeout(1000);
+            displayed = await getDisplayedPeriod();
+            if (!displayed) break;
+            displayedDate = new Date(displayed.year, displayed.month, 1);
+        }
+        while (displayedDate.getTime() < startDate.getTime()) {
+            await nextBtn.click();
+            await page.waitForTimeout(1000);
+            displayed = await getDisplayedPeriod();
+            if (!displayed) break;
+            displayedDate = new Date(displayed.year, displayed.month, 1);
         }
 
-        const bookings: NibolBooking[] = await page.evaluate(({month, year, targetName}) => {
-            const list: any[] = [];
+        // 2. Iterate through months until end
+        while (displayedDate.getTime() <= endDate.getTime()) {
+            console.log(`Collecting data for ${displayedDate.toISOString().slice(0, 7)}...`);
             
-            // Identify all rows
-            const rows = Array.from(document.querySelectorAll('tr'));
-            
-            // Prioritize finding the row with "(You)" or the specific target name
-            const myRow = rows.find(r => 
-                r.textContent?.includes('(You)') || 
-                r.textContent?.toLowerCase().includes(targetName.toLowerCase())
-            );
-            
-            if (!myRow) return [];
+            await page.waitForSelector('table, .CalendarTable_container__1hJ2Y', { timeout: 30000 }).catch(() => console.log('Table not found, proceeding anyway...'));
+            await page.waitForTimeout(4000); // Increased to 4s to ensure data reload
 
-            // Identify header days (usually in <thead> <th> spans)
-            const headers = Array.from(document.querySelectorAll('thead th'));
-            const dayHeaders = headers.map(h => {
-                const span = h.querySelector('span');
-                const dayMatch = (span?.textContent || h.textContent)?.trim().match(/^(\d+)$/);
-                return dayMatch ? parseInt(dayMatch[1], 10) : null;
-            });
-            
-            // Get all cells in the user's row
-            const cells = Array.from(myRow.querySelectorAll('td'));
-            
-            cells.forEach((cell, idx) => {
-                const day = dayHeaders[idx];
-                if (!day) return; // Skip columns that don't represent a day (e.g., the Name column)
+            const monthBookings = await page.evaluate(({month, year, targetName}) => {
+                const list: any[] = [];
+                const rows = Array.from(document.querySelectorAll('tr'));
+                const myRow = rows.find(r => 
+                    r.textContent?.includes('(You)') || 
+                    r.textContent?.toLowerCase().includes(targetName.toLowerCase())
+                );
+                if (!myRow) return [];
 
-                // Detect booking type via classes or colors
-                let type: string | null = null;
-                if (cell.classList.contains('office') || cell.querySelector('span[style*="rgb(22, 119, 255)"]')) {
-                    type = 'Office';
-                } else if (cell.classList.contains('remote') || cell.querySelector('span[style*="rgb(250, 173, 20)"]')) {
-                    type = 'Remote';
-                }
+                const headers = Array.from(document.querySelectorAll('thead th'));
+                const dayHeaders = headers.map(h => {
+                    const span = h.querySelector('span');
+                    const dayMatch = (span?.textContent || h.textContent)?.trim().match(/^(\d+)$/);
+                    return dayMatch ? parseInt(dayMatch[1], 10) : null;
+                });
+                
+                const cells = Array.from(myRow.querySelectorAll('td'));
+                cells.forEach((cell, idx) => {
+                    const day = dayHeaders[idx];
+                    if (!day) return;
+                    let type: string | null = null;
+                    if (cell.classList.contains('office') || cell.querySelector('span[style*="rgb(22, 119, 255)"]')) {
+                        type = 'Office';
+                    } else if (cell.classList.contains('remote') || cell.querySelector('span[style*="rgb(250, 173, 20)"]')) {
+                        type = 'Remote';
+                    }
+                    if (type) {
+                        const monthStr = String(month + 1).padStart(2, '0');
+                        const dayStr = String(day).padStart(2, '0');
+                        list.push({ 
+                            date: `${year}-${monthStr}-${dayStr}`,
+                            type: type,
+                            details: `Detected as ${type} in grid`
+                        });
+                    }
+                });
+                return list;
+            }, { month: displayedDate.getMonth(), year: displayedDate.getFullYear(), targetName: userName });
 
-                if (type) {
-                    const monthStr = String(month + 1).padStart(2, '0');
-                    const dayStr = String(day).padStart(2, '0');
-                    list.push({ 
-                        date: `${year}-${monthStr}-${dayStr}`,
-                        type: type,
-                        details: `Detected as ${type} in grid`
-                    });
-                }
-            });
+            allBookings.push(...monthBookings);
 
-            return list;
-        }, { month: targetMonth, year: targetYear, targetName: userName });
-
-        // Final filtering by range if start/end are provided
-        if (range) {
-            const start = new Date(range.start);
-            const end = new Date(range.end);
-            return bookings.filter(b => {
-                const bDate = new Date(b.date);
-                return bDate >= start && bDate <= end;
-            }).map(b => {
-                const bDate = new Date(b.date);
-                const monthName = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(bDate);
-                const day = bDate.getDate();
-                const year = bDate.getFullYear();
-                return {
-                    ...b,
-                    date: `${day} ${monthName} ${year}`
-                };
-            });
+            // Move to next month
+            await nextBtn.click();
+            await page.waitForTimeout(1000);
+            displayed = await getDisplayedPeriod();
+            if (!displayed) break;
+            displayedDate = new Date(displayed.year, displayed.month, 1);
         }
 
-        return bookings;
+        // Final filtering by exact dates
+        const filtered = allBookings.filter(b => {
+            const bDate = new Date(b.date);
+            return bDate >= start && bDate <= end;
+        });
+
+        return filtered;
 
     } catch (error) {
         console.error("Error fetching calendar data:", error);
@@ -370,4 +387,38 @@ export async function nibolFetchCalendarData(range?: { start: string, end: strin
     } finally {
         await context.close();
     }
+}
+
+export async function collectNibol(force = false, range?: { start: string, end: string }): Promise<string[]> {
+    const NIBOL_DIR = path.join(process.cwd(), 'data', 'raw', 'nibol');
+    const fs = require('fs/promises');
+    
+    console.log('[Nibol] starting collection...');
+    await fs.mkdir(NIBOL_DIR, { recursive: true });
+
+    const now = new Date();
+    const effectiveRange = range ?? {
+        start: process.env['COLLECT_SINCE'] ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`,
+        end:   now.toISOString().slice(0, 10)
+    };
+
+    const bookings = await nibolFetchCalendarData(effectiveRange);
+    
+    // Group by month
+    const grouped: Record<string, NibolBooking[]> = {};
+    for (const b of bookings) {
+        const monthStr = b.date.slice(0, 7);
+        if (!grouped[monthStr]) grouped[monthStr] = [];
+        grouped[monthStr].push(b);
+    }
+
+    const outPaths: string[] = [];
+    for (const [monthStr, monthBookings] of Object.entries(grouped)) {
+        const outPath = path.join(NIBOL_DIR, `${monthStr}.json`);
+        await fs.writeFile(outPath, JSON.stringify(monthBookings, null, 2), 'utf-8');
+        outPaths.push(outPath);
+        console.log(`  Nibol: ${monthStr} -> ${outPath}`);
+    }
+
+    return outPaths;
 }

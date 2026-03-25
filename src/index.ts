@@ -20,11 +20,16 @@ import { collectGraphTeams }    from './collectors/graph/teams';
 import { collectSvnCommits }    from './collectors/vcs/svn';
 import { collectGitCommits }    from './collectors/vcs/git';
 import { collectZucchetti }     from './collectors/zucchetti/index';
+import { collectNibol }         from './collectors/nibol/index';
 import { collectBrowserHistory } from './collectors/browser/history';
 
 async function run(): Promise<void> {
     const forceFlag = process.argv.includes('--force');
     const dateArg   = process.argv.find(a => a.startsWith('--date='))?.split('=')[1];
+    const startArg  = process.argv.find(a => a.startsWith('--start='))?.split('=')[1];
+    const endArg    = process.argv.find(a => a.startsWith('--end='))?.split('=')[1];
+    
+    const range = (startArg && endArg) ? { start: startArg, end: endArg } : undefined;
 
     log.info(
         'Avvio raccolta dati' +
@@ -55,10 +60,14 @@ async function run(): Promise<void> {
     const gitPaths = await collectGitCommits(forceFlag);
     gitPaths.forEach(p => log.info(`[Git] Commit → ${p}`));
 
-    // Zucchetti timesheet (collects from COLLECT_SINCE month by month)
     log.info('[Zucchetti] Raccolta cartellino...');
-    const zuccPaths = await collectZucchetti(forceFlag);
+    const zuccPaths = await collectZucchetti(forceFlag, range);
     zuccPaths.forEach(p => log.info(`[Zucchetti] → ${p}`));
+
+    // Nibol calendar
+    log.info('[Nibol] Raccolta calendario...');
+    const nibolPaths = await collectNibol(forceFlag, range);
+    nibolPaths.forEach(p => log.info(`[Nibol] → ${p}`));
 
     // Browser history (Chrome + Firefox)
     log.info('[Browser] Raccolta cronologia...');
