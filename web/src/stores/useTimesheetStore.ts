@@ -63,7 +63,7 @@ export const useTimesheetStore = defineStore('timesheet', () => {
                 state:      e.stateName,
                 totAllTime: e.timeSpent,
                 hours:      [...e.hours, 0, 0], // Pad to 7 (Mon-Sun)
-                notes:      [null, null, null, null, null, null, null],
+                notes:      [...(e.notes ?? [null, null, null, null, null]), null, null], // Pad to 7
             }));
 
             // Items with at least one hour logged this week → active (prominent)

@@ -12,11 +12,15 @@ import type { AggregatedDay } from "../../analysis/aggregator";
 import type { WeekDayData } from "@shared/week";
 import type { SubmitEdit } from "@shared/submit";
 import { ZucchettiDay } from "@shared/zucchetti";
+import { getItalianHolidays, Holiday } from "@shared/holidays";
 
 export const weekRouter = Router();
 
 const RAW_DIR = path.join(process.cwd(), "data", "raw");
 const AGG_DIR = path.join(process.cwd(), "data", "aggregated");
+
+// Creiamo una cache per evitare ricalcoli inutili
+const holidaysCache = new Map<number, Holiday[]>();
 
 interface WeekResponse {
   monday: string;
@@ -30,6 +34,7 @@ interface TpWeekEntry {
   timeSpent: number;
   projectName: string;
   hours: number[];
+  notes: Array<string | null>;
 }
 
 interface TpWeekResponse {
@@ -99,26 +104,18 @@ function isWorkday(day: ZucchettiDay): boolean {
   return orario !== "DOM" && orario !== "SAB" && orario !== "FES";
 }
 
-// Italian public holidays (month 0-indexed, day 1-indexed)
-const HOLIDAYS_IT: Array<{ m: number; d: number; name: string }> = [
-  { m: 0, d: 1, name: "Capodanno" },
-  { m: 0, d: 6, name: "Epifania" },
-  { m: 3, d: 5, name: "Pasqua 2026" },
-  { m: 3, d: 6, name: "Lunedì dell'Angelo" },
-  { m: 3, d: 25, name: "Festa della Liberazione" },
-  { m: 4, d: 1, name: "Festa del Lavoro" },
-  { m: 5, d: 2, name: "Festa della Repubblica" },
-  { m: 7, d: 15, name: "Ferragosto" },
-  { m: 10, d: 1, name: "Ognissanti" },
-  { m: 11, d: 8, name: "Immacolata" },
-  { m: 11, d: 25, name: "Natale" },
-  { m: 11, d: 26, name: "Santo Stefano" },
-];
+function findHoliday(date: Date): Holiday | undefined {
+  const year = date.getFullYear();
 
-function findHoliday(date: Date): { name: string } | undefined {
-  return HOLIDAYS_IT.find(
-    (h) => h.m === date.getMonth() && h.d === date.getDate(),
-  );
+  // Se non abbiamo ancora calcolato l'anno, lo facciamo una volta sola
+  if (!holidaysCache.has(year)) {
+    holidaysCache.set(year, getItalianHolidays(year));
+  }
+
+  const yearHolidays = holidaysCache.get(year)!;
+  const dateStr = dateToString(date);
+
+  return yearHolidays.find((h) => h.date === dateStr);
 }
 
 // GET /api/week/:date
@@ -217,6 +214,7 @@ weekRouter.get("/:date/tp-hours", async (req: Request, res: Response) => {
 
     // Group time entries by assignable ID and day index
     const entriesByAssignable = new Map<number, Map<number, number>>();
+    const notesByAssignable = new Map<number, Map<number, string[]>>();
 
     for (const entry of timeEntries) {
       const entryDate = parseTpDate(entry.Date);
@@ -233,9 +231,17 @@ weekRouter.get("/:date/tp-hours", async (req: Request, res: Response) => {
 
       if (!entriesByAssignable.has(tpId)) {
         entriesByAssignable.set(tpId, new Map());
+        notesByAssignable.set(tpId, new Map());
       }
       const dayMap = entriesByAssignable.get(tpId)!;
+      const noteMap = notesByAssignable.get(tpId)!;
       dayMap.set(dayIndex, (dayMap.get(dayIndex) ?? 0) + entry.Spent);
+
+      if (entry.Description) {
+        const existing = noteMap.get(dayIndex) ?? [];
+        existing.push(entry.Description);
+        noteMap.set(dayIndex, existing);
+      }
     }
 
     // Build metadata map — openItems first (has state, project, timeSpent)
@@ -276,8 +282,12 @@ weekRouter.get("/:date/tp-hours", async (req: Request, res: Response) => {
 
     for (const item of openItems) {
       const dayHoursMap = entriesByAssignable.get(item.id);
+      const dayNoteMap = notesByAssignable.get(item.id);
       const hours = [0, 1, 2, 3, 4].map(
         (i) => +(dayHoursMap?.get(i) ?? 0).toFixed(2),
+      );
+      const notes: Array<string | null> = [0, 1, 2, 3, 4].map(
+        (i) => dayNoteMap?.get(i)?.join(" | ") ?? null,
       );
       entries.push({
         tpId: item.id,
@@ -286,12 +296,14 @@ weekRouter.get("/:date/tp-hours", async (req: Request, res: Response) => {
         timeSpent: item.timeSpent,
         projectName: item.projectName,
         hours,
+        notes,
       });
     }
 
     // Closed items with hours this week (not in openItems)
     for (const [tpId, dayHoursMap] of entriesByAssignable) {
       if (openIds.has(tpId)) continue;
+      const dayNoteMap = notesByAssignable.get(tpId);
       const meta = metaMap.get(tpId) ?? {
         name: `TP #${tpId}`,
         stateName: "",
@@ -301,6 +313,9 @@ weekRouter.get("/:date/tp-hours", async (req: Request, res: Response) => {
       const hours = [0, 1, 2, 3, 4].map(
         (i) => +(dayHoursMap.get(i) ?? 0).toFixed(2),
       );
+      const notes: Array<string | null> = [0, 1, 2, 3, 4].map(
+        (i) => dayNoteMap?.get(i)?.join(" | ") ?? null,
+      );
       entries.push({
         tpId,
         usName: meta.name,
@@ -308,6 +323,7 @@ weekRouter.get("/:date/tp-hours", async (req: Request, res: Response) => {
         timeSpent: meta.timeSpent,
         projectName: meta.projectName,
         hours,
+        notes,
       });
     }
 
