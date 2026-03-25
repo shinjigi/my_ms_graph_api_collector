@@ -54,23 +54,23 @@ function extractJson(output: string): MonthData[] {
       const [y, m] = firstDate.split("-");
       return [
         {
-          month: parseInt(m, 10),
-          year: parseInt(y, 10),
+          month: Number.parseInt(m, 10),
+          year: Number.parseInt(y, 10),
           header: {},
           days: parsed,
         },
       ];
     } else {
       // It's a single MonthData-like object { header, days }
-      const days = (parsed as any).days || [];
+      const days = parsed.days || [];
       const firstDate = days[0]?.date;
       if (!firstDate) return [];
       const [y, m] = firstDate.split("-");
       return [
         {
-          month: parseInt(m, 10),
-          year: parseInt(y, 10),
-          header: (parsed as any).header,
+          month: Number.parseInt(m, 10),
+          year: Number.parseInt(y, 10),
+          header: parsed.header,
           days,
         },
       ];
