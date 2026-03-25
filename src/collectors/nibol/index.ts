@@ -7,6 +7,7 @@
  * If the SSO redirect is detected, the browser is made visible so the user can
  * re-authenticate, after which the session is persisted again.
  */
+import path from "node:path";
 import { chromium } from "playwright";
 
 const NIBOL_URL = process.env["NIBOL_URL"] ?? "https://app.nibol.com";
@@ -348,12 +349,12 @@ export async function nibolFetchCalendarData(range?: {
     let targetYear = new Date().getFullYear();
 
     if (periodText) {
-      const match = new RegExp(/(\w+)\s+(\d{4})/).exec(periodText);
+      const match = periodText.match(/(\w+)\s+(\d{4})/);
       if (match) {
         const monthName = match[1];
-        targetYear = Number.parseInt(match[2], 10);
+        targetYear = parseInt(match[2], 10);
         const date = new Date(`${monthName} 1, ${targetYear}`);
-        if (!Number.isNaN(date.getTime())) {
+        if (!isNaN(date.getTime())) {
           targetMonth = date.getMonth();
         }
       }
@@ -379,10 +380,10 @@ export async function nibolFetchCalendarData(range?: {
         const headers = Array.from(document.querySelectorAll("thead th"));
         const dayHeaders = headers.map((h) => {
           const span = h.querySelector("span");
-          const dayMatch = new RegExp(/^(\d+)$/).exec(
-            (span?.textContent || h.textContent)?.trim(),
-          );
-          return dayMatch ? Number.parseInt(dayMatch[1], 10) : null;
+          const dayMatch = (span?.textContent || h.textContent)
+            ?.trim()
+            .match(/^(\d+)$/);
+          return dayMatch ? parseInt(dayMatch[1], 10) : null;
         });
 
         // Get all cells in the user's row
@@ -452,4 +453,47 @@ export async function nibolFetchCalendarData(range?: {
   } finally {
     await context.close();
   }
+}
+
+export async function collectNibol(
+  force = false,
+  range?: { start: string; end: string },
+): Promise<string[]> {
+  const NIBOL_DIR = path.join(process.cwd(), "data", "raw", "nibol");
+  const fs = require("node:fs/promises");
+
+  console.log("[Nibol] starting collection...");
+  await fs.mkdir(NIBOL_DIR, { recursive: true });
+
+  const now = new Date();
+  const effectiveRange = range ?? {
+    start:
+      process.env["COLLECT_SINCE"] ??
+      `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`,
+    end: now.toISOString().slice(0, 10),
+  };
+
+  const bookings = await nibolFetchCalendarData(effectiveRange);
+
+  // Group by month
+  const grouped: Record<string, NibolBooking[]> = {};
+  for (const b of bookings) {
+    const monthStr = b.date.slice(0, 7);
+    if (!grouped[monthStr]) grouped[monthStr] = [];
+    grouped[monthStr].push(b);
+  }
+
+  const outPaths: string[] = [];
+  for (const [monthStr, monthBookings] of Object.entries(grouped)) {
+    const outPath = path.join(NIBOL_DIR, `${monthStr}.json`);
+    await fs.writeFile(
+      outPath,
+      JSON.stringify(monthBookings, null, 2),
+      "utf-8",
+    );
+    outPaths.push(outPath);
+    console.log(`  Nibol: ${monthStr} -> ${outPath}`);
+  }
+
+  return outPaths;
 }
