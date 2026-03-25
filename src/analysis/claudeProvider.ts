@@ -3,7 +3,7 @@
  */
 import { spawn } from "node:child_process";
 import Anthropic from "@anthropic-ai/sdk";
-import { AnalyzerProvider, stripCodeFence, tpmToChars } from "./base";
+import { AnalyzerProvider, stripCodeFence, stripJsonComments, tpmToChars } from "./base";
 import { createLogger } from "../logger";
 import { saveRawResponse } from "../aiRaw";
 import { ProposalEntry } from "@shared/analysis";
@@ -60,6 +60,9 @@ async function callOpenAiCompatible(
     // Generous timeout for local CPU models (prefill + generation can take 10+ minutes)
     const timeoutMs = Number(process.env["OPENAI_REQUEST_TIMEOUT_MS"] ?? 900_000);
 
+    // num_ctx: tell Ollama to use the full context window instead of the default 4096
+    const numCtx = Number(process.env["OPENAI_MODEL_MAX_TPM"] ?? 5000);
+
     const response = await fetch(`${baseUrl}/chat/completions`, {
         method:  "POST",
         headers: {
@@ -74,6 +77,7 @@ async function callOpenAiCompatible(
             ],
             max_tokens: 4096,
             stream:     false,
+            options:    { num_ctx: numCtx },   // Ollama-specific: override default 4096 context
         }),
         signal: AbortSignal.timeout(timeoutMs),
     });
@@ -216,7 +220,7 @@ export class OpenAiCompatibleProvider implements AnalyzerProvider {
         const responseText = await callOpenAiCompatible(systemPrompt, userPromptBatched, model);
 
         log.info(`[${this.name}] Risposta ricevuta — ${responseText.length} chars`);
-        log.debug(`[${this.name}] raw: ${responseText.slice(0, 200)}...`);
+        log.debug(`[${this.name}] raw: ${responseText.slice(0, 300)}...`);
 
         await saveRawResponse({
             provider: this.name,
@@ -226,7 +230,9 @@ export class OpenAiCompatibleProvider implements AnalyzerProvider {
             raw:      responseText,
         });
 
-        return JSON.parse(stripCodeFence(responseText)) as { date: string; entries: ProposalEntry[] }[];
+        // Strip code fences AND inline JS comments (some models emit // comments in JSON)
+        const cleaned = stripJsonComments(stripCodeFence(responseText));
+        return JSON.parse(cleaned) as { date: string; entries: ProposalEntry[] }[];
     }
 }
 

@@ -30,9 +30,21 @@ export interface AnalyzerProvider {
 
 /** Strips markdown code fences from a raw AI response before JSON.parse(). */
 export function stripCodeFence(text: string): string {
+    // replaceAll requires the global flag when used with a RegExp
     return text
-        .replaceAll(/^```(?:json)?\s*/m, "")
-        .replaceAll(/\s*```\s*$/m, "")
+        .replaceAll(/^```(?:json)?\s*/gm, "")
+        .replaceAll(/\s*```\s*$/gm, "")
+        .trim();
+}
+
+/**
+ * Strips JS-style line and block comments from a JSON string.
+ * Some local models (e.g. qwen2.5-coder) emit // comments inside JSON output.
+ */
+export function stripJsonComments(json: string): string {
+    return json
+        .replace(/\/\/[^\n]*/g, "")
+        .replace(/\/\*[\s\S]*?\*\//g, "")
         .trim();
 }
 
