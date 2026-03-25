@@ -49,19 +49,21 @@ function callClaudeCli(
  * Calls an OpenAI-compatible API (Ollama, Open WebUI, LM Studio, OpenRouter, etc.).
  * Requires OPENAI_BASE_URL and optionally OPENAI_API_KEY.
  */
+/**
+ * Calls an OpenAI-compatible API using SSE streaming.
+ * Streaming keeps the TCP connection alive during long CPU-bound inference,
+ * preventing OS/router/proxy timeouts that would cut a silent long-running request.
+ */
 async function callOpenAiCompatible(
     systemPrompt: string,
     userPrompt: string,
     model: string,
 ): Promise<string> {
-    const baseUrl = process.env["OPENAI_BASE_URL"]!;
-    const apiKey  = process.env["OPENAI_API_KEY"] ?? "ollama";
-
-    // Generous timeout for local CPU models (prefill + generation can take 10+ minutes)
+    const baseUrl   = process.env["OPENAI_BASE_URL"]!;
+    const apiKey    = process.env["OPENAI_API_KEY"] ?? "ollama";
     const timeoutMs = Number(process.env["OPENAI_REQUEST_TIMEOUT_MS"] ?? 900_000);
-
-    // num_ctx: tell Ollama to use the full context window instead of the default 4096
-    const numCtx = Number(process.env["OPENAI_MODEL_MAX_TPM"] ?? 5000);
+    // num_ctx: override Ollama's default 4096-token context with the actual model window
+    const numCtx    = Number(process.env["OPENAI_MODEL_MAX_TPM"] ?? 5000);
 
     const response = await fetch(`${baseUrl}/chat/completions`, {
         method:  "POST",
@@ -76,8 +78,8 @@ async function callOpenAiCompatible(
                 { role: "user",   content: userPrompt   },
             ],
             max_tokens: 4096,
-            stream:     false,
-            options:    { num_ctx: numCtx },   // Ollama-specific: override default 4096 context
+            stream:     true,  // SSE keeps TCP alive during long CPU inference
+            options:    { num_ctx: numCtx },
         }),
         signal: AbortSignal.timeout(timeoutMs),
     });
@@ -86,9 +88,47 @@ async function callOpenAiCompatible(
         const text = await response.text();
         throw new Error(`OpenAI-compatible API error ${response.status}: ${text}`);
     }
+    if (!response.body) throw new Error("Risposta senza body (streaming non supportato?)");
 
-    const data = await response.json() as { choices?: Array<{ message?: { content?: string } }> };
-    return data.choices?.[0]?.message?.content ?? "";
+    // Collect SSE stream: each line is "data: <json>" or "data: [DONE]"
+    const reader  = response.body.getReader();
+    const decoder = new TextDecoder();
+    let fullContent = "";
+    let tokenCount  = 0;
+    let buffer      = "";
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+
+        // Process complete lines from the buffer
+        const lines  = buffer.split("\n");
+        buffer       = lines.pop() ?? ""; // last (possibly incomplete) line back to buffer
+
+        for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith("data: ")) continue;
+            const payload = trimmed.slice(6);
+            if (payload === "[DONE]") continue;
+            try {
+                const chunk   = JSON.parse(payload) as { choices?: Array<{ delta?: { content?: string } }> };
+                const content = chunk.choices?.[0]?.delta?.content ?? "";
+                if (content) {
+                    fullContent += content;
+                    tokenCount++;
+                    if (tokenCount % 50 === 0) {
+                        log.debug(`[${model}] streaming: ${tokenCount} token generati...`);
+                    }
+                }
+            } catch {
+                // malformed chunk — skip
+            }
+        }
+    }
+
+    log.debug(`[${model}] stream completato — ${tokenCount} token, ${fullContent.length} chars`);
+    return fullContent;
 }
 
 // ─── Claude via Anthropic API ────────────────────────────────────────────────
