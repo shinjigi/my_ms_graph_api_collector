@@ -1,6 +1,7 @@
 import { parseArgs } from 'node:util';
 import { startZucchettiSession } from './session';
 import { scrapeCartellino, validateDay } from './scraper';
+import type { TimesheetData } from './scraper';
 
 const options = {
     date:  { type: 'string' as const }, // YYYY-MM-DD to identify the month
@@ -15,8 +16,8 @@ const { values } = parseArgs({ options, args, strict: false }) as { values: { [k
 
 let targetMonth = values.month as string | undefined;
 let targetYear = values.year as string | undefined;
-let startMonth = values.start as string | undefined;
-let endMonth   = values.end as string | undefined;
+const startMonth = values.start as string | undefined;
+const endMonth   = values.end as string | undefined;
 
 // If date is provided, extract month and year from it
 if (values.date) {
@@ -27,7 +28,7 @@ if (values.date) {
     }
 }
 
-(async () => {
+void (async () => {
     // Use shared session for login + Cartellino navigation
     const session = await startZucchettiSession(false);
     const { browser, page: newPage } = session;
@@ -55,7 +56,7 @@ if (values.date) {
         monthsToScrape.push({ month: now.getMonth() + 1, year: now.getFullYear() });
     }
 
-    const allResults: any[] = [];
+    const allResults: Array<{ month: number; year: number } & TimesheetData> = [];
 
     for (let i = 0; i < monthsToScrape.length; i++) {
         const { month, year } = monthsToScrape[i];

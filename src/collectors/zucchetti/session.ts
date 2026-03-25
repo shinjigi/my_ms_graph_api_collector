@@ -70,7 +70,7 @@ export async function startZucchettiSession(
     console.log(`  [Session] Popup trovato, chiusura in corso...`);
     await popupCloseButton.click();
     console.log(`  [Session] Popup chiuso.`);
-  } catch (e) {
+  } catch (_e) {
     console.log(`  [Session] Nessun popup trovato (o timeout 3s) – ok.`);
   }
 
@@ -212,7 +212,7 @@ export async function startZucchettiSession(
       .locator("#rif_mbbody")
       .waitFor({ state: "detached", timeout: 30000 });
     console.log(`  [Session] Spinner #rif_mbbody scomparso. Pagina pronta.`);
-  } catch (e) {
+  } catch (_e) {
     console.warn(
       `  [Session] ⚠️  #rif_mbbody non è scomparso entro 30s – continuo comunque.`,
     );
@@ -220,7 +220,8 @@ export async function startZucchettiSession(
   console.log(`  [DEBUG] Dump window completo (filtrato)...`);
 
   const debugData = await timesheetPage.evaluate(() => {
-    const result: any = {};
+    const result: Record<string, unknown> = {};
+    const win = window as unknown as Record<string, unknown>;
 
     for (const key in window) {
       try {
@@ -233,7 +234,7 @@ export async function startZucchettiSession(
           lower.includes("check") ||
           lower.includes("id")
         ) {
-          const val = (window as any)[key];
+          const val = win[key];
 
           if (typeof val === "object") {
             result[key] = JSON.stringify(val, null, 2);
@@ -241,7 +242,9 @@ export async function startZucchettiSession(
             result[key] = val;
           }
         }
-      } catch (e) {}
+      } catch (_e) {
+          // property access on window[key] may throw — skip silently
+        }
     }
 
     return result;
@@ -252,12 +255,13 @@ export async function startZucchettiSession(
   // ── 9. Estrazione token ──────────────────────────────────────────────────
   console.log(`  [Session] Estrazione variabili globali JS dalla pagina...`);
   const sessionData = await timesheetPage.evaluate(() => {
-    const ctx = (window as any).m_Ctx || {};
+    const ctx = ((window as unknown as Record<string, unknown>).m_Ctx as Record<string, unknown>) || {};
 
+    const str = (v: unknown): string => (v != null ? String(v) : "");
     return {
-      idCompany: ctx.idAzienda || ctx.IDCOMPANY || ctx.company || "",
-      idEmploy: ctx.idDipendente || ctx.IDEMPLOY || ctx.employ || "",
-      m_cCheck: ctx.check || ctx.m_cCheck || "",
+      idCompany: str(ctx.idAzienda || ctx.IDCOMPANY || ctx.company),
+      idEmploy:  str(ctx.idDipendente || ctx.IDEMPLOY || ctx.employ),
+      m_cCheck:  str(ctx.check || ctx.m_cCheck),
     };
   });
 

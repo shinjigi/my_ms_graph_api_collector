@@ -10,6 +10,7 @@ import { createLogger } from './logger';
 const log = createLogger('collect');
 
  
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const { createGraphClient } = require('./graphClient') as {
     createGraphClient: () => Promise<import('@microsoft/microsoft-graph-client').Client>;
 };

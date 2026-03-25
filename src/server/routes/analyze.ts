@@ -177,7 +177,7 @@ analyzeRouter.post("/:date", async (req: Request, res: Response) => {
   jobs.set(jobId, job);
 
   // Fire and forget
-  runAnalysis(job, force);
+  void runAnalysis(job, force);
 
   res.status(202).json({ jobId });
 });
@@ -211,7 +211,7 @@ analyzeRouter.post("/week/:date", async (req: Request, res: Response) => {
   };
   jobs.set(jobId, job);
 
-  runAnalysis(job, force);
+  void runAnalysis(job, force);
 
   res.status(202).json({ jobId, dates });
 });

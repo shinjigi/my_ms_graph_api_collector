@@ -71,8 +71,8 @@ export abstract class BatchAnalyzerProvider implements AnalyzerProvider {
   abstract isAvailable(): boolean;
 
   async analyze(
-    systemPrompt: string,
-    userPrompt: string,
+    _systemPrompt: string,
+    _userPrompt: string,
   ): Promise<ProposalEntry[]> {
     throw new Error(
       "BatchAnalyzerProvider cannot be called via simple analyze()",
@@ -183,12 +183,12 @@ export function buildUserPromptBatched(
 // ─── Provider chain ─────────────────────────────────────────────────
 export function buildProviders(forceProvider?: string): AnalyzerProvider[] {
   // Lazy imports to avoid circular deps at module level
-  const {
-    ClaudeApiProvider,
-    ClaudeCliProvider,
-    OpenAiCompatibleProvider,
-  } = require("./claudeProvider");
-  const { GeminiProvider } = require("./geminiProvider");
+  const { ClaudeApiProvider, ClaudeCliProvider, OpenAiCompatibleProvider } =
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    require("./claudeProvider") as typeof import("./claudeProvider");
+  const { GeminiProvider } =
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    require("./geminiProvider") as typeof import("./geminiProvider");
 
   const all: Record<string, AnalyzerProvider> = {
     claude: new ClaudeApiProvider(),

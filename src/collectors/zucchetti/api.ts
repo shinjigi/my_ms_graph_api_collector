@@ -5,7 +5,7 @@ import { ZucchettiSession } from "./session";
 
 export interface ZucchettiApiRawResponse {
   Fields: string[];
-  Data: any[][];
+  Data: unknown[][];
 }
 
 import type { ZucchettiDay } from "@shared/zucchetti";
@@ -100,6 +100,7 @@ export async function fetchZucchettiTimesheet(
     );
     throw new Error(
       `Zucchetti: risposta non JSON – ${(jsonErr as Error).message}`,
+      { cause: jsonErr },
     );
   }
 
@@ -174,7 +175,7 @@ export function mapRawToZucchettiDays(
           `  [MAP] ⚠️  Campo "${name}" non trovato nei Fields (riga ${rowIdx})`,
         );
       }
-      return idx !== -1 ? row[idx] || "" : "";
+      return idx !== -1 ? String(row[idx] ?? "") : "";
     };
 
     const date = getField("DATA");

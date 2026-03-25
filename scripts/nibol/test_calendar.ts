@@ -1,4 +1,5 @@
 import { nibolFetchCalendarData } from "../../src/collectors/nibol";
+import type { NibolBooking } from "../../src/collectors/nibol";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as dotenv from "dotenv";
@@ -14,7 +15,7 @@ async function main() {
     end: "2026-03-31",
   };
 
-  let bookings: any[] = [];
+  let bookings: NibolBooking[] = [];
   let success = false;
   const maxRetries = 3;
 

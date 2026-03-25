@@ -48,23 +48,24 @@ function extractJson(output: string): ZucchettiDay[] {
   return Array.isArray(parsed) ? parsed : parsed.days;
 }
 
-async function collectRange(
-  start: string,
-  end: string,
-): Promise<ZucchettiDay[][]> {
+async function collectMonth(
+  year: number,
+  month: number,
+): Promise<ZucchettiDay[]> {
   const scriptPath = path.join(__dirname, "getTimesheet.ts");
-  const output = await runScript(scriptPath, [
-    `--start=${start}`,
-    `--end=${end}`,
-  ]);
-
+  const output = await runScript(scriptPath, [`--month=${month}`, `--year=${year}`]);
   return extractJson(output);
 }
 
-export async function collectZucchetti(force = false): Promise<string[]> {
-  const since = new Date(process.env["COLLECT_SINCE"] ?? "2025-01-01");
+export async function collectZucchetti(
+  force = false,
+  range?: { start: string; end: string },
+): Promise<string[]> {
+  const since = range
+    ? new Date(range.start)
+    : new Date(process.env["COLLECT_SINCE"] ?? "2025-01-01");
   const today = new Date().toISOString().slice(0, 10);
-  const now = new Date();
+  const now = range ? new Date(range.end) : new Date();
 
   await fs.mkdir(ZUCC_DIR, { recursive: true });
 
