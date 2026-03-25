@@ -185,16 +185,10 @@ export async function analyzeBatch(
 
   let lastError: Error | null = null;
   for (const provider of providers) {
-    if (!(await provider.isAvailable())) {
-      log.warn(`[${provider.name}] non disponibile, skip`);
-      continue;
-    }
-
     if (promptChars > provider.maxInputChars) {
       log.warn(
-        `[${provider.name}] prompt (${promptChars} chars) supera il limite del provider (${provider.maxInputChars} chars) — skip`,
+        `[${provider.name}] prompt (${promptChars} chars) supera il limite (${provider.maxInputChars} chars) — tentativo comunque`,
       );
-      continue;
     }
 
     try {
@@ -380,18 +374,22 @@ async function run(): Promise<void> {
       continue;
     }
 
+    // Measure actual prompt size (not raw file — which includes browser history etc.)
+    const system          = buildSystemPrompt();
+    const testUser        = buildUserPromptBatched([...currentBatch, day], kbItems, defaults);
+    const projectedChars  = system.length + testUser.length;
+
     log.info(
-      `  Accodo ${date} — target ${day.oreTarget.toFixed(2)}h, ${day.calendar.length} eventi, ${day.gitCommits.length} commit, ~${aggRaw.length} chars`,
+      `  Accodo ${date} — target ${day.oreTarget.toFixed(2)}h, ${day.calendar.length} eventi, ${day.gitCommits.length} commit — prompt proiettato ~${projectedChars} chars`,
     );
 
-    const estChars = aggRaw.length;
-    if (currentTokens + estChars > maxInputChars && currentBatch.length > 0) {
-      log.debug(`Batch pieno (${currentTokens} + ${estChars} > ${maxInputChars}) — flush`);
+    if (projectedChars > maxInputChars && currentBatch.length > 0) {
+      log.debug(`Batch pieno (${projectedChars} > ${maxInputChars}) — flush prima di aggiungere ${date}`);
       await processBatch();
     }
 
     currentBatch.push(day);
-    currentTokens += estChars;
+    currentTokens = projectedChars;
   }
 
   await processBatch();
