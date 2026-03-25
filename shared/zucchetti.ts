@@ -1,14 +1,20 @@
 // Shared Zucchetti data types — used by both BE collectors and FE display.
 
-export interface ZucchettiJustification {
-    text: string;
-    qta:  string;
-}
-
 export interface ZucchettiRequest {
     text:   string;
     qta?:   string;
     status: string;
+}
+
+interface ZucchettiRawResponse {
+  header: unknown;
+  days: ZucchettiDay[];
+}
+
+
+export interface ZucchettiJustification {
+    text: string;
+    qta:  string;
 }
 
 export interface ZucchettiDay {
@@ -21,4 +27,11 @@ export interface ZucchettiDay {
     giustificativi: ZucchettiJustification[];
     richieste:      ZucchettiRequest[];
     warnings:       string[];
+}
+
+export interface MonthData {
+  month: number;
+  year: number;
+  header: unknown;
+  days: ZucchettiDay[];
 }

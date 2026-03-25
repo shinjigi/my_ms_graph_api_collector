@@ -5,6 +5,7 @@ import { scrapeCartellino, validateDay } from './scraper';
 
 const log = createLogger("zucchetti-collector");
 import type { TimesheetData } from './scraper';
+import type { MonthData } from "@shared/zucchetti";
 
 const options = {
     date:  { type: 'string' as const }, // YYYY-MM-DD to identify the month
@@ -59,7 +60,7 @@ void (async () => {
         monthsToScrape.push({ month: now.getMonth() + 1, year: now.getFullYear() });
     }
 
-    const allResults: Array<{ month: number; year: number } & TimesheetData> = [];
+    const allResults: MonthData[] = [];
 
     for (let i = 0; i < monthsToScrape.length; i++) {
         const { month, year } = monthsToScrape[i];
