@@ -17,7 +17,7 @@ async function listDates(): Promise<string[]> {
   const files = await fs.readdir(PROPOSALS_DIR).catch(() => [] as string[]);
   return files
     .filter((f) => /^\d{4}-\d{2}-\d{2}\.json$/.test(f))
-    .map((f) => f.replace(".json", ""))
+    .map((f) => f.replaceAll(".json", ""))
     .sort((a, b) => a.localeCompare(b))
     .reverse();
 }

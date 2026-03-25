@@ -55,8 +55,8 @@ async function startEdit() {
 }
 
 function saveInput() {
-    const raw = parseFloat(inputRef.value?.value ?? '');
-    emit('update', Math.max(0, isNaN(raw) ? 0 : +raw.toFixed(1)));
+    const raw = Number.parseFloat(inputRef.value?.value ?? '');
+    emit('update', Math.max(0, Number.isNaN(raw) ? 0 : +raw.toFixed(1)));
     editing.value = false;
 }
 

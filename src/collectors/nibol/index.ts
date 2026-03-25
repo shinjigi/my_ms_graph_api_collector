@@ -36,7 +36,7 @@ async function isLoginRequired(
 
 export async function nibolBookDesk(date: string): Promise<void> {
   // URL expects YYYYMMDD
-  const formattedDate = date.replace(/-/g, "");
+  const formattedDate = date.replaceAll(/-/g, "");
   const profileDir = getProfileDir();
   const context = await chromium.launchPersistentContext(profileDir, {
     headless: false,
@@ -222,7 +222,9 @@ export async function nibolBookDesk(date: string): Promise<void> {
 
     // Ensure overlays are restored if we haven't found a desk
     if (!booked && hideStyle) {
-      await hideStyle.evaluate((el) => (el as Element).remove()).catch(() => {});
+      await hideStyle
+        .evaluate((el) => (el as Element).remove())
+        .catch(() => {});
     }
 
     if (booked) {
@@ -350,7 +352,7 @@ export async function nibolFetchCalendarData(range?: {
         const match = periodText.match(/(\w+)\s+(\d{4})/);
         if (match) {
           const monthName = match[1];
-          const year = parseInt(match[2], 10);
+          const year = Number.parseInt(match[2], 10);
           const date = new Date(`${monthName} 1, ${year}`);
           if (!isNaN(date.getTime())) {
             return { month: date.getMonth(), year };
@@ -415,67 +417,68 @@ export async function nibolFetchCalendarData(range?: {
 
       const monthBookings: NibolBooking[] = await page.evaluate(
         ({ month, year, targetName }) => {
-        const list: Array<{ date: string; type: string; details: string }> = [];
+          const list: Array<{ date: string; type: string; details: string }> =
+            [];
 
-        // Identify all rows
-        const rows = Array.from(document.querySelectorAll("tr"));
+          // Identify all rows
+          const rows = Array.from(document.querySelectorAll("tr"));
 
-        // Prioritize finding the row with "(You)" or the specific target name
-        const myRow = rows.find(
-          (r) =>
-            r.textContent?.includes("(You)") ||
-            r.textContent?.toLowerCase().includes(targetName.toLowerCase()),
-        );
+          // Prioritize finding the row with "(You)" or the specific target name
+          const myRow = rows.find(
+            (r) =>
+              r.textContent?.includes("(You)") ||
+              r.textContent?.toLowerCase().includes(targetName.toLowerCase()),
+          );
 
-        if (!myRow) return [];
+          if (!myRow) return [];
 
-        // Identify header days (usually in <thead> <th> spans)
-        const headers = Array.from(document.querySelectorAll("thead th"));
-        const dayHeaders = headers.map((h) => {
-          const span = h.querySelector("span");
-          const dayMatch = (span?.textContent || h.textContent)
-            ?.trim()
-            .match(/^(\d+)$/);
-          return dayMatch ? parseInt(dayMatch[1], 10) : null;
-        });
+          // Identify header days (usually in <thead> <th> spans)
+          const headers = Array.from(document.querySelectorAll("thead th"));
+          const dayHeaders = headers.map((h) => {
+            const span = h.querySelector("span");
+            const dayMatch = (span?.textContent || h.textContent)
+              ?.trim()
+              .match(/^(\d+)$/);
+            return dayMatch ? Number.parseInt(dayMatch[1], 10) : null;
+          });
 
-        // Get all cells in the user's row
-        const cells = Array.from(myRow.querySelectorAll("td"));
+          // Get all cells in the user's row
+          const cells = Array.from(myRow.querySelectorAll("td"));
 
-        cells.forEach((cell, idx) => {
-          const day = dayHeaders[idx];
-          if (!day) return; // Skip columns that don't represent a day (e.g., the Name column)
+          cells.forEach((cell, idx) => {
+            const day = dayHeaders[idx];
+            if (!day) return; // Skip columns that don't represent a day (e.g., the Name column)
 
-          // Detect booking type via classes or colors
-          let type: string | null = null;
-          if (
-            cell.classList.contains("office") ||
-            cell.querySelector('span[style*="rgb(22, 119, 255)"]')
-          ) {
-            type = "Office";
-          } else if (
-            cell.classList.contains("remote") ||
-            cell.querySelector('span[style*="rgb(250, 173, 20)"]')
-          ) {
-            type = "Remote";
-          }
+            // Detect booking type via classes or colors
+            let type: string | null = null;
+            if (
+              cell.classList.contains("office") ||
+              cell.querySelector('span[style*="rgb(22, 119, 255)"]')
+            ) {
+              type = "Office";
+            } else if (
+              cell.classList.contains("remote") ||
+              cell.querySelector('span[style*="rgb(250, 173, 20)"]')
+            ) {
+              type = "Remote";
+            }
 
-          if (type) {
-            const monthStr = String(month + 1).padStart(2, "0");
-            const dayStr = String(day).padStart(2, "0");
-            list.push({
-              date: `${year}-${monthStr}-${dayStr}`,
-              type: type,
-              details: `Detected as ${type} in grid`,
-            });
-          }
-        });
+            if (type) {
+              const monthStr = String(month + 1).padStart(2, "0");
+              const dayStr = String(day).padStart(2, "0");
+              list.push({
+                date: `${year}-${monthStr}-${dayStr}`,
+                type: type,
+                details: `Detected as ${type} in grid`,
+              });
+            }
+          });
 
-        return list;
-      },
-      { month: current.month, year: current.year, targetName: userName },
-    );
-    allBookings.push(...monthBookings);
+          return list;
+        },
+        { month: current.month, year: current.year, targetName: userName },
+      );
+      allBookings.push(...monthBookings);
 
       // Check if we need to navigate to the next month
       if (
@@ -497,11 +500,10 @@ export async function nibolFetchCalendarData(range?: {
     if (range) {
       const start = new Date(range.start);
       const end = new Date(range.end);
-      return allBookings
-        .filter((b) => {
-          const bDate = new Date(b.date);
-          return bDate >= start && bDate <= end;
-        });
+      return allBookings.filter((b) => {
+        const bDate = new Date(b.date);
+        return bDate >= start && bDate <= end;
+      });
     }
 
     return allBookings;

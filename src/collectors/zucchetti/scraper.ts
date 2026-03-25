@@ -38,7 +38,7 @@ async function parseActivityCell(cell: Locator): Promise<ActivityEntry[]> {
   const activities: ActivityEntry[] = [];
 
   for (const rRow of rows) {
-    const fullText = (await rRow.innerText()).trim().replace(/\s+/g, " ");
+    const fullText = (await rRow.innerText()).trim().replaceAll(/\s+/g, " ");
     const statusSpan = rRow.locator("span[title]");
     let status = "";
     if ((await statusSpan.count()) > 0) {
@@ -119,7 +119,7 @@ async function extractRow(
   const dayOfWeek = dayMatch[2].trim();
   const formattedDate = `${header.period.year}-${header.period.month.padStart(2, "0")}-${dayNumber}`;
 
-  const timbrature = (await cells[3].innerText()).trim().replace(/\n/g, " ");
+  const timbrature = (await cells[3].innerText()).trim().replaceAll(/\n/g, " ");
   const giustificativi = (await parseActivityCell(
     cells[4],
   )) as ZucchettiJustification[];
@@ -170,7 +170,7 @@ export async function scrapeSingleDay(
     const firstCell = await row.locator("td").first().innerText();
     const trimmed = firstCell.trim();
     // Quick check: row starts with the target day number
-    if (!trimmed.startsWith(targetDayNum.replace(/^0/, ""))) continue;
+    if (!trimmed.startsWith(targetDayNum.replaceAll(/^0/, ""))) continue;
 
     const day = await extractRow(row, header);
     if (day && day.date === targetDate) return day;
