@@ -1,5 +1,7 @@
 {
   "recommendations": [
-    "yoavbls.pretty-ts-errors"
+    "yoavbls.pretty-ts-errors",
+    "jlcodes.antigravity-cockpit",
+    "ms-azuretools.vscode-docker"
   ]
 }
