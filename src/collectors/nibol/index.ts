@@ -337,32 +337,84 @@ export async function nibolFetchCalendarData(range?: {
 
     await page.screenshot({ path: "data/calendar_debug.png", fullPage: true });
 
-    // 1. Extract period (e.g. "March 2026") from the H3 header
-    const periodText = await page
-      .locator("h3")
-      .filter({ hasText: /202\d/ })
-      .first()
-      .textContent()
-      .catch(() => "");
-    console.log("Detected Period:", periodText);
+    async function getVisibleMonthYear() {
+      const periodText = await page
+        .locator("h3")
+        .filter({ hasText: /202\d/ })
+        .first()
+        .textContent()
+        .catch(() => "");
+      console.log("Detected Period:", periodText);
 
-    let targetMonth = new Date().getMonth();
-    let targetYear = new Date().getFullYear();
-
-    if (periodText) {
-      const match = periodText.match(/(\w+)\s+(\d{4})/);
-      if (match) {
-        const monthName = match[1];
-        targetYear = parseInt(match[2], 10);
-        const date = new Date(`${monthName} 1, ${targetYear}`);
-        if (!isNaN(date.getTime())) {
-          targetMonth = date.getMonth();
+      if (periodText) {
+        const match = periodText.match(/(\w+)\s+(\d{4})/);
+        if (match) {
+          const monthName = match[1];
+          const year = parseInt(match[2], 10);
+          const date = new Date(`${monthName} 1, ${year}`);
+          if (!isNaN(date.getTime())) {
+            return { month: date.getMonth(), year };
+          }
         }
       }
+      return { month: new Date().getMonth(), year: new Date().getFullYear() };
     }
 
-    const bookings: NibolBooking[] = await page.evaluate(
-      ({ month, year, targetName }) => {
+    const { month: startMonth, year: startYear } = range
+      ? {
+          month: new Date(range.start).getMonth(),
+          year: new Date(range.start).getFullYear(),
+        }
+      : { month: new Date().getMonth(), year: new Date().getFullYear() };
+
+    const { month: endMonth, year: endYear } = range
+      ? {
+          month: new Date(range.end).getMonth(),
+          year: new Date(range.end).getFullYear(),
+        }
+      : { month: new Date().getMonth(), year: new Date().getFullYear() };
+
+    // Navigate to the start month
+    let current = await getVisibleMonthYear();
+    console.log(
+      `Current visible: ${current.month + 1}/${current.year}, Target start: ${startMonth + 1}/${startYear}`,
+    );
+
+    // Navigate backward if needed
+    while (
+      current.year > startYear ||
+      (current.year === startYear && current.month > startMonth)
+    ) {
+      console.log("Navigating to previous month...");
+      await page
+        .locator('button.ant-btn-icon-only:has(svg path[d^="M18.5 12H6"])')
+        .click();
+      await page.waitForTimeout(2000);
+      current = await getVisibleMonthYear();
+    }
+
+    // Navigate forward if needed
+    while (
+      current.year < startYear ||
+      (current.year === startYear && current.month < startMonth)
+    ) {
+      console.log("Navigating to next month...");
+      await page
+        .locator('button.ant-btn-icon-only:has(svg path[d^="M6 12H18.5"])')
+        .click();
+      await page.waitForTimeout(2000);
+      current = await getVisibleMonthYear();
+    }
+
+    const allBookings: NibolBooking[] = [];
+    let finished = false;
+
+    while (!finished) {
+      console.log(`Scraping month: ${current.month + 1}/${current.year}`);
+      await page.waitForTimeout(2000); // Give it time to load the grid contents
+
+      const monthBookings: NibolBooking[] = await page.evaluate(
+        ({ month, year, targetName }) => {
         const list: Array<{ date: string; type: string; details: string }> = [];
 
         // Identify all rows
@@ -421,33 +473,38 @@ export async function nibolFetchCalendarData(range?: {
 
         return list;
       },
-      { month: targetMonth, year: targetYear, targetName: userName },
+      { month: current.month, year: current.year, targetName: userName },
     );
+    allBookings.push(...monthBookings);
+
+      // Check if we need to navigate to the next month
+      if (
+        current.year < endYear ||
+        (current.year === endYear && current.month < endMonth)
+      ) {
+        console.log("Navigating to next month...");
+        await page
+          .locator('button.ant-btn-icon-only:has(svg path[d^="M6 12H18.5"])')
+          .click();
+        await page.waitForTimeout(2000);
+        current = await getVisibleMonthYear();
+      } else {
+        finished = true;
+      }
+    }
 
     // Final filtering by range if start/end are provided
     if (range) {
       const start = new Date(range.start);
       const end = new Date(range.end);
-      return bookings
+      return allBookings
         .filter((b) => {
           const bDate = new Date(b.date);
           return bDate >= start && bDate <= end;
-        })
-        .map((b) => {
-          const bDate = new Date(b.date);
-          const monthName = new Intl.DateTimeFormat("en-US", {
-            month: "long",
-          }).format(bDate);
-          const day = bDate.getDate();
-          const year = bDate.getFullYear();
-          return {
-            ...b,
-            date: `${day} ${monthName} ${year}`,
-          };
         });
     }
 
-    return bookings;
+    return allBookings;
   } catch (error) {
     console.error("Error fetching calendar data:", error);
     return [];
