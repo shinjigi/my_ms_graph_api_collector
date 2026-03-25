@@ -16,7 +16,6 @@ import * as dotenv from "dotenv";
 
 dotenv.config();
 
-import type { AggregatedDay } from "./aggregator";
 import type { ProposalEntry, DayProposal } from "@shared/analysis";
 import type { KbEntry, KbStore } from "@shared/kb";
 import { SYSTEM_PROMPT, userInstruction } from "./prompts";
@@ -67,6 +66,7 @@ export interface DefaultsConfig {
 
 // ─── Shared utilities ───────────────────────────────────────────────
 import { AnalyzerProvider, BatchAnalyzerProvider } from "./base";
+import { AggregatedDay } from "@shared/aggregator";
 
 export async function loadKb(): Promise<KbEntry[]> {
   const raw = await fs.readFile(KB_FILE, "utf-8");

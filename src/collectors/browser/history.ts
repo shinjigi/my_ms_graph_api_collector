@@ -3,6 +3,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { createRequire } from "node:module";
 import { mergeByKey, readMeta, writeMeta, shouldSkipMonth } from "../utils";
+import { BrowserVisit } from "@shared/aggregator";
 
 const _require = createRequire(__filename);
 
@@ -11,15 +12,6 @@ const FIREFOX_DIR = path.join(process.cwd(), "data", "raw", "browser-firefox");
 
 // Offset between Windows FILETIME epoch (Jan 1, 1601) and Unix epoch (Jan 1, 1970) in microseconds
 const CHROME_EPOCH_OFFSET_US = BigInt(11_644_473_600) * BigInt(1_000_000);
-
-export interface BrowserVisit {
-  visitId: string; // "<source>-<id>" to avoid collisions across profiles
-  source: string; // e.g. "chrome-profile1", "firefox"
-  url: string;
-  title: string | null;
-  visitTime: string; // ISO 8601
-  date: string; // YYYY-MM-DD
-}
 
 type SqlJsStatic = import("sql.js").SqlJsStatic;
 

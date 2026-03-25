@@ -9,7 +9,6 @@ import { Router, Request, Response } from "express";
 import * as crypto from "node:crypto";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import type { AggregatedDay } from "../../analysis/aggregator";
 import {
   AGG_DIR,
   PROPOSALS_DIR,
@@ -20,6 +19,7 @@ import {
   KB_FILE,
 } from "../../analysis/analyzer";
 import { DayProposal } from "@shared/analysis";
+import { AggregatedDay } from "@shared/aggregator";
 
 export const analyzeRouter = Router();
 

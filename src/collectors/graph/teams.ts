@@ -2,28 +2,10 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { Client } from "@microsoft/microsoft-graph-client";
 import { mergeByKey, readMeta, writeMeta } from "../utils";
+import { ChatState, TeamsMessageRaw } from "@shared/aggregator";
 
 const TEAMS_DIR = path.join(process.cwd(), "data", "raw", "graph-teams");
 const CHAT_STATES_FILE = path.join(TEAMS_DIR, "chat-states.json");
-
-export interface TeamsMessageRaw {
-  id: string;
-  chatId: string;
-  chatType: string;
-  chatTopic: string | null;
-  createdDateTime: string;
-  lastModifiedDateTime: string;
-  from: unknown;
-  body: { contentType: string; content: string };
-  webUrl: string | null;
-  messageType: string;
-}
-
-interface ChatState {
-  lastModifiedDateTime: string; // ISO — fetch only messages newer than this
-  topic: string | null;
-  chatType: string;
-}
 
 async function loadChatStates(): Promise<Record<string, ChatState>> {
   try {

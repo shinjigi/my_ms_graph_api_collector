@@ -9,15 +9,18 @@ import * as path from "node:path";
 import * as dotenv from "dotenv";
 dotenv.config();
 
-import type { CalendarEventRaw } from "../collectors/graph/calendar";
-import type { EmailRaw } from "../collectors/graph/email";
-import type { TeamsMessageRaw } from "../collectors/graph/teams";
-import type { SvnCommit } from "../collectors/vcs/svn";
-import type { GitCommit } from "../collectors/vcs/git";
-import type { BrowserVisit } from "../collectors/browser/history";
 import { hhmmToHours } from "../targetprocess/format";
 import { createLogger } from "../logger";
 import { ZucchettiDay } from "@shared/zucchetti";
+import {
+  AggregatedDay,
+  CalendarEventRaw,
+  EmailRaw,
+  TeamsMessageRaw,
+  SvnCommit,
+  GitCommit,
+  BrowserVisit,
+} from "@shared/aggregator";
 
 const log = createLogger("aggregator");
 
@@ -32,20 +35,6 @@ const GIT_DIR = path.join(RAW_DIR, "git");
 const SVN_DIR = path.join(RAW_DIR, "svn");
 const CHROME_DIR = path.join(RAW_DIR, "browser-chrome");
 const FIREFOX_DIR = path.join(RAW_DIR, "browser-firefox");
-
-export interface AggregatedDay {
-  date: string; // YYYY-MM-DD
-  isWorkday: boolean;
-  oreTarget: number; // decimal hours from Zucchetti hOrd
-  location: "office" | "smart" | "mixed" | "unknown";
-  zucchetti: ZucchettiDay | null;
-  calendar: CalendarEventRaw[];
-  emails: EmailRaw[];
-  teams: TeamsMessageRaw[];
-  svnCommits: SvnCommit[];
-  gitCommits: GitCommit[];
-  browserVisits: BrowserVisit[];
-}
 
 export function parseZucchettiLocation(
   day: ZucchettiDay,
