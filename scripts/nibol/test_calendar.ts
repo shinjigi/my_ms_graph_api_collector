@@ -3,17 +3,31 @@ import type { NibolBooking } from "../../src/collectors/nibol";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as dotenv from "dotenv";
+import { parseArgs } from "node:util";
 
 dotenv.config();
 
 async function main() {
   console.log("[Nibol] Testing Calendar Data Fetching...");
 
+  const options = {
+    start: { type: "string" as const },
+    end: { type: "string" as const },
+  };
+
+  const { values } = parseArgs({
+    options,
+    args: process.argv.slice(2),
+    strict: false,
+  }) as { values: { start?: string; end?: string } };
+
   // Testing with a range for March 2026
   const range = {
-    start: "2026-03-01",
-    end: "2026-03-31",
+    start: values.start ?? "2026-03-01",
+    end: values.end ?? "2026-03-31",
   };
+
+  console.log(`[Nibol] Data range: ${range.start} to ${range.end}`);
 
   let bookings: NibolBooking[] = [];
   let success = false;
