@@ -1,8 +1,8 @@
 <template>
     <thead>
         <tr class="text-xs">
-            <th class="w-48">User Story</th>
-            <th class="w-20">Stato</th>
+            <th>User Story</th>
+            <th>Stato</th>
             <th v-for="(d, i) in ts.days.slice(0, 6)" :key="i"
                 class="text-center text-xs"
                 :class="dayHeadCls(d, i)">
@@ -31,8 +31,8 @@
                     </span>
                 </template>
             </th>
-            <th class="text-center w-16 text-xs">Tot</th>
-            <th class="text-center w-10 text-xs opacity-60">Rem</th>
+            <th class="text-center text-xs">Tot</th>
+            <th class="text-center text-xs opacity-60">Rem</th>
         </tr>
     </thead>
 </template>
