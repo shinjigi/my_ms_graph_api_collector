@@ -323,18 +323,18 @@ async function run(): Promise<void> {
           JSON.stringify(proposal, null, 2),
           "utf-8",
         );
-        console.log(
+        log.debug(
           `    → ${proposal.date}: ${proposal.entries.length} entries, totale ${proposal.totalHours}h [${proposal.provider}]`,
         );
         processed++;
       }
     } catch (err) {
       const msg = (err as Error).message;
-      console.error(
+      log.error(
         `    Errore batch per le date da ${currentBatch[0]?.date} a ${currentBatch.at(-1)?.date}: ${msg}`,
       );
       if (msg.includes("credit balance is too low")) {
-        console.error(
+        log.error(
           "\n[FATAL] Credito Anthropic esaurito. Interruzione processo.",
         );
         process.exit(1);
