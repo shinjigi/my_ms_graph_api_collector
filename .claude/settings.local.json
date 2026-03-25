@@ -58,7 +58,8 @@
       "Bash(C:/SVN/_app/python/Conda/Scripts/conda.exe run:*)",
       "Bash(git stash:*)",
       "Bash(git remote:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(npm install:*)"
     ]
   }
 }

@@ -1,13 +1,21 @@
+import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
+import eslintConfigPrettier from "eslint-config-prettier";
 
-export default tseslint.config(
+export default [
+  // 1. Regole base JS
+  eslint.configs.recommended,
+
+  // 2. Regole base TS (usiamo l'espansione dell'array)
   ...tseslint.configs.recommended,
+
+  // 3. La tua configurazione specifica
   {
-    // CONFIGURAZIONE SPECIFICA PER I FILE TS
-    files: ["**/*.ts"],
+    files: ["src/**/*.ts", "shared/**/*.ts", "scripts/**/*.ts"],
     languageOptions: {
+      parser: tseslint.parser, // Specifichiamo il parser esplicitamente
       parserOptions: {
-        project: true,
+        project: "./tsconfig.json",
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -17,23 +25,27 @@ export default tseslint.config(
         "warn",
         { argsIgnorePattern: "^_" },
       ],
-      // Disattiviamo le regole "estetiche" che ti hanno dato errore
-      "@typescript-eslint/array-type": "off",
-      "@typescript-eslint/no-require-imports": "off",
-      "@typescript-eslint/prefer-for-of": "off",
+      "@typescript-eslint/no-explicit-any": "warn",
     },
   },
+
+  // 4. Disabilita i controlli sui file JS
   {
-    // CONFIGURAZIONE PER I FILE JS (evita il parsing error)
-    files: ["src/**/*.ts", "shared/**/*.ts", "scripts/**/*.ts"],
+    files: ["**/*.js", "**/*.mjs"],
     ...tseslint.configs.disableTypeChecked,
   },
+
+  // 5. File da ignorare
   {
     ignores: [
       "dist/**",
       "node_modules/**",
       "zucchetti_automation/**",
       "web/**",
+      "data/**",
     ],
   },
-);
+
+  // 6. Prettier sempre per ultimo
+  eslintConfigPrettier,
+];
