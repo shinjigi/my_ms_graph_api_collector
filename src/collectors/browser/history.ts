@@ -1,7 +1,7 @@
 import * as fs   from 'fs/promises';
 import * as os   from 'os';
 import * as path from 'path';
-import { mergeByKey, readMeta, writeMeta, shouldSkipMonth, lastDayOfMonth } from '../utils';
+import { mergeByKey, readMeta, writeMeta, shouldSkipMonth } from '../utils';
 
 const CHROME_DIR  = path.join(process.cwd(), 'data', 'raw', 'browser-chrome');
 const FIREFOX_DIR = path.join(process.cwd(), 'data', 'raw', 'browser-firefox');
@@ -24,7 +24,7 @@ type SqlJsStatic = import('sql.js').SqlJsStatic;
 type Database    = import('sql.js').Database;
 
 async function loadSqlJs(): Promise<SqlJsStatic> {
-     
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const initSqlJs = require('sql.js') as (opts?: { locateFile?: (f: string) => string }) => Promise<SqlJsStatic>;
     return initSqlJs({
         locateFile: (f: string) => path.join(path.dirname(require.resolve('sql.js')), f),

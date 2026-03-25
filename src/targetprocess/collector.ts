@@ -245,15 +245,25 @@ abstract class BatchKbProvider implements KbCollectorProvider {
   ): Promise<void>;
 }
 
+interface AiResultItem {
+  id: number;
+  summary?: string;
+  tags?: string[];
+  userActivities?: Record<string, string>;
+  stakeholders?: string[];
+  stakeholder?: string[];
+}
+
 /** Maps AI result objects back to enriched items and writes to kbMap. */
 function applyResults(
   batch: EnrichedItem[],
   data: unknown,
   kbMap: Map<number, KbEntry>,
 ): void {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const results: any[] =
-    (data as any)?.results ?? (Array.isArray(data) ? data : []);
+  const dataObj = data as { results?: AiResultItem[] } | AiResultItem[];
+  const results: AiResultItem[] = Array.isArray(dataObj)
+    ? dataObj
+    : (dataObj.results ?? []);
   const batchIds = new Set(batch.map((b) => b.item.id));
 
   for (const result of results) {

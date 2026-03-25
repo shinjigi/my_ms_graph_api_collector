@@ -8,6 +8,7 @@
  * re-authenticate, after which the session is persisted again.
  */
 import path from "node:path";
+import * as nodeFs from "node:fs/promises";
 import { chromium } from "playwright";
 
 const NIBOL_URL = process.env["NIBOL_URL"] ?? "https://app.nibol.com";
@@ -200,7 +201,7 @@ export async function nibolBookDesk(date: string): Promise<void> {
               console.log(`  >>> Target desk found: ${cleanText}!`);
               if (hideStyle)
                 await hideStyle
-                  .evaluate((el) => (el as any).remove())
+                  .evaluate((el) => (el as Element).remove())
                   .catch(() => {});
               console.log(`  >>> Executing click...`);
               await pin.click({ force: true });
@@ -221,7 +222,7 @@ export async function nibolBookDesk(date: string): Promise<void> {
 
     // Ensure overlays are restored if we haven't found a desk
     if (!booked && hideStyle) {
-      await hideStyle.evaluate((el) => (el as any).remove()).catch(() => {});
+      await hideStyle.evaluate((el) => (el as Element).remove()).catch(() => {});
     }
 
     if (booked) {
@@ -362,7 +363,7 @@ export async function nibolFetchCalendarData(range?: {
 
     const bookings: NibolBooking[] = await page.evaluate(
       ({ month, year, targetName }) => {
-        const list: any[] = [];
+        const list: Array<{ date: string; type: string; details: string }> = [];
 
         // Identify all rows
         const rows = Array.from(document.querySelectorAll("tr"));
@@ -456,14 +457,13 @@ export async function nibolFetchCalendarData(range?: {
 }
 
 export async function collectNibol(
-  force = false,
+  _force = false,
   range?: { start: string; end: string },
 ): Promise<string[]> {
   const NIBOL_DIR = path.join(process.cwd(), "data", "raw", "nibol");
-  const fs = require("node:fs/promises");
 
   console.log("[Nibol] starting collection...");
-  await fs.mkdir(NIBOL_DIR, { recursive: true });
+  await nodeFs.mkdir(NIBOL_DIR, { recursive: true });
 
   const now = new Date();
   const effectiveRange = range ?? {
@@ -486,7 +486,7 @@ export async function collectNibol(
   const outPaths: string[] = [];
   for (const [monthStr, monthBookings] of Object.entries(grouped)) {
     const outPath = path.join(NIBOL_DIR, `${monthStr}.json`);
-    await fs.writeFile(
+    await nodeFs.writeFile(
       outPath,
       JSON.stringify(monthBookings, null, 2),
       "utf-8",

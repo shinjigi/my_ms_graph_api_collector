@@ -1,6 +1,5 @@
 import { nibolBookDesk, nibolCheckIn } from '../src/collectors/nibol';
 import * as dotenv from 'dotenv';
-import * as path from 'path';
 
 dotenv.config();
 
@@ -10,11 +9,10 @@ async function test() {
 
     try {
         console.log('--- Testing Book Desk ---');
-        // Uncomment to actually test booking
-        // await nibolBookDesk(date);
-        
+        await nibolBookDesk(date);
+
         console.log('--- Testing Check-in ---');
-        // await nibolCheckIn(date);
+        await nibolCheckIn(date);
 
         console.log('Test logic completed. Please check logs for success/failure.');
     } catch (error) {

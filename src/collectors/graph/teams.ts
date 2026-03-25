@@ -1,7 +1,7 @@
 import * as fs   from 'fs/promises';
 import * as path from 'path';
 import type { Client } from '@microsoft/microsoft-graph-client';
-import { mergeByKey, readMeta, writeMeta, shouldSkipMonth, lastDayOfMonth } from '../utils';
+import { mergeByKey, readMeta, writeMeta } from '../utils';
 
 const TEAMS_DIR        = path.join(process.cwd(), 'data', 'raw', 'graph-teams');
 const CHAT_STATES_FILE = path.join(TEAMS_DIR, 'chat-states.json');
