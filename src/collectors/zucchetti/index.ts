@@ -5,7 +5,7 @@ import { readMeta, writeMeta, shouldSkipMonth } from "../utils";
 import { createLogger } from "../../logger";
 
 const log = createLogger("zucchetti");
-import type { ZucchettiDay } from "@shared/zucchetti";
+import type { ZucchettiDay, MonthData } from "@shared/zucchetti";
 
 const ZUCC_DIR = path.join(process.cwd(), "data", "raw", "zucchetti");
 
@@ -31,83 +31,111 @@ function runScript(scriptPath: string, args: string[]): Promise<string> {
   });
 }
 
-interface ZucchettiRawResponse {
-  header: unknown;
-  days: ZucchettiDay[];
-}
-
-function extractJson(output: string): ZucchettiDay[] {
-  const start = output.indexOf("--- START JSON ---");
-  const end = output.indexOf("--- END JSON ---");
+function extractJson(output: string): MonthData[] {
+  const startMarker = "--- START JSON ---";
+  const endMarker = "--- END JSON ---";
+  const start = output.indexOf(startMarker);
+  const end = output.indexOf(endMarker);
 
   if (start === -1 || end === -1) {
     throw new Error("Marker JSON non trovati nell'output di getTimesheet.ts");
   }
 
-  const raw = output.slice(start + "--- START JSON ---".length, end).trim();
-  const parsed = JSON.parse(raw) as ZucchettiRawResponse | ZucchettiDay[];
+  const raw = output.slice(start + startMarker.length, end).trim();
+  const parsed = JSON.parse(raw);
 
-  // Handle both wrapped ({ header, days: [...] }) and flat array formats
-  return Array.isArray(parsed) ? parsed : parsed.days;
-}
+  // If it's a single month (legacy or single-month call), wrap it in an array
+  if (!Array.isArray(parsed) || (parsed.length > 0 && !parsed[0].days)) {
+      // It might be a single MonthData-like object or a flat array of days
+      if (Array.isArray(parsed)) {
+          // It's a flat array of days (shouldn't happen with current getTimesheet.ts but for safety)
+          const firstDate = parsed[0]?.date;
+          if (!firstDate) return [];
+          const [y, m] = firstDate.split("-");
+          return [{ month: parseInt(m, 10), year: parseInt(y, 10), header: {}, days: parsed }];
+      } else {
+          // It's a single MonthData-like object { header, days }
+          const days = (parsed as any).days || [];
+          const firstDate = days[0]?.date;
+          if (!firstDate) return [];
+          const [y, m] = firstDate.split("-");
+          return [{ month: parseInt(m, 10), year: parseInt(y, 10), header: (parsed as any).header, days }];
+      }
+  }
 
-async function collectMonth(
-  year: number,
-  month: number,
-): Promise<ZucchettiDay[]> {
-  const scriptPath = path.join(__dirname, "getTimesheet.ts");
-  const output = await runScript(scriptPath, [`--month=${month}`, `--year=${year}`]);
-  return extractJson(output);
+  return parsed as MonthData[];
 }
 
 export async function collectZucchetti(
   force = false,
   range?: { start: string; end: string },
 ): Promise<string[]> {
-  const since = range
-    ? new Date(range.start)
-    : new Date(process.env["COLLECT_SINCE"] ?? "2025-01-01");
+  const sinceStr = range?.start || process.env["COLLECT_SINCE"] || "2025-01-01";
+  const endStr = range?.end || new Date().toISOString().slice(0, 7); // Default to current month YYYY-MM
+  
   const today = new Date().toISOString().slice(0, 10);
-  const now = range ? new Date(range.end) : new Date();
-
   await fs.mkdir(ZUCC_DIR, { recursive: true });
 
+  // Optimization: find the first month that needs collection
   const meta = await readMeta(ZUCC_DIR);
-  const outPaths: string[] = [];
-  let current = new Date(since.getFullYear(), since.getMonth(), 1);
-
-  while (current <= now) {
-    const year = current.getFullYear();
-    const month = current.getMonth() + 1;
-    const monthStr = `${year}-${String(month).padStart(2, "0")}`;
-    const isCurrentMonth = monthStr === today.slice(0, 7);
-    const outPath = path.join(ZUCC_DIR, `${monthStr}.json`);
-
-    if (
-      !force &&
-      !isCurrentMonth &&
-      shouldSkipMonth(meta[monthStr], monthStr, ["zucchetti"])
-    ) {
-      log.info(`${monthStr}: skip`);
-      outPaths.push(outPath);
-    } else {
-      try {
-        log.info(`raccolta ${monthStr}...`);
-        const days = await collectMonth(year, month);
-        await fs.writeFile(outPath, JSON.stringify(days, null, 2), "utf-8");
-        await writeMeta(ZUCC_DIR, monthStr, {
-          lastExtractedDate: today,
-          sources: ["zucchetti"],
-        });
-        outPaths.push(outPath);
-      } catch (err) {
-        log.warn(`${monthStr}: ${(err as Error).message}`);
+  
+  let startMonthDate = new Date(sinceStr.length === 7 ? `${sinceStr}-01` : sinceStr);
+  const endMonthDate = new Date(endStr.length === 7 ? `${endStr}-01` : endStr);
+  
+  if (!force) {
+    // Skip already collected months from the beginning
+    while (startMonthDate <= endMonthDate) {
+      const mStr = startMonthDate.toISOString().slice(0, 7);
+      if (shouldSkipMonth(meta[mStr], mStr, ["zucchetti"])) {
+        startMonthDate.setMonth(startMonthDate.getMonth() + 1);
+      } else {
+        break;
       }
     }
-
-    // Advance to next month
-    current = new Date(year, month, 1);
   }
 
+  if (startMonthDate > endMonthDate) {
+    log.info("Tutti i mesi nell'intervallo sono gia' aggiornati. Skip.");
+    return [];
+  }
+
+  const actualStart = startMonthDate.toISOString().slice(0, 7);
+  const actualEnd = endMonthDate.toISOString().slice(0, 7);
+
+  log.info(`Avvio raccolta batch: ${actualStart} -> ${actualEnd}...`);
+
+  const scriptPath = path.join(__dirname, "getTimesheet.ts");
+  const output = await runScript(scriptPath, [`--start=${actualStart}`, `--end=${actualEnd}`]);
+  
+  const results = extractJson(output);
+  const outPaths: string[] = [];
+
+  for (const item of results) {
+    const monthStr = `${item.year}-${String(item.month).padStart(2, "0")}`;
+    const outPath = path.join(ZUCC_DIR, `${monthStr}.json`);
+    
+    await fs.writeFile(outPath, JSON.stringify(item.days, null, 2), "utf-8");
+    await writeMeta(ZUCC_DIR, monthStr, {
+      lastExtractedDate: today,
+      sources: ["zucchetti"],
+    });
+    outPaths.push(outPath);
+  }
+
+  log.info(`Raccolti ${outPaths.length} mesi.`);
   return outPaths;
+}
+
+// --- CLI entry point ---
+if (require.main === module || process.argv[1]?.includes("zucchetti/index")) {
+  const force = process.argv.includes("--force");
+  const start = process.argv.find((a) => a.startsWith("--start="))?.split("=")[1];
+  const end = process.argv.find((a) => a.startsWith("--end="))?.split("=")[1];
+
+  collectZucchetti(force, start && end ? { start, end } : undefined)
+    .then(() => process.exit(0))
+    .catch((err) => {
+      log.error(err.message);
+      process.exit(1);
+    });
 }
