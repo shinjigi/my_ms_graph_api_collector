@@ -1,5 +1,8 @@
 import "dotenv/config";
 import { chromium, Browser, BrowserContext, Page } from "playwright";
+import { createLogger } from "../../logger";
+
+const log = createLogger("zucchetti-session");
 
 export interface ZucchettiSession {
   browser: Browser;
@@ -35,12 +38,12 @@ export async function startZucchettiSession(
   const username = process.env.ZUCCHETTI_USERNAME;
   const password = process.env.ZUCCHETTI_PASSWORD;
 
-  console.log(`  [Session] headless=${headless}`);
-  console.log(
-    `  [Session] ZUCCHETTI_USERNAME=${username ? `"${username}"` : "⚠️  NON IMPOSTATO"}`,
+  log.info(`headless=${headless}`);
+  log.info(
+    `ZUCCHETTI_USERNAME=${username ? `"${username}"` : "⚠️  NON IMPOSTATO"}`,
   );
-  console.log(
-    `  [Session] ZUCCHETTI_PASSWORD=${password ? `"${"*".repeat(password.length)}"` : "⚠️  NON IMPOSTATO"}`,
+  log.info(
+    `ZUCCHETTI_PASSWORD=${password ? `"${"*".repeat(password.length)}"` : "⚠️  NON IMPOSTATO"}`,
   );
 
   if (!username || !password) {
@@ -49,54 +52,54 @@ export async function startZucchettiSession(
     );
   }
 
-  console.log(`  [Session] Avvio browser Chromium...`);
+  log.info("Avvio browser Chromium...");
   const browser = await chromium.launch({ headless });
   const context = await browser.newContext();
   const page = await context.newPage();
 
   // ── 1. Navigazione alla home ─────────────────────────────────────────────
   const homeUrl = `${baseUrl}/hrpzcs01/jsp/home.jsp`;
-  console.log(`  [Session] Navigazione a: ${homeUrl}`);
+  log.info(`Navigazione a: ${homeUrl}`);
   const homeResponse = await page.goto(homeUrl);
-  console.log(
-    `  [Session] home.jsp → status=${homeResponse?.status()} url=${page.url()}`,
+  log.info(
+    `home.jsp → status=${homeResponse?.status()} url=${page.url()}`,
   );
 
   // ── 2. Popup "Comunicazioni" ─────────────────────────────────────────────
-  console.log(`  [Session] Controllo popup iniziale...`);
+  log.info("Controllo popup iniziale...");
   try {
     const popupCloseButton = page.locator('[id^="spModalLayer_closebtn"]');
     await popupCloseButton.waitFor({ state: "visible", timeout: 3000 });
-    console.log(`  [Session] Popup trovato, chiusura in corso...`);
+    log.info("Popup trovato, chiusura in corso...");
     await popupCloseButton.click();
-    console.log(`  [Session] Popup chiuso.`);
+    log.info("Popup chiuso.");
   } catch (_e) {
-    console.log(`  [Session] Nessun popup trovato (o timeout 3s) – ok.`);
+    log.info("Nessun popup trovato (o timeout 3s) – ok.");
   }
 
   // ── 3. Ricerca campi login ───────────────────────────────────────────────
   const loginSelector =
     'input[placeholder="Username"], input[name*="UserName"]';
-  console.log(`  [Session] Attesa selettore login: ${loginSelector}`);
+  log.info(`Attesa selettore login: ${loginSelector}`);
   try {
     await page.waitForSelector(loginSelector, {
       state: "visible",
       timeout: 15000,
     });
-    console.log(
-      `  [Session] Campo username trovato. URL corrente: ${page.url()}`,
+    log.info(
+      `Campo username trovato. URL corrente: ${page.url()}`,
     );
   } catch (e) {
-    console.error(
-      `  [Session] ❌ Campo username NON trovato entro 15s. URL: ${page.url()}`,
+    log.error(
+      `❌ Campo username NON trovato entro 15s. URL: ${page.url()}`,
     );
     // Dump titolo e snippet HTML per capire dove siamo
     const title = await page.title();
     const bodySnippet = await page.evaluate(
       () => document.body?.innerHTML?.slice(0, 500) || "(body vuoto)",
     );
-    console.error(`  [Session] Titolo pagina: "${title}"`);
-    console.error(`  [Session] HTML snippet:\n${bodySnippet}`);
+    log.error(`Titolo pagina: "${title}"`);
+    log.error(`HTML snippet:\n${bodySnippet}`);
     throw e;
   }
 
@@ -109,7 +112,7 @@ export async function startZucchettiSession(
     .locator('input[placeholder="Password"], input[type="password"]')
     .first()
     .fill(password);
-  console.log(`  [Session] Credenziali inserite. Invio login...`);
+  log.info("Credenziali inserite. Invio login...");
 
   // ── 5. Submit ────────────────────────────────────────────────────────────
   const [navResponse] = await Promise.all([
@@ -120,8 +123,8 @@ export async function startZucchettiSession(
       .first()
       .click(),
   ]);
-  console.log(
-    `  [Session] Dopo login: status=${navResponse?.status()} url=${page.url()}`,
+  log.info(
+    `Dopo login: status=${navResponse?.status()} url=${page.url()}`,
   );
 
   // Verifica che non siamo ancora sulla pagina di login (errore credenziali)
@@ -134,30 +137,30 @@ export async function startZucchettiSession(
       return el?.textContent?.trim() || null;
     });
     if (errorText) {
-      console.error(
-        `  [Session] ❌ Possibile errore di login rilevato: "${errorText}"`,
+      log.error(
+        `❌ Possibile errore di login rilevato: "${errorText}"`,
       );
     } else {
-      console.warn(
-        `  [Session] ⚠️  URL post-login ancora su home/login – potrebbe essere normale o errore silenzioso.`,
+      log.warn(
+        `⚠️  URL post-login ancora su home/login – potrebbe essere normale o errore silenzioso.`,
       );
     }
   }
 
   // ── 6. Navigazione al Cartellino ────────────────────────────────────────
-  console.log(
-    `  [Session] Inizializzazione contesto API (apertura Cartellino)...`,
+  log.info(
+    "Inizializzazione contesto API (apertura Cartellino)...",
   );
-  console.log(`  [Session] Attesa link "Servizi aggiuntivi"...`);
+  log.info("Attesa link \"Servizi aggiuntivi\"...");
   try {
     await page.waitForSelector('a[title="Servizi aggiuntivi"]', {
       state: "visible",
       timeout: 15000,
     });
-    console.log(`  [Session] Link "Servizi aggiuntivi" trovato.`);
+    log.info("Link \"Servizi aggiuntivi\" trovato.");
   } catch (e) {
-    console.error(
-      `  [Session] ❌ Link "Servizi aggiuntivi" NON trovato. URL: ${page.url()}`,
+    log.error(
+      `❌ Link \"Servizi aggiuntivi\" NON trovato. URL: ${page.url()}`,
     );
     const title = await page.title();
     const links = await page.evaluate(() =>
@@ -166,17 +169,17 @@ export async function startZucchettiSession(
         .slice(0, 20)
         .join("\n"),
     );
-    console.error(
-      `  [Session] Titolo: "${title}"\n  Link disponibili (primis 20):\n${links}`,
+    log.error(
+      `Titolo: "${title}"\n  Link disponibili (primis 20):\n${links}`,
     );
     throw e;
   }
   await page.click('a[title="Servizi aggiuntivi"]');
-  console.log(`  [Session] Click "Servizi aggiuntivi" eseguito.`);
+  log.info("Click \"Servizi aggiuntivi\" eseguito.");
 
   // ── 7. Apertura nuova tab Cartellino ─────────────────────────────────────
-  console.log(
-    `  [Session] Attesa apertura nuova pagina (Cartellino Mensile)...`,
+  log.info(
+    "Attesa apertura nuova pagina (Cartellino Mensile)...",
   );
   let timesheetPage: Page;
   try {
@@ -184,40 +187,40 @@ export async function startZucchettiSession(
       context.waitForEvent("page", { timeout: 15000 }),
       page.getByText("Cartellino Mensile", { exact: false }).click(),
     ]);
-    console.log(`  [Session] Nuova pagina aperta: ${timesheetPage.url()}`);
+    log.info(`Nuova pagina aperta: ${timesheetPage.url()}`);
   } catch (e) {
-    console.error(
-      `  [Session] ❌ Impossibile aprire la pagina del Cartellino.`,
+    log.error(
+      "❌ Impossibile aprire la pagina del Cartellino.",
     );
     // Cerca il testo nell'eventuale menu espanso
     const menuText = await page.evaluate(() =>
       document.body?.innerText?.slice(0, 500),
     );
-    console.error(`  [Session] Testo visibile nel menu:\n${menuText}`);
+    log.error(`Testo visibile nel menu:\n${menuText}`);
     throw e;
   }
 
   // ── 8. Attesa caricamento Cartellino ─────────────────────────────────────
-  console.log(`  [Session] Attesa networkidle su pagina Cartellino...`);
+  log.info("Attesa networkidle su pagina Cartellino...");
   await timesheetPage.waitForLoadState("networkidle");
-  console.log(
-    `  [Session] URL Cartellino dopo networkidle: ${timesheetPage.url()}`,
+  log.info(
+    `URL Cartellino dopo networkidle: ${timesheetPage.url()}`,
   );
 
-  console.log(
-    `  [Session] Attesa scomparsa spinner #rif_mbbody (timeout 30s)...`,
+  log.info(
+    "Attesa scomparsa spinner #rif_mbbody (timeout 30s)...",
   );
   try {
     await timesheetPage
       .locator("#rif_mbbody")
       .waitFor({ state: "detached", timeout: 30000 });
-    console.log(`  [Session] Spinner #rif_mbbody scomparso. Pagina pronta.`);
+    log.info("Spinner #rif_mbbody scomparso. Pagina pronta.");
   } catch (_e) {
-    console.warn(
-      `  [Session] ⚠️  #rif_mbbody non è scomparso entro 30s – continuo comunque.`,
+    log.warn(
+      "⚠️  #rif_mbbody non è scomparso entro 30s – continuo comunque.",
     );
   }
-  console.log(`  [DEBUG] Dump window completo (filtrato)...`);
+  log.debug("Dump window completo (filtrato)...");
 
   const debugData = await timesheetPage.evaluate(() => {
     const result: Record<string, unknown> = {};
@@ -250,31 +253,27 @@ export async function startZucchettiSession(
     return result;
   });
 
-  console.log(`  [DEBUG] WINDOW VARS:\n${JSON.stringify(debugData, null, 2)}`);
+  log.debug("WINDOW VARS:", debugData);
 
   // ── 9. Estrazione token ──────────────────────────────────────────────────
-  console.log(`  [Session] Estrazione variabili globali JS dalla pagina...`);
-  const sessionData = await timesheetPage.evaluate(() => {
-    const ctx = ((window as unknown as Record<string, unknown>).m_Ctx as Record<string, unknown>) || {};
-
-    const str = (v: unknown): string => (v != null ? String(v) : "");
-    return {
-      idCompany: str(ctx.idAzienda || ctx.IDCOMPANY || ctx.company),
-      idEmploy:  str(ctx.idDipendente || ctx.IDEMPLOY || ctx.employ),
-      m_cCheck:  str(ctx.check || ctx.m_cCheck),
-    };
+  log.info("Estrazione variabili globali JS dalla pagina...");
+  const rawCtx = await timesheetPage.evaluate(() => {
+    return (window as any).m_Ctx || {};
   });
 
-  const { idCompany, idEmploy, m_cCheck } = sessionData;
+  const str = (v: any) => (v != null ? String(v) : "");
+  const idCompany = str(rawCtx.idAzienda || rawCtx.IDCOMPANY || rawCtx.company);
+  const idEmploy = str(rawCtx.idDipendente || rawCtx.IDEMPLOY || rawCtx.employ);
+  const m_cCheck = str(rawCtx.check || rawCtx.m_cCheck);
 
-  console.log(
-    `  [Session] idCompany="${idCompany}" ${idCompany ? "✅" : "⚠️  VUOTO"}`,
+  log.info(
+    `idCompany="${idCompany}" ${idCompany ? "✅" : "⚠️  VUOTO"}`,
   );
-  console.log(
-    `  [Session] idEmploy="${idEmploy}" ${idEmploy ? "✅" : "⚠️  VUOTO"}`,
+  log.info(
+    `idEmploy="${idEmploy}" ${idEmploy ? "✅" : "⚠️  VUOTO"}`,
   );
-  console.log(
-    `  [Session] m_cCheck="${m_cCheck}" ${m_cCheck ? "✅" : "⚠️  VUOTO"}`,
+  log.info(
+    `m_cCheck="${m_cCheck}" ${m_cCheck ? "✅" : "⚠️  VUOTO"}`,
   );
 
   if (!idCompany || !idEmploy || !m_cCheck) {
@@ -290,19 +289,19 @@ export async function startZucchettiSession(
           k.toLowerCase().includes("check"),
       );
     });
-    console.warn(
-      `  [Session] ⚠️  Variabili window rilevanti trovate: ${JSON.stringify(windowVars)}`,
+    log.warn(
+      `⚠️  Variabili window rilevanti trovate: ${JSON.stringify(windowVars)}`,
     );
   }
 
   // ── 10. Cookies ──────────────────────────────────────────────────────────
   const cookiesArray = await context.cookies();
   const cookies = cookiesArray.map((c) => `${c.name}=${c.value}`).join("; ");
-  console.log(`  [Session] Cookie estratti: ${cookiesArray.length} cookie`);
-  console.log(
-    `  [Session] Nomi cookie: [${cookiesArray.map((c) => c.name).join(", ")}]`,
+  log.info(`Cookie estratti: ${cookiesArray.length} cookie`);
+  log.info(
+    `Nomi cookie: [${cookiesArray.map((c) => c.name).join(", ")}]`,
   );
-  console.log(`  [Session] Sessione inizializzata con successo ✅`);
+  log.info("Sessione inizializzata con successo ✅");
 
   return {
     browser,

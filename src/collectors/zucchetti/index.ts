@@ -2,6 +2,9 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { spawn } from "node:child_process";
 import { readMeta, writeMeta, shouldSkipMonth } from "../utils";
+import { createLogger } from "../../logger";
+
+const log = createLogger("zucchetti");
 import type { ZucchettiDay } from "@shared/zucchetti";
 
 const ZUCC_DIR = path.join(process.cwd(), "data", "raw", "zucchetti");
@@ -85,11 +88,11 @@ export async function collectZucchetti(
       !isCurrentMonth &&
       shouldSkipMonth(meta[monthStr], monthStr, ["zucchetti"])
     ) {
-      console.log(`  Zucchetti: ${monthStr}: skip`);
+      log.info(`${monthStr}: skip`);
       outPaths.push(outPath);
     } else {
       try {
-        console.log(`  Zucchetti: raccolta ${monthStr}...`);
+        log.info(`raccolta ${monthStr}...`);
         const days = await collectMonth(year, month);
         await fs.writeFile(outPath, JSON.stringify(days, null, 2), "utf-8");
         await writeMeta(ZUCC_DIR, monthStr, {
@@ -98,7 +101,7 @@ export async function collectZucchetti(
         });
         outPaths.push(outPath);
       } catch (err) {
-        console.warn(`  Zucchetti ${monthStr}: ${(err as Error).message}`);
+        log.warn(`${monthStr}: ${(err as Error).message}`);
       }
     }
 
