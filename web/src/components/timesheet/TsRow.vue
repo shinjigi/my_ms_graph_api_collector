@@ -1,9 +1,9 @@
 <template>
     <tr class="hover text-xs" :class="{ 'pinned-row': isPinned }">
-        <td class="font-medium pl-3">
+        <td class="font-medium pl-3 truncate">
             <a :href="rowTpLink" target="_blank" class="hover:underline hover:text-primary transition-colors">{{ row.us }}</a>
         </td>
-        <td>
+        <td class="truncate">
             <span class="state-dot-wrap">
                 <span class="state-dot" :style="{ background: dotColor }"></span>
                 {{ stateAbbr }}
@@ -87,7 +87,13 @@ function selectDay(dayIdx: number) {
 const rowTpLink = makeTpLink(props.row.tpId);
 const dotColor  = computed(() => stateColor(props.row.state));
 const stateAbbr = computed(() =>
-    ({ 'Inception':'Inception', 'Dev/Unit test':'Dev', 'Testing':'Test' }[props.row.state] ?? props.row.state)
+    ({
+        'Inception': 'Inception',
+        'Dev/Unit test': 'Dev',
+        'Development / Unit test': 'Dev',
+        'Testing': 'Test',
+        'Done': 'Done',
+    }[props.row.state] ?? props.row.state)
 );
 const weHours = computed(() =>
     (ts.getHours(props.row.tpId, 5)) + (ts.getHours(props.row.tpId, 6))

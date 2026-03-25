@@ -285,13 +285,7 @@ export async function analyzeBatch(
       });
     } catch (err) {
       lastError = err as Error;
-      const msg = lastError.message;
-      log.error(`[${provider.name}] errore: ${msg}`);
-
-      // Fatal errors — do not try next provider
-      if (msg.includes("credit balance is too low")) {
-        throw lastError;
-      }
+      log.error(`[${provider.name}] errore: ${lastError.message}`);
     }
   }
 

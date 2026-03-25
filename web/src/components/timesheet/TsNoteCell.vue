@@ -3,7 +3,7 @@
         class="tc-note"
         :class="{ empty: !currentNote, editing: editing }"
         :title="currentNote || 'Aggiungi nota…'"
-        @click="startEdit"
+        @click.stop="startEdit"
     >
         <template v-if="!editing">{{ displayNote }}</template>
         <input

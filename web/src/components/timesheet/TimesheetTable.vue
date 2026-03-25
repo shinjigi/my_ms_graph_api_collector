@@ -7,14 +7,14 @@
         </div>
         <template v-else>
         <!-- Main table -->
-        <table class="table table-xs w-full" ref="mainTableRef" style="table-layout:fixed">
+        <table class="table table-fixed table-xs w-full" ref="mainTableRef">
             <colgroup>
-                <col style="width:auto; min-width:180px">
-                <col style="width:80px">
-                <col v-for="i in 5" :key="i" style="width:64px">
-                <col style="width:56px">
-                <col style="width:64px">
-                <col style="width:40px">
+                <col class="ts-col-name">
+                <col class="ts-col-state">
+                <col v-for="i in 5" :key="i" class="ts-col-day">
+                <col class="ts-col-we">
+                <col class="ts-col-tot">
+                <col class="ts-col-rem">
             </colgroup>
             <TsHeader />
             <TsTotals />
@@ -70,8 +70,8 @@
             <span class="ml-auto shrink-0 text-base-content/25">{{ filteredPinned.length }} / {{ ts.pinned.length }}</span>
         </div>
         <!-- Pinned scroll container -->
-        <div class="ts-pin-scroll">
-            <table class="table table-xs w-full" style="table-layout:fixed">
+        <div class="ts-pin-scroll" ref="pinScrollRef">
+            <table class="table table-fixed table-xs w-full">
                 <colgroup>
                     <col v-for="(w, i) in pinWidths" :key="i" :style="{ width: w }">
                 </colgroup>
@@ -90,7 +90,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useTimesheetStore }  from '../../stores/useTimesheetStore';
 import { useUiStore }         from '../../stores/useUiStore';
 import TsRow                  from './TsRow.vue';
@@ -135,24 +135,28 @@ const filteredPinned = computed(() => {
     });
 });
 
-// Sync pinned table column widths from the main table header
+// Sync pinned table column widths from main table header, compensating for scrollbar gutter
 const mainTableRef = ref<HTMLTableElement | null>(null);
+const pinScrollRef = ref<HTMLDivElement | null>(null);
 const pinWidths    = ref<string[]>([]);
 
-function syncPinCols() {
+function syncCols() {
     const ths = mainTableRef.value?.querySelectorAll('thead th');
-    if (!ths) return;
-    pinWidths.value = Array.from(ths).map(th => (th as HTMLElement).offsetWidth + 'px');
+    const pin = pinScrollRef.value;
+    if (!ths || !pin) return;
+    const gutter = pin.offsetWidth - pin.clientWidth;
+    pinWidths.value = Array.from(ths).map((th, i) => {
+        const w = (th as HTMLElement).offsetWidth;
+        return (i === 0 ? Math.max(180, w - gutter) : w) + 'px';
+    });
 }
 
-const ro = new ResizeObserver(() => syncPinCols());
+const ro = new ResizeObserver(syncCols);
 
 onMounted(() => {
-    nextTick(syncPinCols);
+    requestAnimationFrame(syncCols);
     if (mainTableRef.value) ro.observe(mainTableRef.value);
+    if (pinScrollRef.value) ro.observe(pinScrollRef.value);
 });
 onUnmounted(() => ro.disconnect());
-
-// Re-sync when data changes (active rows may change column distribution)
-watch(() => ts.active.length + ts.pinned.length, () => nextTick(syncPinCols));
 </script>
