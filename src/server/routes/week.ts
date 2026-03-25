@@ -8,11 +8,11 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { TargetprocessClient } from "../../targetprocess/client";
 import { parseTpDate, hhmmToHours } from "../../targetprocess/format";
-import type { AggregatedDay } from "../../analysis/aggregator";
 import type { WeekDayData } from "@shared/week";
 import type { SubmitEdit } from "@shared/submit";
 import { ZucchettiDay } from "@shared/zucchetti";
 import { getItalianHolidays, Holiday } from "@shared/holidays";
+import { AggregatedDay } from "@shared/aggregator";
 
 export const weekRouter = Router();
 

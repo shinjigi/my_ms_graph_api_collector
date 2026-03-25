@@ -8,17 +8,9 @@ import {
   shouldSkipMonth,
   lastDayOfMonth,
 } from "../utils";
+import { EmailRaw } from "@shared/aggregator";
 
 const EMAIL_DIR = path.join(process.cwd(), "data", "raw", "graph-email");
-
-export interface EmailRaw {
-  id: string;
-  subject: string;
-  from: { emailAddress: { name: string; address: string } } | null;
-  receivedDateTime: string;
-  bodyPreview: string;
-  webLink: string;
-}
 
 async function fetchMonthEmails(
   client: Client,

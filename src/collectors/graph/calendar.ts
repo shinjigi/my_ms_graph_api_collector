@@ -8,28 +8,9 @@ import {
   shouldSkipMonth,
   lastDayOfMonth,
 } from "../utils";
+import { CalendarEventRaw } from "@shared/aggregator";
 
 const CAL_DIR = path.join(process.cwd(), "data", "raw", "graph-calendar");
-
-interface AttendeeStatus {
-  response: string;
-}
-
-interface EmailAddress {
-  name: string;
-  address: string;
-}
-
-export interface CalendarEventRaw {
-  id: string;
-  subject: string;
-  start: { dateTime: string; timeZone: string };
-  end: { dateTime: string; timeZone: string };
-  organizer: { emailAddress: EmailAddress } | null;
-  attendees: Array<{ emailAddress: EmailAddress; status: AttendeeStatus }>;
-  isOnlineMeeting: boolean;
-  webLink: string;
-}
 
 async function fetchMonthEvents(
   client: Client,

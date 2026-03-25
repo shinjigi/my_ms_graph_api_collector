@@ -9,6 +9,7 @@ import {
   shouldSkipMonth,
   lastDayOfMonth,
 } from "../utils";
+import { SvnCommit } from "@shared/aggregator";
 
 function parseXml(xml: string): Promise<unknown> {
   return new Promise((resolve, reject) =>
@@ -18,14 +19,6 @@ function parseXml(xml: string): Promise<unknown> {
   );
 }
 const SVN_DIR = path.join(process.cwd(), "data", "raw", "svn");
-
-export interface SvnCommit {
-  revision: string;
-  author: string;
-  date: string; // YYYY-MM-DD
-  message: string;
-  paths: string[];
-}
 
 function runSvn(args: string[], svnBin: string): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -86,20 +79,19 @@ async function fetchMonthCommits(
   const entries: SvnLogEntry[] = parsed?.log?.logentry ?? [];
 
   const commits: SvnCommit[] = entries.flatMap((e) => {
-      const rawDate = (e.date ?? [])[0] ?? "";
-      const d = new Date(rawDate);
-      if (Number.isNaN(d.getTime())) return []; // property-change or merge-tracking entries have no date
-      return [
-        {
-          revision: e.$.revision,
-          author: (e.author ?? [""])[0],
-          date: d.toISOString().slice(0, 10),
-          message: ((e.msg ?? [""])[0] ?? "").trim(),
-          paths: (e.paths?.[0]?.path ?? []).map((p: { _: string }) => p._),
-        },
-      ];
-    },
-  );
+    const rawDate = (e.date ?? [])[0] ?? "";
+    const d = new Date(rawDate);
+    if (Number.isNaN(d.getTime())) return []; // property-change or merge-tracking entries have no date
+    return [
+      {
+        revision: e.$.revision,
+        author: (e.author ?? [""])[0],
+        date: d.toISOString().slice(0, 10),
+        message: ((e.msg ?? [""])[0] ?? "").trim(),
+        paths: (e.paths?.[0]?.path ?? []).map((p: { _: string }) => p._),
+      },
+    ];
+  });
 
   // Filter to only commits by the configured author
   if (authorFilter) {
