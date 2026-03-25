@@ -40,15 +40,15 @@ export class TargetprocessClient {
       .map(
         ([k, v]) =>
           `${encodeURIComponent(k)}=${encodeURIComponent(v)
-            .replace(/%2C/g, ",")
-            .replace(/%5B/g, "[")
-            .replace(/%5D/g, "]")
-            .replace(/%28/g, "(")
-            .replace(/%29/g, ")")
-            .replace(/%3D/g, "=")
-            .replace(/%7B/g, "{")
-            .replace(/%7D/g, "}")
-            .replace(/%2E/g, ".")}`,
+            .replaceAll(/%2C/g, ",")
+            .replaceAll(/%5B/g, "[")
+            .replaceAll(/%5D/g, "]")
+            .replaceAll(/%28/g, "(")
+            .replaceAll(/%29/g, ")")
+            .replaceAll(/%3D/g, "=")
+            .replaceAll(/%7B/g, "{")
+            .replaceAll(/%7D/g, "}")
+            .replaceAll(/%2E/g, ".")}`,
       )
       .join("&");
   }

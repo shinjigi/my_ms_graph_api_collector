@@ -103,7 +103,7 @@ async function runAnalysis(job: AnalysisJob, force: boolean): Promise<void> {
       }
 
       const day = await loadAggDay(date);
-      if (!day || !day.isWorkday) continue;
+      if (!day?.isWorkday) continue;
       daysToProcess.push(day);
     }
 

@@ -87,7 +87,7 @@ function formatTime(iso: string): string {
 }
 
 function stripHtml(html: string): string {
-    return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+    return html.replaceAll(/<[^>]*>/g, ' ').replaceAll(/\s+/g, ' ').trim();
 }
 
 function truncate(text: string, max: number): string {

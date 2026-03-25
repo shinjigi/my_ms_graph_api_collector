@@ -77,14 +77,16 @@ async function fetchChatMessagesSince(
   let nextLink: string | null = null;
 
   do {
-    const res = (nextLink
-      ? await c.api(nextLink).get()
-      : await c
-          .api(`/me/chats/${chatId}/messages`)
-          .orderby("lastModifiedDateTime desc")
-          .filter(`lastModifiedDateTime gt ${since}`)
-          .top(50)
-          .get()) as GraphPage<TeamsMessageRaw>;
+    const res = (
+      nextLink
+        ? await c.api(nextLink).get()
+        : await c
+            .api(`/me/chats/${chatId}/messages`)
+            .orderby("lastModifiedDateTime desc")
+            .filter(`lastModifiedDateTime gt ${since}`)
+            .top(50)
+            .get()
+    ) as GraphPage<TeamsMessageRaw>;
 
     const page: TeamsMessageRaw[] = res.value ?? [];
     nextLink = res["@odata.nextLink"] ?? null;
@@ -118,13 +120,15 @@ export async function collectGraphTeams(
   let chatsNextLink: string | null = null;
 
   do {
-    const res = (chatsNextLink
-      ? await client.api(chatsNextLink).get()
-      : await client
-          .api("/me/chats")
-          .select("id,topic,chatType,lastUpdatedDateTime")
-          .top(50)
-          .get()) as GraphPage<GraphChat>;
+    const res = (
+      chatsNextLink
+        ? await client.api(chatsNextLink).get()
+        : await client
+            .api("/me/chats")
+            .select("id,topic,chatType,lastUpdatedDateTime")
+            .top(50)
+            .get()
+    ) as GraphPage<GraphChat>;
 
     allChats.push(...(res.value ?? []));
     chatsNextLink = res["@odata.nextLink"] ?? null;
@@ -218,7 +222,7 @@ export async function collectGraphTeams(
   const existingFiles = await fs.readdir(TEAMS_DIR).catch(() => [] as string[]);
   for (const f of existingFiles) {
     if (!/^\d{4}-\d{2}\.json$/.test(f)) continue;
-    const month = f.replace(".json", "");
+    const month = f.replaceAll(".json", "");
     if (!byMonth.has(month) && meta[month]) {
       console.log(`  [Teams] ${month}: skip (nessun nuovo messaggio)`);
       outPaths.push(path.join(TEAMS_DIR, f));
