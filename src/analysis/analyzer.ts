@@ -170,6 +170,63 @@ export function buildProviders(forceProvider?: string): AnalyzerProvider[] {
   return [all["claude"], all["ollama"], all["gemini"], all["cli"]];
 }
 
+/** Adds `days` calendar days to a YYYY-MM-DD string. */
+function shiftDate(dateStr: string, days: number): string {
+  const d = new Date(dateStr);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Filters KB items to those relevant to the analysis period.
+ * Open items (isFinalState === false) are always kept.
+ * Closed items are kept only if created or last active within the window.
+ */
+function filterKbByPeriod(items: KbEntry[], batchDates: string[]): KbEntry[] {
+  if (batchDates.length === 0) return items;
+  const windowDays  = Number(process.env["KB_RELEVANCE_WINDOW_DAYS"] ?? 90);
+  const batchMin    = batchDates.reduce((a, b) => (a < b ? a : b));
+  const batchMax    = batchDates.reduce((a, b) => (a > b ? a : b));
+  const windowStart = shiftDate(batchMin, -windowDays);
+  const windowEnd   = shiftDate(batchMax,  windowDays);
+
+  return items.filter((e) => {
+    if (!e.createDate)          return true;   // legacy entry — keep
+    if (e.isFinalState === false) return true; // still open — always keep
+    // Closed or unknown: keep only if created or active within window
+    const inWindow =
+      (e.createDate >= windowStart && e.createDate <= windowEnd) ||
+      (e.lastActivityDate != null && e.lastActivityDate >= windowStart);
+    return inWindow;
+  });
+}
+
+/** Sorts KB items by relevance to the batch period (most relevant first). */
+function sortKbByRelevance(items: KbEntry[], batchDates: string[]): KbEntry[] {
+  if (batchDates.length === 0) return items;
+  const batchSet    = new Set(batchDates);
+  const batchMin    = batchDates.reduce((a, b) => (a < b ? a : b));
+  const windowDays  = Number(process.env["KB_RELEVANCE_WINDOW_DAYS"] ?? 90);
+  const windowStart = shiftDate(batchMin, -windowDays);
+
+  const score = (e: KbEntry): number => {
+    let s = 0;
+    if (e.lastActivityDate) {
+      if (batchSet.has(e.lastActivityDate))      s += 3;
+      else if (e.lastActivityDate >= windowStart) s += 2;
+      else                                        s += 1;
+    }
+    if (e.isFinalState === false) s += 1;
+    return s;
+  };
+
+  return [...items].sort((a, b) => {
+    const ds = score(b) - score(a);
+    if (ds !== 0) return ds;
+    return (b.lastActivityDate ?? "").localeCompare(a.lastActivityDate ?? "");
+  });
+}
+
 /** Truncate KB items to fit within a character budget (for small-context providers). */
 function fitKbItems(items: KbEntry[], budgetChars: number): KbEntry[] {
   let total = 0;
@@ -192,14 +249,19 @@ export async function analyzeBatch(
 ): Promise<DayProposal[]> {
   const system = buildSystemPrompt();
 
+  const batchDates   = batch.map((d) => d.date);
+  const filteredKb   = filterKbByPeriod(kbItems, batchDates);
+  const sortedKb     = sortKbByRelevance(filteredKb, batchDates);
+  log.info(`KB filtrata: ${sortedKb.length}/${kbItems.length} items per il periodo`);
+
   let lastError: Error | null = null;
   for (const provider of providers) {
     // Fit KB items within 60% of the provider's budget — leave the rest for day data + response
-    const kbBudgetChars  = Math.floor(provider.maxInputChars * 0.6);
-    const kbItemsForProvider = fitKbItems(kbItems, kbBudgetChars);
-    if (kbItemsForProvider.length < kbItems.length) {
+    const kbBudgetChars      = Math.floor(provider.maxInputChars * 0.6);
+    const kbItemsForProvider = fitKbItems(sortedKb, kbBudgetChars);
+    if (kbItemsForProvider.length < sortedKb.length) {
       log.warn(
-        `[${provider.name}] KB ridotto: ${kbItemsForProvider.length}/${kbItems.length} items (budget ${kbBudgetChars} chars)`,
+        `[${provider.name}] KB ridotto: ${kbItemsForProvider.length}/${sortedKb.length} items (budget ${kbBudgetChars} chars)`,
       );
     }
 

@@ -1,3 +1,23 @@
+/** Normalizes a display name: trims, collapses whitespace, canonical apostrophes, NFC. */
+export function normalizeName(s: string): string {
+  return s.trim().replace(/\s+/g, " ").replace(/['']/g, "'").normalize("NFC");
+}
+
+/** Case-insensitive normalized equality. */
+export function nameEquals(a: string, b: string): boolean {
+  return normalizeName(a).toLowerCase() === normalizeName(b).toLowerCase();
+}
+
+/** Build a lookup Set of normalized lowercase names for fast membership checks. */
+export function nameSet(names: Iterable<string>): Set<string> {
+  return new Set([...names].map((n) => normalizeName(n).toLowerCase()));
+}
+
+/** Returns true if the normalized lowercase name is in the set. */
+export function nameSetHas(set: Set<string>, name: string): boolean {
+  return set.has(normalizeName(name).toLowerCase());
+}
+
 export function hasJsonFlag(): boolean {
   return process.argv.includes("--json");
 }
