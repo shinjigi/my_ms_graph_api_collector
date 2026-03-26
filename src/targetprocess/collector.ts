@@ -22,6 +22,7 @@ import { TargetprocessClient } from "./client";
 import { AnalysisPrompts } from "./prompts";
 import type { TpOpenItem, TpUserStat, TpTimeEntry } from "./types";
 import type { KbEntry, KbStore } from "@shared/kb";
+import { parseTpDate, nameSet, nameSetHas } from "./format";
 
 const logger = createLogger("collector");
 
@@ -90,7 +91,7 @@ const KB_FILE = path.join(KB_DIR, "us-summaries.json");
 const ENRICHED_DIR = path.join(process.cwd(), "data", "raw", "targetprocess");
 
 // ─── Priority colleagues ──────────────────────────────────────────────────────
-const COLLEAGUES_PRIORITY = new Set([
+const COLLEAGUES_PRIORITY = nameSet([
   "Flavio Passera",
   "Marco Anselmo",
   "Michela Della Misericordia",
@@ -100,6 +101,7 @@ const COLLEAGUES_PRIORITY = new Set([
   "Sara Fiano",
   "Marcella Nardone",
   "Matteo D'Amario",
+  "Team ITA Web",
 ]);
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -272,16 +274,34 @@ function applyResults(
       );
       continue;
     }
+    const timeEntryDates = original.logs
+      .map((l) => parseTpDate(l.Date))
+      .filter((d) => d !== "-");
+    const maxTimeEntry =
+      timeEntryDates.length > 0
+        ? timeEntryDates.reduce((a, b) => (a > b ? a : b))
+        : undefined;
+    const stateDate        = original.item.lastStateChangeDate;
+    const lastActivityDate =
+      maxTimeEntry && stateDate
+        ? maxTimeEntry > stateDate ? maxTimeEntry : stateDate
+        : (maxTimeEntry ?? stateDate);
+
     kbMap.set(result.id, {
-      id: original.item.id,
-      entityType: original.item.entityType,
-      projectName: original.item.projectName,
-      name: original.item.name,
-      summary: result.summary ?? "",
-      tags: result.tags ?? [],
-      userActivities: result.userActivities ?? {},
-      stakeholders: (result.stakeholders || result.stakeholder) ?? [],
-      cachedAt: new Date().toISOString(),
+      id:                   original.item.id,
+      entityType:           original.item.entityType,
+      projectName:          original.item.projectName,
+      name:                 original.item.name,
+      summary:              result.summary ?? "",
+      tags:                 result.tags ?? [],
+      userActivities:       result.userActivities ?? {},
+      stakeholders:         (result.stakeholders || result.stakeholder) ?? [],
+      cachedAt:             new Date().toISOString(),
+      createDate:           original.item.createDate,
+      currentState:         original.item.stateName,
+      isFinalState:         original.item.isFinalState,
+      lastStateChangeDate:  stateDate,
+      lastActivityDate,
     });
     batchIds.delete(result.id);
   }
@@ -532,113 +552,105 @@ function buildProviders(forceProvider?: string): KbCollectorProvider[] {
   return [all["claude"], all["gemini"]];
 }
 
-// ─── CLI entry point ──────────────────────────────────────────────────────────
-async function run(): Promise<void> {
-  const updateKb = process.argv.includes("--update-kb");
-  const force = process.argv.includes("--force");
-  const providerArg = process.argv
-    .find((a) => a.startsWith("--provider="))
-    ?.split("=")[1];
-  const fromEnriched = process.argv
-    .find((a) => a.startsWith("--from-enriched="))
-    ?.split("=")
-    .slice(1)
-    .join("=");
-  const fromAiResponse = process.argv
-    .find((a) => a.startsWith("--from-ai-response="))
-    ?.split("=")
-    .slice(1)
-    .join("=");
+// ─── CLI helpers ──────────────────────────────────────────────────────────────
+interface RunArgs {
+  updateKb:      boolean;
+  force:         boolean;
+  providerArg?:  string;
+  fromEnriched?: string;
+  fromAiResponse?: string;
+}
 
-  if (!updateKb) {
-    logger.info(
-      "Usage: tsx src/targetprocess/collector.ts --update-kb [--force] [--provider=claude|gemini]",
-    );
-    logger.info(
-      "       tsx src/targetprocess/collector.ts --update-kb --from-enriched=<path> [--from-ai-response=<path>]",
-    );
-    process.exit(0);
+function parseRunArgs(): RunArgs {
+  const argv          = process.argv;
+  const findArg       = (prefix: string) =>
+    argv.find((a) => a.startsWith(prefix))?.split("=").slice(1).join("=");
+
+  return {
+    updateKb:       argv.includes("--update-kb"),
+    force:          argv.includes("--force"),
+    providerArg:    findArg("--provider="),
+    fromEnriched:   findArg("--from-enriched="),
+    fromAiResponse: findArg("--from-ai-response="),
+  };
+}
+
+async function runEnrichmentFromApi(
+  client: TargetprocessClient,
+  kbMap: Map<number, KbEntry>,
+  force: boolean,
+): Promise<EnrichedItem[]> {
+  logger.info("Recupero item assegnati da TargetProcess...");
+  const me    = await client.getMe();
+  const items = await client.getMyAssignedOpenItems();
+  logger.info(`Trovati ${items.length} open item.`);
+
+  const toProcess = items.filter(
+    (item) => force || !kbMap.has(item.id) || kbMap.get(item.id)!.name !== item.name,
+  );
+
+  if (toProcess.length === 0) {
+    logger.info("Nessun item da aggiornare.");
+    return [];
   }
 
-  const kb = await loadKb();
-  const kbMap = new Map<number, KbEntry>(kb.items.map((e) => [e.id, e]));
+  // Phase A — cheap pre-filter before HTTP calls
+  const myNameNorm       = nameSet([me.FullName]);
+  const isRelevantByMeta = (item: TpOpenItem): boolean =>
+    nameSetHas(myNameNorm, item.owner) ||
+    nameSetHas(COLLEAGUES_PRIORITY, item.owner) ||
+    item.assignments.some(
+      (a) => nameSetHas(myNameNorm, a.fullName) || nameSetHas(COLLEAGUES_PRIORITY, a.fullName),
+    );
 
-  // ── Enrichment phase ─────────────────────────────────────────────────────
-  let enriched: EnrichedItem[];
-
-  if (fromEnriched) {
-    logger.info(`Carico enriched da file: ${fromEnriched}`);
-    const loaded = await loadEnriched(fromEnriched);
-    enriched = loaded.items;
+  const preFiltered = toProcess.filter(isRelevantByMeta);
+  if (preFiltered.length < toProcess.length) {
     logger.info(
-      `Caricati ${enriched.length} item (userId=${loaded.userId}, user=${loaded.userName}).`,
+      `Pre-filtro: scartati ${toProcess.length - preFiltered.length} item senza coinvolgimento del team`,
     );
-  } else {
-    const client = new TargetprocessClient();
-
-    logger.info("Recupero item assegnati da TargetProcess...");
-    const me = await client.getMe();
-    const items = await client.getMyAssignedOpenItems();
-    logger.info(`Trovati ${items.length} open item.`);
-
-    // Filter items that need updating
-    const toProcess: TpOpenItem[] = items.filter(
-      (item) =>
-        force || !kbMap.has(item.id) || kbMap.get(item.id)!.name !== item.name,
-    );
-
-    if (toProcess.length === 0) {
-      logger.info("Nessun item da aggiornare.");
-      return;
-    }
-
-    logger.info(`Arricchimento ${toProcess.length} item (stats + log)...`);
-    enriched = [];
-
-    for (const item of toProcess) {
-      const stats = await client.getAssignableStatistics(item.id);
-      const logs = await client.getTimesByAssignable(item.id);
-
-      const hasMyHours = stats.some(
-        (s) => s.userName === me.FullName && s.totalHours > 0,
-      );
-      const hasColleagueHours = stats.some(
-        (s) => COLLEAGUES_PRIORITY.has(s.userName) && s.totalHours > 0,
-      );
-      const hasColleagueAssigned =
-        item.assignments?.some((a) => COLLEAGUES_PRIORITY.has(a)) ?? false;
-
-      enriched.push({
-        item,
-        stats,
-        logs,
-        priority: hasMyHours
-          ? 4
-          : hasColleagueHours
-            ? 3
-            : hasColleagueAssigned
-              ? 2
-              : 1,
-      });
-    }
-
-    // High-priority items first (my hours > colleague hours > colleague assigned > rest), then by ID desc
-    enriched.sort((a, b) =>
-      b.priority !== a.priority
-        ? b.priority - a.priority
-        : b.item.id - a.item.id,
-    );
-
-    // Persist enriched data before calling AI — enables offline replay
-    const enrichedPath = await saveEnriched(enriched, me.Id, me.FullName);
-    logger.info(`Enriched salvato: ${enrichedPath}`);
   }
 
-  // ── Provider phase ───────────────────────────────────────────────────────
-  const providers = fromAiResponse
-    ? [new ReplayProvider(fromAiResponse)]
-    : buildProviders(providerArg);
+  logger.info(`Arricchimento ${preFiltered.length} item (stats + log)...`);
+  const enriched: EnrichedItem[] = [];
 
+  for (const item of preFiltered) {
+    const stats = await client.getAssignableStatistics(item.id);
+    const logs  = await client.getTimesByAssignable(item.id);
+
+    const hasMyHours           = stats.some((s) => nameSetHas(myNameNorm, s.userName) && s.totalHours > 0);
+    const hasColleagueHours    = stats.some((s) => nameSetHas(COLLEAGUES_PRIORITY, s.userName) && s.totalHours > 0);
+    const hasColleagueAssigned = item.assignments.some((a) => nameSetHas(COLLEAGUES_PRIORITY, a.fullName));
+    const ownerIsRelevant      = nameSetHas(myNameNorm, item.owner) || nameSetHas(COLLEAGUES_PRIORITY, item.owner);
+
+    // Phase B — post-filter: discard if no actual team involvement
+    if (!hasMyHours && !hasColleagueHours && !hasColleagueAssigned && !ownerIsRelevant) {
+      logger.debug(`Post-filtro: scartato item #${item.id} "${item.name}" — nessun coinvolgimento del team`);
+      continue;
+    }
+
+    enriched.push({
+      item,
+      stats,
+      logs,
+      priority: hasMyHours ? 4 : hasColleagueHours ? 3 : hasColleagueAssigned ? 2 : 1,
+    });
+  }
+
+  // High-priority first (my hours > colleague hours > colleague assigned > rest), then by ID desc
+  enriched.sort((a, b) =>
+    b.priority !== a.priority ? b.priority - a.priority : b.item.id - a.item.id,
+  );
+
+  const enrichedPath = await saveEnriched(enriched, me.Id, me.FullName);
+  logger.info(`Enriched salvato: ${enrichedPath}`);
+  return enriched;
+}
+
+async function runProviderPhase(
+  enriched: EnrichedItem[],
+  kbMap: Map<number, KbEntry>,
+  providers: KbCollectorProvider[],
+): Promise<void> {
   logger.info(`Provider chain: ${providers.map((p) => p.name).join(" → ")}`);
 
   for (const provider of providers) {
@@ -646,7 +658,6 @@ async function run(): Promise<void> {
       logger.warn(`[${provider.name}] non disponibile, skip`);
       continue;
     }
-
     try {
       logger.info(`[${provider.name}] avvio raccolta...`);
       await provider.collect(enriched, kbMap);
@@ -659,6 +670,55 @@ async function run(): Promise<void> {
   }
 
   throw new Error("Tutti i provider hanno fallito.");
+}
+
+// ─── CLI entry point ──────────────────────────────────────────────────────────
+async function run(): Promise<void> {
+  const args = parseRunArgs();
+
+  if (!args.updateKb) {
+    logger.info(
+      "Usage: tsx src/targetprocess/collector.ts --update-kb [--force] [--provider=claude|gemini]",
+    );
+    logger.info(
+      "       tsx src/targetprocess/collector.ts --update-kb --from-enriched=<path> [--from-ai-response=<path>]",
+    );
+    process.exit(0);
+  }
+
+  const kb    = await loadKb();
+  const kbMap = new Map<number, KbEntry>(kb.items.map((e) => [e.id, e]));
+
+  // ── Enrichment phase ─────────────────────────────────────────────────────
+  let enriched: EnrichedItem[];
+
+  // Auto-detect today's enriched file when --from-enriched is not explicit and --force is not set
+  const todayEnrichedPath = path.join(
+    ENRICHED_DIR,
+    `enriched-${new Date().toISOString().slice(0, 10)}.json`,
+  );
+  const enrichedSource = args.fromEnriched ?? (
+    !args.force && await fs.access(todayEnrichedPath).then(() => true).catch(() => false)
+      ? todayEnrichedPath
+      : undefined
+  );
+
+  if (enrichedSource) {
+    logger.info(`Carico enriched da file: ${enrichedSource}`);
+    const loaded = await loadEnriched(enrichedSource);
+    enriched     = loaded.items;
+    logger.info(`Caricati ${enriched.length} item (userId=${loaded.userId}, user=${loaded.userName}).`);
+  } else {
+    enriched = await runEnrichmentFromApi(new TargetprocessClient(), kbMap, args.force);
+    if (enriched.length === 0) return;
+  }
+
+  // ── Provider phase ────────────────────────────────────────────────────────
+  const providers = args.fromAiResponse
+    ? [new ReplayProvider(args.fromAiResponse)]
+    : buildProviders(args.providerArg);
+
+  await runProviderPhase(enriched, kbMap, providers);
 }
 
 run().catch((err: Error) => {

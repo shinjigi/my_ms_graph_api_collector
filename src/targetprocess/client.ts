@@ -3,6 +3,8 @@ import * as dotenv from "dotenv";
 import type {
   TpProject,
   TpEntityRef,
+  TpAssignment,
+  TpAssignmentEntry,
   TpUserStory,
   TpUserStoryDetail,
   TpTask,
@@ -14,9 +16,16 @@ import type {
   TpListV2,
   TpUserStat,
 } from "./types";
-import { parseTpDate } from "./format";
+import { parseTpDate, normalizeName } from "./format";
 
 dotenv.config();
+
+function toAssignmentEntries(raw: TpAssignment[]): TpAssignmentEntry[] {
+  return raw.map((a) => ({
+    fullName: normalizeName(a.GeneralUser.FullName),
+    role:     a.Role?.Name ?? "",
+  }));
+}
 
 export class TargetprocessClient {
   private readonly baseUrl: string;
@@ -229,75 +238,75 @@ export class TargetprocessClient {
     const me = await this.getMe();
     const items: TpOpenItem[] = [];
 
-    type TpUserStoryWithExtra = TpUserStory & {
+    type EntityStateWithFinal = TpEntityRef & { IsFinal: boolean };
+    type WithExtra = {
       TimeSpent: number;
       Project: { Id: number; Name: string } | null;
+      EntityState: EntityStateWithFinal | null;
+      LastStateChangeDate?: string;
+      CreateDate?: string;
     };
 
     // NOTE: TP v1 does not support boolean filters (EntityState.IsFinal eq false raises a 400).
     // We fetch all assigned items and filter client-side by EntityState.IsFinal.
 
     // Fetch UserStories assigned to me
-    const usResult = await this.request<
-      TpList<
-        TpUserStoryWithExtra & {
-          EntityState: (TpEntityRef & { IsFinal: boolean }) | null;
-        }
-      >
-    >("v1", "UserStories", {
-      where: `(Assignments.GeneralUser.Id eq ${me.Id})`,
-      include:
-        "[Id,Name,Description,EntityState[Name,IsFinal],TimeSpent,Project[Id,Name],Owner[FullName],Assignments[GeneralUser[FullName]]]",
-      take: "200",
-    });
+    const usResult = await this.request<TpList<TpUserStory & WithExtra>>(
+      "v1",
+      "UserStories",
+      {
+        where:   `(Assignments.GeneralUser.Id eq ${me.Id})`,
+        include: "[Id,Name,Description,EntityState[Name,IsFinal],TimeSpent,Project[Id,Name],Owner[FullName],Assignments[GeneralUser[FullName],Role[Name]],CreateDate,LastStateChangeDate]",
+        take:    "200",
+      },
+    );
 
     for (const us of usResult.Items) {
       if (us.EntityState?.IsFinal) continue;
       items.push({
-        id: us.Id,
-        name: us.Name,
-        description: us.Description,
-        entityType: "UserStory",
-        stateName: us.EntityState?.Name ?? "",
-        timeSpent: us.TimeSpent ?? 0,
-        projectName: us.Project?.Name ?? "",
-        parentName: null,
-        owner: us.Owner?.FullName || "N/A",
-        assignments:
-          us.Assignments?.Items.map((a) => a.GeneralUser.FullName) || [],
+        id:                   us.Id,
+        name:                 us.Name,
+        description:          us.Description,
+        entityType:           "UserStory",
+        stateName:            us.EntityState?.Name ?? "",
+        isFinalState:         us.EntityState?.IsFinal ?? false,
+        timeSpent:            us.TimeSpent ?? 0,
+        projectName:          us.Project?.Name ?? "",
+        parentName:           null,
+        owner:                normalizeName(us.Owner?.FullName ?? "N/A"),
+        assignments:          toAssignmentEntries(us.Assignments?.Items ?? []),
+        createDate:           us.CreateDate ? parseTpDate(us.CreateDate) : undefined,
+        lastStateChangeDate:  us.LastStateChangeDate ? parseTpDate(us.LastStateChangeDate) : undefined,
       });
     }
 
     // Fetch Tasks assigned to me
-    const taskResult = await this.request<
-      TpList<
-        TpTask & { EntityState: (TpEntityRef & { IsFinal: boolean }) | null }
-      >
-    >("v1", "Tasks", {
-      where: `(Assignments.GeneralUser.Id eq ${me.Id})`,
-      include:
-        "[Id,Name,Description,EntityState[Name,IsFinal],TimeSpent,Project[Id,Name],UserStory[Id,Name,Owner[FullName]],Owner[FullName],Assignments[GeneralUser[FullName]]]",
-      take: "200",
-    });
+    const taskResult = await this.request<TpList<TpTask & WithExtra>>(
+      "v1",
+      "Tasks",
+      {
+        where:   `(Assignments.GeneralUser.Id eq ${me.Id})`,
+        include: "[Id,Name,Description,EntityState[Name,IsFinal],TimeSpent,Project[Id,Name],UserStory[Id,Name,Owner[FullName]],Owner[FullName],Assignments[GeneralUser[FullName],Role[Name]],CreateDate,LastStateChangeDate]",
+        take:    "200",
+      },
+    );
 
     for (const task of taskResult.Items) {
-      if (
-        (task.EntityState as (TpEntityRef & { IsFinal?: boolean }) | null)
-          ?.IsFinal
-      )
-        continue;
+      if (task.EntityState?.IsFinal) continue;
       items.push({
-        id: task.Id,
-        name: task.Name,
-        description: task.Description,
-        entityType: "Task",
-        stateName: task.EntityState?.Name ?? "",
-        timeSpent: task.TimeSpent ?? 0,
-        projectName: task.Project?.Name ?? "",
-        parentName: task.UserStory?.Name ?? null,
-        owner: task.Owner?.FullName || "N/A",
-        assignments:
-          task.Assignments?.Items.map((a) => a.GeneralUser.FullName) || [],
+        id:                   task.Id,
+        name:                 task.Name,
+        description:          task.Description,
+        entityType:           "Task",
+        stateName:            task.EntityState?.Name ?? "",
+        isFinalState:         task.EntityState?.IsFinal ?? false,
+        timeSpent:            task.TimeSpent ?? 0,
+        projectName:          task.Project?.Name ?? "",
+        parentName:           task.UserStory?.Name ?? null,
+        owner:                normalizeName(task.Owner?.FullName ?? "N/A"),
+        assignments:          toAssignmentEntries(task.Assignments?.Items ?? []),
+        createDate:           task.CreateDate ? parseTpDate(task.CreateDate) : undefined,
+        lastStateChangeDate:  task.LastStateChangeDate ? parseTpDate(task.LastStateChangeDate) : undefined,
       });
     }
 
@@ -378,17 +387,17 @@ export class TargetprocessClient {
 
     for (const us of usResult.Items) {
       items.push({
-        id: us.Id,
-        name: us.Name,
-        description: us.Description,
-        entityType: "UserStory",
-        stateName: us.EntityState?.Name ?? "",
-        timeSpent: us.TimeSpent ?? 0,
-        projectName: us.Project?.Name ?? "",
-        parentName: null,
-        owner: us.Owner?.FullName || "N/A",
-        assignments:
-          us.Assignments?.Items.map((a) => a.GeneralUser.FullName) || [],
+        id:           us.Id,
+        name:         us.Name,
+        description:  us.Description,
+        entityType:   "UserStory",
+        stateName:    (us.EntityState as (TpEntityRef & { IsFinal?: boolean }) | null)?.Name ?? "",
+        isFinalState: (us.EntityState as (TpEntityRef & { IsFinal?: boolean }) | null)?.IsFinal ?? false,
+        timeSpent:    us.TimeSpent ?? 0,
+        projectName:  us.Project?.Name ?? "",
+        parentName:   null,
+        owner:        normalizeName(us.Owner?.FullName ?? "N/A"),
+        assignments:  toAssignmentEntries(us.Assignments?.Items ?? []),
       });
     }
 

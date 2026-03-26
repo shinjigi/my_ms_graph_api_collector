@@ -15,6 +15,12 @@ export interface TpUserRef {
 
 export interface TpAssignment {
   GeneralUser: TpUserRef;
+  Role: { Id: number; Name: string } | null;
+}
+
+export interface TpAssignmentEntry {
+  fullName: string;   // normalized display name
+  role:     string;   // e.g. "Developer (Realisator)", "" if null
 }
 
 export interface TpUserStory {
@@ -53,16 +59,19 @@ export interface TpTask {
 }
 
 export interface TpOpenItem {
-  id: number;
-  name: string;
-  description: string | null;
-  entityType: "UserStory" | "Task" | "Bug";
-  stateName: string;
-  timeSpent: number;
-  projectName: string;
-  parentName: string | null;
-  owner: string;
-  assignments: string[];
+  id:                   number;
+  name:                 string;
+  description:          string | null;
+  entityType:           "UserStory" | "Task" | "Bug";
+  stateName:            string;
+  isFinalState:         boolean;
+  timeSpent:            number;
+  projectName:          string;
+  parentName:           string | null;
+  owner:                string;   // normalized
+  assignments:          TpAssignmentEntry[];
+  createDate?:          string;   // YYYY-MM-DD
+  lastStateChangeDate?: string;   // YYYY-MM-DD
 }
 
 export interface TpTimeEntry {
