@@ -3,5 +3,6 @@ node_modules/
 .token-cache.json
 data/
 .env copy
+.claude/settings.local.json
 web/dist/
 .automation-chrome/nibol/
