@@ -80,6 +80,25 @@ export const useTimesheetStore = defineStore(
           days.value.map((d) => d.date),
         );
 
+        // Count VCS commits per task per day by parsing "#XXXXXX" refs in commit messages
+        const taskIdRe = /#(\d{5,6})\b/g;
+        const gitCounts = new Map<string, number>(); // key: "tpId_dayIdx"
+        const svnCounts = new Map<string, number>();
+        weekRes.days.forEach((d, di) => {
+          for (const c of d.gitCommits ?? []) {
+            for (const m of [...c.message.matchAll(taskIdRe)]) {
+              const k = `${m[1]}_${di}`;
+              gitCounts.set(k, (gitCounts.get(k) ?? 0) + 1);
+            }
+          }
+          for (const c of d.svnCommits ?? []) {
+            for (const m of [...c.message.matchAll(taskIdRe)]) {
+              const k = `${m[1]}_${di}`;
+              svnCounts.set(k, (svnCounts.get(k) ?? 0) + 1);
+            }
+          }
+        });
+
         // Map entries to rows; split active (has hours this week) vs pinned (no hours yet)
         const allRows = tpData.entries.map((e: any) => ({
           project: e.projectName,
@@ -89,6 +108,8 @@ export const useTimesheetStore = defineStore(
           totAllTime: e.timeSpent,
           hours: [...e.hours, 0, 0], // Pad to 7 (Mon-Sun)
           notes: [...(e.notes ?? [null, null, null, null, null]), null, null], // Pad to 7
+          git: Array.from({ length: 7 }, (_, i) => gitCounts.get(`${e.tpId}_${i}`) ?? 0),
+          svn: Array.from({ length: 7 }, (_, i) => svnCounts.get(`${e.tpId}_${i}`) ?? 0),
         }));
 
         // Items with at least one hour logged this week → active (prominent)
@@ -261,7 +282,7 @@ export const useTimesheetStore = defineStore(
           dayIdx,
           hours,
           date,
-          description: noteEdits.value[key] ?? "",
+          description: getNote(tpId, dayIdx),
         });
       }
       return edits;
@@ -329,6 +350,7 @@ export const useTimesheetStore = defineStore(
       clearEdits,
       schedulePromotion,
       fetchWeekData,
+      buildEdits,
       submitWeekHours,
       submitDayHours,
       totalsRow,

@@ -112,8 +112,8 @@ export const useDayStore = defineStore(
             tpHours: ts.getHours(r.tpId, dayIdx),
             zucHours: WORKDAY_HOURS,
             emails: 0,
-            commits: 0,
-            meetings: 0,
+            commits: (r.git?.[dayIdx] ?? 0) + (r.svn?.[dayIdx] ?? 0),
+            meetings: calEvents.length,
             color: stateColor(r.state),
             note: ts.getNote(r.tpId, dayIdx),
           }));
@@ -141,7 +141,9 @@ export const useDayStore = defineStore(
     );
 
     const quickLog = computed<QuickLogItem[]>(() => {
-      const ts = useTimesheetStore();
+      const ts      = useTimesheetStore();
+      const picker  = usePickerStore();
+      const dayIdx  = picker.selectedDayIdx;
       const inToday = new Set(usToday.value.map((u) => u.tpId));
       return [...ts.active, ...ts.pinned]
         .filter((r) => !inToday.has(r.tpId))
@@ -152,7 +154,7 @@ export const useDayStore = defineStore(
           tpHours: 0,
           zucHours: WORKDAY_HOURS,
           emails: 0,
-          commits: r.git?.[4] ?? 0,
+          commits: dayIdx >= 0 ? (r.git?.[dayIdx] ?? 0) + (r.svn?.[dayIdx] ?? 0) : 0,
           meetings: 0,
           color: stateColor(r.state),
           note: "",

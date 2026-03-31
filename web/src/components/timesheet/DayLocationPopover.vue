@@ -21,12 +21,18 @@
                 </div>
             </div>
 
-            <!-- Zucchetti giustificativi -->
-            <div v-if="giust.length > 0" class="mb-3">
-                <div class="text-xs font-semibold text-base-content/50 uppercase tracking-wide mb-1">Giustificativi Zucchetti</div>
+            <!-- Zucchetti giustificativi + richieste -->
+            <div v-if="giust.length > 0 || richieste.length > 0" class="mb-3">
+                <div class="text-xs font-semibold text-base-content/50 uppercase tracking-wide mb-1">Zucchetti</div>
                 <div class="flex flex-wrap gap-1">
                     <span v-for="g in giust" :key="g.text"
                           class="badge badge-sm badge-ghost text-xs">{{ g.text }}</span>
+                    <span v-for="r in richieste" :key="r.text + r.status"
+                          class="badge badge-sm text-xs"
+                          :class="r.status === 'Approvata' ? 'badge-success' : r.status === 'Cancellata' ? 'badge-error opacity-50' : 'badge-warning'"
+                          :title="r.status">
+                        ⌛ {{ r.text }}
+                    </span>
                 </div>
             </div>
 
@@ -42,21 +48,45 @@
             </div>
             <div v-else class="mb-3 text-xs text-base-content/30 italic">Nessun segnale di lavoro rilevato</div>
 
-            <!-- Declarations (moved from TsZucchettiBar) -->
-            <div class="mb-3">
+            <!-- Declarations — hidden for holidays -->
+            <div v-if="!dayData?.holiday" class="mb-3">
                 <div class="text-xs font-semibold text-base-content/50 uppercase tracking-wide mb-1.5">Dichiara su Zucchetti</div>
                 <div class="flex flex-wrap gap-1.5">
-                    <button class="btn btn-xs btn-outline gap-1" :disabled="busy" @click="doAction('SMART WORKING', true, WORKDAY_HOURS)">
-                        🏠 SW giornata
+                    <!-- SW giornata -->
+                    <button class="btn btn-xs gap-1"
+                            :class="hasActivity('SMART WORKING') ? 'btn-success btn-outline' : 'btn-outline'"
+                            :disabled="anyBusy || hasActivity('SMART WORKING')"
+                            @click="doAction('SW_FULL', 'SMART WORKING', true, WORKDAY_HOURS)">
+                        <span v-if="busyAction === 'SW_FULL'" class="loading loading-spinner loading-xs"></span>
+                        <span v-else>🏠</span>
+                        SW giornata
                     </button>
-                    <button class="btn btn-xs btn-outline gap-1" :disabled="busy" @click="doAction('SMART WORKING', false, HALF_WORKDAY_HOURS, 3, 51)">
-                        🏠 SW mezza
+                    <!-- SW mezza -->
+                    <button class="btn btn-xs gap-1"
+                            :class="hasActivity('SMART WORKING') ? 'btn-success btn-outline' : 'btn-outline'"
+                            :disabled="anyBusy || hasActivity('SMART WORKING')"
+                            @click="doAction('SW_HALF', 'SMART WORKING', false, HALF_WORKDAY_HOURS, 3, 51)">
+                        <span v-if="busyAction === 'SW_HALF'" class="loading loading-spinner loading-xs"></span>
+                        <span v-else>🏠</span>
+                        SW mezza
                     </button>
-                    <button class="btn btn-xs btn-outline gap-1 text-warning border-warning/50" :disabled="busy" @click="doAction('FERIE', true, 0)">
-                        🏖️ Ferie giornata
+                    <!-- Ferie giornata -->
+                    <button class="btn btn-xs gap-1 text-warning border-warning/50"
+                            :class="hasActivity('FERIE') ? 'btn-warning btn-outline' : 'btn-outline'"
+                            :disabled="anyBusy || hasActivity('FERIE')"
+                            @click="doAction('FER_FULL', 'FERIE', true, 0)">
+                        <span v-if="busyAction === 'FER_FULL'" class="loading loading-spinner loading-xs"></span>
+                        <span v-else>🏖️</span>
+                        Ferie giornata
                     </button>
-                    <button class="btn btn-xs btn-outline gap-1 text-warning border-warning/50" :disabled="busy" @click="doAction('FERIE', false, HALF_WORKDAY_HOURS, 3, 51)">
-                        🏖️ Ferie mezza
+                    <!-- Ferie mezza -->
+                    <button class="btn btn-xs gap-1 text-warning border-warning/50"
+                            :class="hasActivity('FERIE') ? 'btn-warning btn-outline' : 'btn-outline'"
+                            :disabled="anyBusy || hasActivity('FERIE')"
+                            @click="doAction('FER_HALF', 'FERIE', false, HALF_WORKDAY_HOURS, 3, 51)">
+                        <span v-if="busyAction === 'FER_HALF'" class="loading loading-spinner loading-xs"></span>
+                        <span v-else>🏖️</span>
+                        Ferie mezza
                     </button>
                 </div>
             </div>
@@ -64,9 +94,12 @@
             <!-- Action feedback -->
             <div v-if="actionMsg" class="text-xs mb-2" :class="actionMsgCls">{{ actionMsg }}</div>
 
-            <!-- Modal actions: Sync + Close -->
+            <!-- Modal actions: Sync (workdays only) + Close -->
             <div class="modal-action mt-2">
-                <button class="btn btn-sm btn-outline gap-1" :disabled="syncing || busy" @click="doSync(false)">
+                <button v-if="!dayData?.holiday"
+                        class="btn btn-sm btn-outline gap-1"
+                        :disabled="syncing || anyBusy"
+                        @click="doSync">
                     <span v-if="syncing" class="loading loading-spinner loading-xs"></span>
                     <span v-else>🔄</span>
                     Sincronizza giorno
@@ -82,31 +115,27 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed }             from 'vue';
-import { useTimesheetStore }          from '../../stores/useTimesheetStore';
-import { usePickerStore }             from '../../stores/usePickerStore';
-import { syncData }                   from '../../api';
-import { submitZucchettiRequest }     from '../../api';
-import { locationEmoji, locationTitle } from '../../utils';
+import { ref, computed }                 from 'vue';
+import { useTimesheetStore }              from '../../stores/useTimesheetStore';
+import { syncData, submitZucchettiRequest } from '../../api';
+import { locationEmoji, locationTitle }  from '../../utils';
 import { WORKDAY_HOURS, HALF_WORKDAY_HOURS } from '../../standards';
-import type { WeekDayResponse }       from '../../types';
-import type { ZucchettiJustification } from '@shared/zucchetti';
+import { formatDateLabel }               from '@shared/dates';
+import type { WeekDayResponse }          from '../../types';
+import type { ZucchettiJustification, ZucchettiRequest } from '@shared/zucchetti';
 
-const ts     = useTimesheetStore();
-const picker = usePickerStore();
+const ts = useTimesheetStore();
 
-const dialog  = ref<HTMLDialogElement | null>(null);
-const dayIdx  = ref(0);
+const dialog = ref<HTMLDialogElement | null>(null);
+const dayIdx = ref(0);
 
 // --- Derived data ---
 
 const dayData = computed(() => ts.weekData?.days[dayIdx.value] ?? null);
 
-import { formatDateLabel } from "@shared/dates";
-
 const dateLabel = computed(() => {
     const d = dayData.value;
-    return d ? formatDateLabel(d.date) : "–";
+    return d ? formatDateLabel(d.date) : '–';
 });
 
 const nibolLabel = computed(() => {
@@ -120,13 +149,25 @@ const giust = computed((): ZucchettiJustification[] =>
     dayData.value?.zucchetti?.giustificativi ?? [],
 );
 
+const richieste = computed((): ZucchettiRequest[] =>
+    dayData.value?.zucchetti?.richieste ?? [],
+);
+
+/** True if the given keyword matches an active (non-cancelled) giustificativo or richiesta. */
+function hasActivity(keyword: string): boolean {
+    const kw = keyword.toUpperCase();
+    const inGiust = giust.value.some(g => g.text.toUpperCase().includes(kw));
+    const inRich  = richieste.value.some(r => r.text.toUpperCase().includes(kw) && r.status !== 'Cancellata');
+    return inGiust || inRich;
+}
+
 const signals = computed(() => {
     const d = dayData.value;
     if (!d) return { meetings: 0, emails: 0, commits: 0, teams: 0, total: 0 };
-    const meetings = d.calendar?.length ?? 0;
-    const emails   = d.emails?.length   ?? 0;
+    const meetings = d.calendar?.length    ?? 0;
+    const emails   = d.emails?.length      ?? 0;
     const commits  = (d.gitCommits?.length ?? 0) + (d.svnCommits?.length ?? 0);
-    const teams    = d.teams?.length    ?? 0;
+    const teams    = d.teams?.length       ?? 0;
     return { meetings, emails, commits, teams, total: meetings + emails + commits + teams };
 });
 
@@ -136,27 +177,24 @@ const syncing    = ref(false);
 const syncMsg    = ref('');
 const syncMsgCls = ref('text-success');
 
-async function doSync(force: boolean) {
+async function doSync() {
     if (syncing.value) return;
     syncing.value = true;
     syncMsg.value = '';
 
     try {
-        const d      = dayData.value;
+        const d = dayData.value;
         if (!d) throw new Error('Giorno non selezionato');
-        const result = await syncData('day', d.date, force);
+        const result = await syncData('day', d.date, false);
 
-        const aggregated = result.aggregated.length;
-        const errors     = result.errors.length;
-        if (errors > 0) {
-            syncMsg.value    = `⚠ ${aggregated} aggregati, ${errors} errori`;
+        if (result.errors.length > 0) {
+            syncMsg.value    = `⚠ ${result.aggregated.length} aggregati, ${result.errors.length} errori`;
             syncMsgCls.value = 'text-warning';
         } else {
             syncMsg.value    = `✓ Sincronizzato (${result.synced.join(', ') || 'già aggiornato'})`;
             syncMsgCls.value = 'text-success';
         }
 
-        // Re-fetch week data so the UI reflects fresh location info
         await ts.fetchWeekData(d.date);
     } catch (err) {
         syncMsg.value    = `✗ ${(err as Error).message}`;
@@ -167,26 +205,31 @@ async function doSync(force: boolean) {
     }
 }
 
-// --- Zucchetti declarations (absorbed from TsZucchettiBar) ---
+// --- Zucchetti declarations ---
 
-const busy        = ref(false);
-const actionMsg   = ref('');
+const busyAction = ref('');
+const anyBusy    = computed(() => busyAction.value !== '');
+const actionMsg    = ref('');
 const actionMsgCls = ref('text-success');
 
-function selectedDateStr(): string {
-    const d = dayData.value;
-    if (!d) return '';
-    return d.date;
-}
-
-async function doAction(type: string, fullDay: boolean, tpHours: number, hours?: number, minutes?: number) {
-    if (busy.value) return;
-    busy.value   = true;
-    actionMsg.value = '';
+async function doAction(
+    key: string,
+    type: string,
+    fullDay: boolean,
+    tpHours: number,
+    hours?: number,
+    minutes?: number,
+) {
+    if (anyBusy.value) return;
+    busyAction.value  = key;
+    actionMsg.value   = '';
 
     try {
+        const d = dayData.value;
+        if (!d) throw new Error('Giorno non selezionato');
+
         const result = await submitZucchettiRequest({
-            date:    selectedDateStr(),
+            date:    d.date,
             type,
             fullDay,
             hours:   hours ?? 0,
@@ -194,23 +237,28 @@ async function doAction(type: string, fullDay: boolean, tpHours: number, hours?:
         });
 
         if (result.success) {
-            actionMsg.value    = result.skipped ? 'Già presente' : `✓ ${type}`;
-            actionMsgCls.value = result.skipped ? 'text-warning' : 'text-success';
-
-            if (result.dayUpdate) {
-                ts.patchDay(dayIdx.value, result.dayUpdate as unknown as WeekDayResponse);
+            if (result.scrapeError) {
+                actionMsg.value    = `✓ ${type} — ⚠ scrape: ${result.scrapeError}`;
+                actionMsgCls.value = 'text-warning';
+                // Scrape failed: force a full re-fetch so the UI stays consistent
+                await ts.fetchWeekData(d.date);
+            } else {
+                actionMsg.value    = result.skipped ? 'Già presente' : `✓ ${type}`;
+                actionMsgCls.value = result.skipped ? 'text-warning' : 'text-success';
+                if (result.dayUpdate) {
+                    ts.patchDay(dayIdx.value, result.dayUpdate as unknown as WeekDayResponse);
+                }
             }
+            ts.fillDay(dayIdx.value, tpHours);
         } else {
             actionMsg.value    = `✗ ${result.message}`;
             actionMsgCls.value = 'text-error';
         }
-
-        ts.fillDay(dayIdx.value, tpHours);
     } catch (err) {
         actionMsg.value    = `✗ ${(err as Error).message}`;
         actionMsgCls.value = 'text-error';
     } finally {
-        busy.value = false;
+        busyAction.value = '';
         setTimeout(() => { actionMsg.value = ''; }, 8000);
     }
 }
@@ -218,8 +266,8 @@ async function doAction(type: string, fullDay: boolean, tpHours: number, hours?:
 // --- Public API ---
 
 function open(idx: number) {
-    dayIdx.value = idx;
-    syncMsg.value = '';
+    dayIdx.value    = idx;
+    syncMsg.value   = '';
     actionMsg.value = '';
     dialog.value?.showModal();
 }
