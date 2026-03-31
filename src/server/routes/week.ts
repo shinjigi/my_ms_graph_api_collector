@@ -145,25 +145,26 @@ weekRouter.get("/:date", async (req: Request, res: Response) => {
     const rawOre = zuccDay?.hOrd ? hhmmToHours(zuccDay.hOrd) : null;
     const oreTarget = agg?.oreTarget ?? (isWd ? (rawOre ?? 8) : 0);
     // Location: Nibol is the primary source (desk booking is authoritative).
-    // "Scraped" means the day is on or before meta.lastExtractedDate for its month.
-    // Days beyond that date — or months with no file at all — show "unknown" (→ "?" in UI).
-    const month = dateStr.slice(0, 7);
-    const nibolLastScraped = nibolMeta[month]?.lastExtractedDate ?? null;
+    const monthStr = dateStr.slice(0, 7);
+    const nibolLastScraped = nibolMeta[monthStr]?.lastExtractedDate ?? null;
     const nibolDayScraped = nibolLastScraped !== null && dateStr <= nibolLastScraped;
     const nibolBooking = nibolByDate.get(dateStr) ?? (nibolDayScraped ? agg?.nibol ?? null : null);
-    let location: WeekDayData["location"];
+
+    let location: WeekDayData["location"] = "unknown";
     if (nibolBooking) {
       const t = nibolBooking.type.toLowerCase();
       location = t === "remote" || t === "home" ? "smart" : "office";
+    } else if (zuccDay) {
+      const zLoc = parseZucchettiLocation(zuccDay);
+      // If we have explicit signals (smart/travel/external), use them.
+      // If Zucchetti says 'office' (no signals), but Nibol was scraped with no booking,
+      // revert to 'unknown' to be conservative (might be an undeclared absence).
+      if (zLoc === "office" && nibolDayScraped) {
+        location = "unknown";
+      } else {
+        location = zLoc;
+      }
     } else if (nibolDayScraped) {
-      // Scraped but no booking → Zucchetti can confirm explicit declarations only;
-      // absent evidence defaults to "unknown" rather than assuming office.
-      const texts = zuccDay?.giustificativi?.map((g) => g.text?.toUpperCase() ?? "") ?? [];
-      if (texts.some((t) => t.includes("SMART")))            location = "smart";
-      else if (texts.some((t) => t.includes("TRASFERTA")))   location = "travel";
-      else if (texts.some((t) => t.includes("SERVIZIO ESTERNO"))) location = "external";
-      else location = "unknown";
-    } else {
       location = "unknown";
     }
 

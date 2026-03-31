@@ -17,6 +17,7 @@ import { weekRouter }      from './routes/week';
 import { zucchettiRouter } from './routes/zucchetti';
 import { analyzeRouter }   from './routes/analyze';
 import { signalsRouter }   from './routes/signals';
+import { syncRouter }      from './routes/sync';
 
 const app  = express();
 const PORT = Number(process.env['SERVER_PORT'] ?? 3001);
@@ -31,6 +32,7 @@ app.use('/api/week',      weekRouter);
 app.use('/api/zucchetti', zucchettiRouter);
 app.use('/api/analyze',   analyzeRouter);
 app.use('/api/day',       signalsRouter);
+app.use('/api/sync',      syncRouter);
 
 app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', ts: new Date().toISOString() });

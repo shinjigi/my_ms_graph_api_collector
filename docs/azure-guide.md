@@ -120,8 +120,22 @@ TOP=25
 
 ## 6. Esecuzione
 
+Per raccogliere i dati (collect):
 ```powershell
-npm start
+npm run collect
 ```
 
-Al primo avvio, il programma mostrerà un URL e un codice da inserire nel browser per autenticarsi. Alle esecuzioni successive, il token verrà rinnovato automaticamente dalla cache (`.token-cache.json`).
+Per avviare il server web (Express API + Vite frontend):
+```powershell
+npm run serve          # backend Express su porta 3001
+cd web && npm run dev  # frontend Vite su porta 5173
+```
+
+Per il pipeline completo (collect → aggregate → analyze → serve):
+```powershell
+npm run all
+```
+
+> **Nota:** `npm start` è un alias di `npm run collect` (raccoglie i dati grezzi), **non** avvia il server.
+
+Al primo avvio del collector, il programma mostrerà un URL e un codice da inserire nel browser per autenticarsi. Alle esecuzioni successive, il token verrà rinnovato automaticamente dalla cache (`.token-cache.json`).

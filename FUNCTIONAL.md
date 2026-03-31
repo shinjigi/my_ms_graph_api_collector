@@ -109,8 +109,9 @@ classDiagram
         +string date
         +boolean isWorkday
         +number oreTarget
-        +location: office|smart|mixed|unknown
+        +location: office|smart|travel|external|mixed|unknown
         +ZucchettiDay zucchetti
+        +NibolBooking nibol
         +CalendarEvent[] calendar
         +EmailRaw[] emails
         +TeamsMessageRaw[] teams
@@ -151,6 +152,7 @@ classDiagram
         +number totalHours
         +ProposalEntry[] entries
         +string generatedAt
+        +string provider
     }
     class ProposalEntry {
         +number|null taskId
@@ -274,10 +276,12 @@ Authentication: Base64-encoded token as `Authorization: Basic <token>`.
 
 ## Nibol integration
 
-Nibol is the desk booking system. `src/collectors/nibol.ts` uses Playwright with a persistent browser session to:
+Nibol is the desk booking system. The architecture is split in two parts:
 
-- `bookDesk` — reserve a desk for a given date
-- `checkIn` — confirm presence on arrival
+- **Collector** `src/collectors/nibol/index.ts` — called during `npm run collect`, scrapes the Nibol calendar and writes bookings to `data/raw/nibol/YYYY-MM.json`.
+- **Standalone scripts** `scripts/nibol/book_desk.ts`, `scripts/nibol/getCalendar.ts` — use Playwright with a persistent browser session to:
+  - `bookDesk` — reserve a desk for a given date
+  - `checkIn` — confirm presence on arrival
 
 Triggered from the UI via `POST /api/hooks/nibol`.
 

@@ -10,7 +10,7 @@
 my_ms_graph_api_collector/
 ├── src/
 │   ├── index.ts                        # collect entrypoint (npm run collect)
-│   ├── graphClient.js                  # MSAL device-code auth + Graph client (CJS)
+│   ├── graphClient.ts                  # MSAL device-code auth + Graph client
 │   ├── collectors/
 │   │   ├── utils.ts                    # shared: mergeByKey, skip/force, .meta.json
 │   │   ├── graph/
@@ -39,16 +39,17 @@ my_ms_graph_api_collector/
 │   ├── server/
 │   │   ├── app.ts                      # Express server (port 3001)
 │   │   └── routes/
-│   │       ├── week.ts                 # GET /api/week/:date + POST submit
+│   │       ├── week.ts                 # GET /api/week/:date, GET /api/week/:date/tp-hours, POST /api/week/:date/submit
 │   │       ├── analyze.ts              # POST /api/analyze/:date (async + job tracking)
 │   │       ├── proposals.ts            # GET/PATCH /api/proposals/:date
 │   │       ├── submit.ts               # POST /api/submit/:date (proposal-based)
 │   │       ├── zucchetti.ts            # GET /api/zucchetti/*
-│   │       └── hooks.ts                # POST /api/hooks/{zucchetti,nibol}
+│   │       ├── hooks.ts                # POST /api/hooks/{zucchetti,nibol}
+│   │       ├── signals.ts              # GET /api/day/:date — per-day activity signals
+│   │       └── sync.ts                 # GET /api/sync/* — sync utilities
 │   └── targetprocess/
 │       ├── client.ts                   # TargetProcess REST v1 client
-│       ├── collector.ts                # KB update (npm run kb:update)
-│       ├── collectorGemini.ts          # KB update via Gemini
+│       ├── collector.ts                # KB update (npm run kb:update) — Claude + Gemini providers inside
 │       ├── prompts.ts                  # TP AI prompts
 │       ├── format.ts                   # hhmmToHours, parseTpDate helpers
 │       └── types.ts                    # TP entity interfaces
@@ -86,11 +87,17 @@ my_ms_graph_api_collector/
 │           └── TimeCellWidget.vue      # − value + smart ±0.5 increment (shared)
 ├── scripts/
 │   ├── tp/                             # Standalone TP CLI tools (ts-node)
-│   ├── nibol/                          # Nibol desk booking scripts (tsx)
+│   ├── nibol/                          # Nibol desk booking scripts (tsx): book_desk.ts, getCalendar.ts
 │   ├── morning-automation.ps1          # Daily 08:30 Windows Task Scheduler automation
 │   ├── schedule-morning.ps1            # One-time setup: register the scheduled task
 │   ├── bootstrap-env.ps1               # Generate .env from Azure App Registration
-│   └── test-nibol.ts                   # Nibol connection test
+│   ├── launch-nibol-setup.ps1          # Interactive Nibol browser profile setup
+│   ├── analyze-ollama-remote.sh        # Remote Ollama analysis helper
+│   ├── rewrite_git_commit.sh           # Git commit history rewrite utility
+│   ├── test-nibol.ts                   # Nibol connection test
+│   ├── test-standup-paginate.ts        # Standup pagination test
+│   ├── test-teams-filter.ts            # Teams filter test
+│   └── test-teams-thursday.ts          # Teams Thursday test
 ├── docs/
 │   ├── OPERATOR.md                     # Operator runbook — 10 use cases
 │   ├── DATA-STRATEGY.md                # Collection + aggregation + analysis strategy
@@ -173,7 +180,7 @@ flowchart TD
 
     Raw --> AGG["npm run aggregate\naggregator.ts\nloadDirMonthly&lt;T&gt;(dir)"]
     AGG --> AGGF[data/aggregated/YYYY-MM-DD.json]
-    AGGF --> ANA["npm run analyze\nclaudeAnalyzer.ts"]
+    AGGF --> ANA["npm run analyze\nanalyzer.ts"]
     ANA --> PROP[data/proposals/YYYY-MM-DD.json]
     PROP --> SRV["npm run serve\nExpress :3001\nVite :5173"]
 ```
@@ -248,11 +255,20 @@ Copy `.env.example` to `.env`:
 | `TP_BASE_URL` | ✅ | TargetProcess instance URL |
 | `TP_TOKEN` | ✅ | Base64 TP API token |
 | `MISC_TASK_ID` | — | Fallback TP task for unattributed hours |
-| `CLAUDE_API_KEY` | — | Anthropic API key — **backend 1** (see below) |
+| `SERVER_PORT` | — | Express server port (default `3001`) |
+| `CLAUDE_API_KEY` | — | Anthropic API key — **backend 1** |
 | `CLAUDE_MODEL` | — | Anthropic model ID (default `claude-haiku-4-5-20251001`) |
+| `CLAUDE_MODEL_MAX_TPM` | — | Claude token budget in chars (default `200000`) |
 | `OPENAI_BASE_URL` | — | OpenAI-compatible base URL — **backend 2**: Ollama (`http://localhost:11434/v1`), LM Studio, OpenRouter, etc. |
 | `OPENAI_API_KEY` | — | API key for the OpenAI-compatible endpoint (Ollama: any string) |
-| `OPENAI_MODEL` | — | Model name for the OpenAI-compatible endpoint (e.g. `llama3.2`) |
+| `OPENAI_MODEL` | — | Model name for the OpenAI-compatible endpoint (e.g. `qwen2.5-coder:3b`) |
+| `OPENAI_MODEL_MAX_TPM` | — | Token budget for OpenAI-compat endpoint (default `5000`) |
+| `OPENAI_NUM_CTX` | — | Ollama context window in tokens (default: `OPENAI_MODEL_MAX_TPM`) |
+| `OPENAI_REQUEST_TIMEOUT_MS` | — | Request timeout for OpenAI-compat endpoint (default `900000` = 15 min) |
+| `GEMINI_API_KEY` | — | Google Generative AI API key — **backend 3** |
+| `GEMINI_MODEL` | — | Gemini model ID (default `gemini-2.0-flash`) |
+| `GEMINI_MODEL_MAX_TPM` | — | Gemini token budget (default `1000000`) |
+| `KB_RELEVANCE_WINDOW_DAYS` | — | Days window for KB relevance filtering in analyzer (default `90`) |
 | `GIT_ROOTS` | — | Semicolon-separated root dirs to scan for git repos (maxDepth 4). Supports Windows paths and WSL UNC paths: `//wsl.localhost/Ubuntu/home/<user>/projects` |
 | `GIT_EMAILS` | — | Semicolon-separated author emails to include; empty = all authors |
 | `SVN_URL` | — | SVN repository URL |
@@ -265,21 +281,21 @@ Copy `.env.example` to `.env`:
 
 ### AI analyzer backends
 
-`claudeAnalyzer.ts` selects the LLM backend in priority order:
+`analyzer.ts` builds the provider chain in priority order (first available wins):
 
 ```mermaid
-flowchart TD
-    A{CLAUDE_API_KEY set?}
-    B[Anthropic SDK\nPay-per-token API]
-    C{OPENAI_BASE_URL set?}
-    D[OpenAI-compatible HTTP\nOllama · LM Studio · OpenRouter]
-    E[claude CLI  -p \nClaude Code subscription]
+flowchart LR
+    A["Claude API\nCLAUDE_API_KEY"]
+    B["OpenAI-compat\nOPENAI_BASE_URL\n(Ollama · LM Studio · OpenRouter)"]
+    C["Gemini\nGEMINI_API_KEY"]
+    D["Claude CLI\nclaude -p"]
 
-    A -->|yes| B
-    A -->|no|  C
-    C -->|yes| D
-    C -->|no|  E
+    A -->|fail/no key| B
+    B -->|fail/no URL| C
+    C -->|fail/no key| D
 ```
+
+All 4 providers run an `isAvailable()` probe at startup. Only reachable providers enter the active chain.
 
 ---
 

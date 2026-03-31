@@ -41,12 +41,20 @@ const NIBOL_DIR  = path.join(RAW_DIR, "nibol");
 export function parseZucchettiLocation(
   day: ZucchettiDay,
 ): AggregatedDay["location"] {
-  const texts = day.giustificativi.map((g) => g.text.toUpperCase());
-  if (texts.some((t) => t.includes("SMART")))             return "smart";
-  if (texts.some((t) => t.includes("TRASFERTA")))         return "travel";
-  if (texts.some((t) => t.includes("SERVIZIO ESTERNO")))  return "external";
-  if (day.giustificativi.length === 0)                    return "office";
-  return "unknown"; // has giustificativi but none are location-relevant
+  const giust = day.giustificativi.map((g) => g.text.toUpperCase());
+  const reqs = (day.richieste ?? [])
+    .filter((r) => r.status.toUpperCase() !== "CANCELLATA")
+    .map((r) => r.text.toUpperCase());
+  const allSignals = [...giust, ...reqs];
+
+  if (allSignals.some((s) => s.includes("SMART")))             return "smart";
+  if (allSignals.some((s) => s.includes("TRASFERTA")))         return "travel";
+  if (allSignals.some((s) => s.includes("SERVIZIO ESTERNO")))  return "external";
+
+  // If we have no signals at all, it's typically office work (default).
+  // If we have signals but they don't match location keywords, it's unknown.
+  if (giust.length === 0 && reqs.length === 0) return "office";
+  return "unknown";
 }
 
 export function isWorkday(day: ZucchettiDay): boolean {
