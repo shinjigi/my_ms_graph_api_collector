@@ -1,4 +1,6 @@
 <template>
+    <div>
+    <DayLocationPopover ref="popover" />
     <div class="bg-base-100 border border-base-300 rounded-xl p-3 mb-3 flex items-center gap-2 overflow-x-auto">
         <button class="btn btn-ghost btn-xs btn-square shrink-0">
             <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -26,7 +28,9 @@
                     <span class="mx-1 text-base-content/20">·</span>
                     <span class="text-primary font-medium">{{ card.tpH }}h</span> TP
                 </div>
-                <div v-if="card.badges.length > 0" class="flex flex-wrap gap-0.5 mt-1">
+                <div v-if="card.badges.length > 0"
+                     class="flex flex-wrap gap-0.5 mt-1 cursor-pointer"
+                     @click.stop="popover?.open(i)">
                     <span v-for="b in card.badges" :key="b.emoji"
                           class="ws-badge" :title="b.title">{{ b.emoji }}</span>
                 </div>
@@ -38,17 +42,20 @@
             </svg>
         </button>
     </div>
+    </div>
 </template>
 
 <script setup lang="ts">
-import { computed }           from 'vue';
+import { computed, ref }      from 'vue';
 import { usePickerStore }     from '../../stores/usePickerStore';
 import { useTimesheetStore }  from '../../stores/useTimesheetStore';
 import { locationEmoji, locationTitle, giustActivityEmojis } from '../../utils';
 import type { ZucchettiJustification } from '@shared/zucchetti';
+import DayLocationPopover from '../timesheet/DayLocationPopover.vue';
 
-const picker = usePickerStore();
-const ts     = useTimesheetStore();
+const picker  = usePickerStore();
+const ts      = useTimesheetStore();
+const popover = ref<InstanceType<typeof DayLocationPopover> | null>(null);
 
 const weekCards = computed(() => {
     const sel = picker.pickerSelected;

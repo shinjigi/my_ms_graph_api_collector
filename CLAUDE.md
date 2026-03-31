@@ -30,20 +30,24 @@ Vue frontend (web/)           →  http://localhost:5173
 
 ### Analyzer (unified)
 
-Fallback chain: Claude API → Gemini → Claude CLI.
+Fallback chain: Claude API → OpenAI-compat (Ollama/LM Studio) → Gemini → Claude CLI.
 
 ```
 src/analysis/
 ├── analyzer.ts          ← orchestrator: interface, shared logic, analyzeDay(), run()
+├── base.ts              ← AnalyzerProvider interface, stripCodeFence, tpmToChars
 ├── prompts.ts           ← prompt templates (static text + variable interpolation)
-├── claudeProvider.ts    ← Anthropic API + OpenAI-compat backends
-└── geminiProvider.ts    ← Google Generative AI SDK
+├── claudeProvider.ts    ← Anthropic API (ClaudeApiProvider) + OpenAI-compat (OpenAiCompatibleProvider) + CLI (ClaudeCliProvider)
+└── geminiProvider.ts    ← Google Generative AI SDK (GeminiProvider)
 ```
 
-Server endpoints for async analysis with job tracking:
+Server endpoints:
 - `POST /api/analyze/:date` — single day (202 + jobId)
 - `POST /api/analyze/week/:date` — all workdays in week (202 + jobId)
 - `GET /api/analyze/status/:jobId` — poll job status
+- `GET /api/day/:date` — day signals (calendar, email, teams, commits, browser)
+- `GET /api/sync/*` — sync utilities
+- `GET /api/health` — health check
 
 ### Collectors
 
@@ -55,11 +59,11 @@ Server endpoints for async analysis with job tracking:
   - `getTimesheet.ts` — CLI: full month extraction
 - **VCS** (git, svn): commit history collection
 - **Browser** (chrome, firefox): browsing history via sql.js
-- **Nibol** (desk booking): Playwright automation via `scripts/nibol/` (`npm run nibol:book`, `npm run nibol:calendar`)
+- **Nibol**: split architecture — `src/collectors/nibol/index.ts` scrapes calendar data during `npm run collect` (writes to `data/raw/nibol/`); standalone desk-booking scripts in `scripts/nibol/` (`npm run nibol:book`, `npm run nibol:calendar`)
 
 ### Auth flow
 
-`graphClient.js` uses MSAL's `PublicClientApplication` with a file-based token cache (`.token-cache.json`). On first run, it prompts the user to authenticate via device code (URL + code in browser). Subsequent runs use `acquireTokenSilent` with the cached refresh token.
+`graphClient.ts` uses MSAL's `PublicClientApplication` with a file-based token cache (`.token-cache.json`). On first run, it prompts the user to authenticate via device code (URL + code in browser). Subsequent runs use `acquireTokenSilent` with the cached refresh token.
 
 ### Zucchetti automation gotchas
 
@@ -83,10 +87,12 @@ Server endpoints for async analysis with job tracking:
 
 ### Key types
 
-- `ZucchettiDay` — `src/collectors/zucchetti/index.ts`
-- `AggregatedDay` — `src/analysis/aggregator.ts`
-- `DayProposal`, `ProposalEntry`, `AnalyzerProvider` — `src/analysis/analyzer.ts`
-- `WeekDayData` — `src/server/routes/week.ts`
+- `ZucchettiDay` — `shared/zucchetti.ts` (canonical; imported by collector and aggregator)
+- `AggregatedDay`, `NibolBooking`, `GitCommit`, `SvnCommit`, `BrowserVisit`, etc. — `shared/aggregator.ts`
+- `DayProposal`, `ProposalEntry` — `shared/analysis.ts`
+- `KbEntry`, `KbStore` — `shared/kb.ts`
+- `AnalyzerProvider` — `src/analysis/base.ts`
+- `WeekDayData` — `shared/week.ts`
 - Frontend view types — `web/src/types/index.ts`
 
 ### Directory structure (key paths)

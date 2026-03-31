@@ -178,6 +178,30 @@ export async function fetchDayBrowser(date: string): Promise<BrowserResponse> {
   return res.json();
 }
 
+export interface SyncResult {
+  synced:     string[];
+  skipped:    string[];
+  aggregated: string[];
+  errors:     string[];
+}
+
+export async function syncData(
+  scope: "day" | "week",
+  date: string,
+  force = false,
+): Promise<SyncResult> {
+  const res = await fetch("/api/sync", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ scope, date, force }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.error ?? `syncData: ${res.status}`);
+  }
+  return res.json();
+}
+
 export async function fetchProposal(
   date: string,
 ): Promise<{ proposal: DayProposal; signals: unknown } | null> {
