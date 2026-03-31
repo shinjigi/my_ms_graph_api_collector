@@ -91,7 +91,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { useTimesheetStore }  from '../../stores/useTimesheetStore';
 import { useUiStore }         from '../../stores/useUiStore';
 import TsRow                  from './TsRow.vue';
@@ -155,12 +155,22 @@ function syncCols() {
     });
 }
 
-const ro = new ResizeObserver(syncCols);
+const ro = new ResizeObserver(() => syncCols());
+const syncOnNextTick = () => nextTick(syncCols);
+
+// Watch for any state that changes table column alignment or presence
+watch(() => ts.active,       syncOnNextTick, { deep: true });
+watch(() => ts.pinned,       syncOnNextTick, { deep: true });
+watch(() => ui.weVisible,    syncOnNextTick);
+watch(() => ui.pinnedSearch, syncOnNextTick);
 
 onMounted(() => {
-    requestAnimationFrame(syncCols);
+    syncCols();
     if (mainTableRef.value) ro.observe(mainTableRef.value);
     if (pinScrollRef.value) ro.observe(pinScrollRef.value);
+    // Extra safety: some layout shifts might happen after mount / first data load
+    setTimeout(syncCols, 150);
+    setTimeout(syncCols, 500);
 });
 onUnmounted(() => ro.disconnect());
 </script>

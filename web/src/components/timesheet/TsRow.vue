@@ -19,11 +19,18 @@
             </template>
             <!-- Pinned row: quick-add + button -->
             <template v-else-if="isPinned">
-                <button class="pin-add-btn" @click.stop="quickAdd(i)" title="+0.5h">
-                    <span v-if="ts.getHours(row.tpId, i) > 0" class="pin-add-hours">{{ ts.getHours(row.tpId, i) }}h</span>
-                    <span class="pin-add-plus">+</span>
-                    <span v-if="isPending && ts.getHours(row.tpId, i) > 0" class="loading loading-ring loading-xs text-warning ml-0.5"></span>
-                </button>
+                <div class="flex flex-col items-center gap-0.5">
+                    <button class="pin-add-btn" @click.stop="quickAdd(i)" title="+0.5h">
+                        <span v-if="ts.getHours(row.tpId, i) > 0" class="pin-add-hours">{{ hoursToHhmm(ts.getHours(row.tpId, i)) }}</span>
+                        <span class="pin-add-plus">+</span>
+                        <span v-if="isPending && ts.getHours(row.tpId, i) > 0" class="loading loading-ring loading-xs text-warning ml-0.5"></span>
+                    </button>
+                    <TsNoteCell v-if="ts.getHours(row.tpId, i) > 0" :tpId="row.tpId" :day-idx="i" />
+                    <div class="flex gap-1">
+                        <span v-if="row.git?.[i]" class="commit-dot source-git" :title="`${row.git[i]} git commit`"></span>
+                        <span v-if="row.svn?.[i]" class="commit-dot source-svn" :title="`${row.svn[i]} svn commit`"></span>
+                    </div>
+                </div>
             </template>
             <!-- Active row: full widget -->
             <template v-else>
@@ -89,6 +96,7 @@ import { useTimesheetStore } from '../../stores/useTimesheetStore';
 import { usePickerStore }    from '../../stores/usePickerStore';
 import { useUiStore }        from '../../stores/useUiStore';
 import { stateColor, tpLink as makeTpLink } from '../../utils';
+import { hoursToHhmm } from '@shared/dates';
 import type { TsRow, Day }   from '../../types';
 import TimeCellWidget        from '../TimeCellWidget.vue';
 import TsNoteCell            from './TsNoteCell.vue';

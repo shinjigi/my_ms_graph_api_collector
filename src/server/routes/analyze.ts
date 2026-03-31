@@ -101,7 +101,11 @@ async function runAnalysis(job: AnalysisJob, force: boolean): Promise<void> {
       daysToProcess.push(day);
     }
 
-    if (daysToProcess.length > 0) {
+    if (daysToProcess.length === 0) {
+      console.log(
+        `[analyze-job ${job.id}] Tutti i giorni già analizzati — nessun nuovo proposal da generare (usa force=true per forzare).`,
+      );
+    } else {
       console.log(
         `[analyze-job ${job.id}] Analisi batch per ${daysToProcess.length} giorni...`,
       );
