@@ -15,7 +15,7 @@ interface PickerDay {
   holidayName: string;
 }
 
-import { todayMidnight, dateToString, getMonday, shiftDate, DAYABB_IT, MONTH_IT } from "@shared/dates";
+import { todayMidnight, dateToString, getMonday, shiftDate, DAYABB_IT, startOfMonth, formatMonthYearLabel, getYearMonth, getDaysInMonth, addMonths } from "@shared/dates";
 
 export const usePickerStore = defineStore(
   "picker",
@@ -25,22 +25,16 @@ export const usePickerStore = defineStore(
     const today = todayMidnight();
     const pickerToday = ref<Date>(today);
     const pickerSelected = ref<Date>(todayMidnight());
-    const pickerMonth = ref<Date>(
-      new Date(today.getFullYear(), today.getMonth(), 1),
-    );
+    const pickerMonth = ref<Date>(startOfMonth(today));
 
-    const monthLabel = computed(
-      () =>
-        `${MONTH_IT[pickerMonth.value.getMonth()]} ${pickerMonth.value.getFullYear()}`,
-    );
+    const monthLabel = computed(() => formatMonthYearLabel(pickerMonth.value));
 
     const daysInMonth = computed<PickerDay[]>(() => {
-      const yr = pickerMonth.value.getFullYear();
-      const mo = pickerMonth.value.getMonth();
-      const count = new Date(yr, mo + 1, 0).getDate();
+      const { year, month } = getYearMonth(pickerMonth.value);
+      const count = getDaysInMonth(year, month);
       const result: PickerDay[] = [];
       for (let d = 1; d <= count; d++) {
-        const date = new Date(yr, mo, d);
+        const date = new Date(year, month - 1, d);
         const dow = date.getDay();
         const holiday = findHoliday(date);
 
@@ -89,17 +83,15 @@ export const usePickerStore = defineStore(
     /** Silent update from router — does NOT push to history. */
     function setFromDate(date: Date) {
       pickerSelected.value = date;
-      pickerMonth.value = new Date(date.getFullYear(), date.getMonth(), 1);
+      pickerMonth.value = startOfMonth(date);
     }
 
     function prevMonth() {
-      const m = pickerMonth.value;
-      pickerMonth.value = new Date(m.getFullYear(), m.getMonth() - 1, 1);
+      pickerMonth.value = addMonths(pickerMonth.value, -1);
     }
 
     function nextMonth() {
-      const m = pickerMonth.value;
-      pickerMonth.value = new Date(m.getFullYear(), m.getMonth() + 1, 1);
+      pickerMonth.value = addMonths(pickerMonth.value, 1);
     }
 
     function goToday() {

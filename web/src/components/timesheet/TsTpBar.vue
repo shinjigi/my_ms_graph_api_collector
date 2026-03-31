@@ -55,6 +55,7 @@ import { useTimesheetStore }    from '../../stores/useTimesheetStore';
 import { useAnalysisStore }     from '../../stores/useAnalysisStore';
 import { usePickerStore }       from '../../stores/usePickerStore';
 import TpSubmitPopover          from './TpSubmitPopover.vue';
+import { dateToString }         from '@shared/dates';
 
 defineEmits<{ (e: 'open-verifica'): void }>();
 
@@ -67,8 +68,7 @@ const submitPopover = ref<InstanceType<typeof TpSubmitPopover> | null>(null);
 // ---- Analysis ----
 
 function selectedDateStr(): string {
-    const d = picker.pickerSelected;
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    return dateToString(picker.pickerSelected);
 }
 
 function runWeekAnalysis(force = false) {

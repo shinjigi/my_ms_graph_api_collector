@@ -16,7 +16,7 @@ import * as dotenv from "dotenv";
 
 dotenv.config();
 
-import { shiftDate, getISOTimestamp } from "@shared/dates";
+import { shiftDate, getISOTimestamp, getWeekBoundsFromStr } from "@shared/dates";
 import type { ProposalEntry, DayProposal } from "@shared/analysis";
 import type { KbEntry, KbStore } from "@shared/kb";
 import { SYSTEM_PROMPT, userInstruction } from "./prompts";
@@ -339,17 +339,9 @@ async function run(): Promise<void> {
   let weekStart = "";
   let weekEnd = "";
   if (weekArg) {
-    const [yearStr, weekStr] = weekArg.split("-");
-    const year = Number.parseInt(yearStr, 10);
-    const week = Number.parseInt(weekStr.replaceAll("W", ""), 10);
-    const date = new Date(year, 0, 1 + (week - 1) * 7);
-    const day = date.getDay();
-    const start = new Date(date);
-    start.setDate(date.getDate() - day + (day === 0 ? -6 : 1));
-    const end = new Date(start);
-    end.setDate(start.getDate() + 6);
-    weekStart = start.toISOString().split("T")[0];
-    weekEnd = end.toISOString().split("T")[0];
+    const bounds = getWeekBoundsFromStr(weekArg);
+    weekStart = bounds.start;
+    weekEnd = bounds.end;
   }
 
   // KB is a prerequisite — fail fast

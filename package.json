@@ -8,7 +8,7 @@
     "start": "tsx src/index.ts",
     "collect": "tsx src/index.ts",
     "collect:force": "tsx src/index.ts --force",
-    "collect:range:zucchetti": "tsx src/collectors/zucchetti/index.ts --start=2025-06 --end=2025-09",
+    "collect:range:zucchetti": "tsx src/collectors/zucchetti/index.ts --start=2025-06 --end=2026-03 --force",
     "collect:range:nibol": "tsx scripts/nibol/getCalendar.ts --start=2025-06-01 --end=2025-09-30",
     "aggregate": "tsx src/analysis/aggregator.ts",
     "analyze": "tsx src/analysis/analyzer.ts",

@@ -119,7 +119,7 @@ import { ref, computed }                 from 'vue';
 import { useTimesheetStore }              from '../../stores/useTimesheetStore';
 import { syncData, submitZucchettiRequest } from '../../api';
 import { locationEmoji, locationTitle }  from '../../utils';
-import { WORKDAY_HOURS, HALF_WORKDAY_HOURS } from '../../standards';
+import { WORKDAY_HOURS, HALF_WORKDAY_HOURS } from '@shared/standards';
 import { formatDateLabel }               from '@shared/dates';
 import type { WeekDayResponse }          from '../../types';
 import type { ZucchettiJustification, ZucchettiRequest } from '@shared/zucchetti';

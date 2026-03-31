@@ -9,7 +9,7 @@ import {
   shouldSkipMonth,
 } from "../utils";
 import { SvnCommit } from "@shared/aggregator";
-import { dateToString, currentMonthString, lastDayOfMonth } from "@shared/dates";
+import { dateToString, currentMonthString, lastDayOfMonth, startOfMonth, addMonths } from "@shared/dates";
 
 function parseXml(xml: string): Promise<unknown> {
   return new Promise((resolve, reject) =>
@@ -120,14 +120,11 @@ export async function collectSvnCommits(force = false): Promise<string[]> {
   const outPaths: string[] = [];
   const sources = [svnUrl];
 
-  const sinceDate = new Date(since);
-  let current = new Date(sinceDate.getFullYear(), sinceDate.getMonth(), 1);
+  let current = startOfMonth(since);
   const now = new Date();
 
   while (current <= now) {
-    const year = current.getFullYear();
-    const mo = current.getMonth() + 1;
-    const month = `${year}-${String(mo).padStart(2, "0")}`;
+    const month = currentMonthString(current);
     const isCurrentMonth = month === currentMonthString();
     const outPath = path.join(SVN_DIR, `${month}.json`);
 
@@ -177,7 +174,7 @@ export async function collectSvnCommits(force = false): Promise<string[]> {
       }
     }
 
-    current = new Date(year, mo, 1);
+    current = addMonths(current, 1);
   }
 
   return outPaths;

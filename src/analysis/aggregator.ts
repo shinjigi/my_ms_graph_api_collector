@@ -12,6 +12,8 @@ dotenv.config();
 import { hhmmToHours } from "../targetprocess/format";
 import { createLogger } from "../logger";
 import { ZucchettiDay } from "@shared/zucchetti";
+import { extractMonthStr } from "@shared/dates";
+import { WORKDAY_HOURS } from "@shared/standards";
 import {
   AggregatedDay,
   CalendarEventRaw,
@@ -108,7 +110,7 @@ export async function aggregateSingleDay(
   date: string,
   zDay: ZucchettiDay,
 ): Promise<AggregatedDay> {
-  const monthStr = date.slice(0, 7);
+  const monthStr = extractMonthStr(date);
 
   const [calendar, emails, teams, svn, git, chrome, firefox, nibolMonth] =
     await Promise.all([
@@ -124,7 +126,7 @@ export async function aggregateSingleDay(
 
   const workday = isWorkday(zDay);
   const rawOre = zDay.hOrd ? hhmmToHours(zDay.hOrd) : null;
-  const oreTarget = workday ? (rawOre ?? 8) : 0;
+  const oreTarget = workday ? (rawOre ?? WORKDAY_HOURS) : 0;
   const nibol = nibolMonth.find((b) => b.date === date) ?? null;
 
   const bundle: AggregatedDay = {
@@ -248,7 +250,7 @@ async function run(): Promise<void> {
     if (date < sinceDate) continue;
     const workday = isWorkday(zDay);
     const rawOre = zDay.hOrd ? hhmmToHours(zDay.hOrd) : null;
-    const oreTarget = workday ? (rawOre ?? 8) : 0;
+    const oreTarget = workday ? (rawOre ?? WORKDAY_HOURS) : 0;
 
     const bundle: AggregatedDay = {
       date,

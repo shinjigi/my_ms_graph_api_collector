@@ -1,4 +1,4 @@
-import { WORKDAY_HOURS } from "../standards";
+import { WORKDAY_HOURS } from "@shared/standards";
 import type {
   Day,
   TsRow,

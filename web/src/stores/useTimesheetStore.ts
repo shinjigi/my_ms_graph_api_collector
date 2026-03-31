@@ -12,7 +12,7 @@ import type {
   SubmitEdit,
   WeekDayResponse,
 } from "../types";
-import { dateToString, DAYABB_IT, MONTH_IT, parseDateString, shiftDate } from "@shared/dates";
+import { dateToString, DAYABB_IT, parseDateString, shiftDate, formatShortDateLabel } from "@shared/dates";
 
 export const useTimesheetStore = defineStore(
   "timesheet",
@@ -61,8 +61,7 @@ export const useTimesheetStore = defineStore(
         days.value = weekRes.days.map((d, idx) => {
           const dow = idx; // 0=Mon...6=Sun
           const dayLabel = DAYABB_IT[[1, 2, 3, 4, 5, 6, 0][dow] % 7] ?? "?";
-          const dateObj = parseDateString(d.date);
-          const dateLabel = `${dateObj.getDate()} ${MONTH_IT[dateObj.getMonth()].substring(0, 3)}`;
+          const dateLabel = formatShortDateLabel(d.date);
 
           return {
             label: dayLabel,

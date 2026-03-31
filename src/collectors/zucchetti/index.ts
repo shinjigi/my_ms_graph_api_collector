@@ -51,11 +51,11 @@ function extractJson(output: string): MonthData[] {
       // It's a flat array of days (shouldn't happen with current getTimesheet.ts but for safety)
       const firstDate = parsed[0]?.date;
       if (!firstDate) return [];
-      const [y, m] = firstDate.split("-");
+      const { year, month } = getYearMonth(firstDate);
       return [
         {
-          month: Number.parseInt(m, 10),
-          year: Number.parseInt(y, 10),
+          month,
+          year,
           header: {},
           days: parsed,
         },
@@ -65,11 +65,11 @@ function extractJson(output: string): MonthData[] {
       const days = parsed.days || [];
       const firstDate = days[0]?.date;
       if (!firstDate) return [];
-      const [y, m] = firstDate.split("-");
+      const { year, month } = getYearMonth(firstDate);
       return [
         {
-          month: Number.parseInt(m, 10),
-          year: Number.parseInt(y, 10),
+          month,
+          year,
           header: parsed.header,
           days,
         },
@@ -80,7 +80,7 @@ function extractJson(output: string): MonthData[] {
   return parsed as MonthData[];
 }
 
-import { currentMonthString, dateToString } from "@shared/dates";
+import { currentMonthString, dateToString, getYearMonth, parseDateString, addMonths } from "@shared/dates";
 
 export async function collectZucchetti(
   force = false,
@@ -95,17 +95,15 @@ export async function collectZucchetti(
   // Optimization: find the first month that needs collection
   const meta = await readMeta(ZUCC_DIR);
 
-  const startMonthDate = new Date(
-    sinceStr.length === 7 ? `${sinceStr}-01` : sinceStr,
-  );
-  const endMonthDate = new Date(endStr.length === 7 ? `${endStr}-01` : endStr);
+  let startMonthDate = parseDateString(sinceStr);
+  const endMonthDate = parseDateString(endStr);
 
   if (!force) {
     // Skip already collected months from the beginning
     while (startMonthDate <= endMonthDate) {
       const mStr = currentMonthString(startMonthDate);
       if (shouldSkipMonth(meta[mStr], mStr, ["zucchetti"])) {
-        startMonthDate.setMonth(startMonthDate.getMonth() + 1);
+        startMonthDate = addMonths(startMonthDate, 1);
       } else {
         break;
       }

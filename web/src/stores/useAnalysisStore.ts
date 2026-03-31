@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
+import { getTimeString } from '@shared/dates';
 import { analyzeDay, analyzeWeek, pollAnalysisStatus, fetchProposal } from '../api';
 import type { DayProposal, AnalysisJobStatus } from '../types';
 
@@ -22,10 +23,7 @@ export const useAnalysisStore = defineStore('analysis', () => {
 
     const lastRun = computed(() => {
         if (!proposal.value?.generatedAt) return null;
-        const d = new Date(proposal.value.generatedAt);
-        const hh = String(d.getHours()).padStart(2, '0');
-        const mm = String(d.getMinutes()).padStart(2, '0');
-        return `${hh}:${mm}`;
+        return getTimeString(new Date(proposal.value.generatedAt), ":").substring(0, 5);
     });
 
     function stopPolling() {

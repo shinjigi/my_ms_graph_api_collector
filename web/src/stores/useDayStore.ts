@@ -10,7 +10,7 @@ import type {
   Email,
   TlEventType,
 } from "../types";
-import { WORKDAY_HOURS } from "../standards";
+import { WORKDAY_HOURS } from "@shared/standards";
 import { dateToString, getTimeString } from "@shared/dates";
 
 export const useDayStore = defineStore(
@@ -39,7 +39,7 @@ export const useDayStore = defineStore(
         );
         return {
           type: "meeting" as TlEventType,
-          time: `${String(start.getHours()).padStart(2, "0")}:${String(start.getMinutes()).padStart(2, "0")}`,
+          time: getTimeString(start).slice(0, 5),
           label: ev.subject,
           top: 0,
           h: durationMins,
@@ -141,9 +141,9 @@ export const useDayStore = defineStore(
     );
 
     const quickLog = computed<QuickLogItem[]>(() => {
-      const ts      = useTimesheetStore();
-      const picker  = usePickerStore();
-      const dayIdx  = picker.selectedDayIdx;
+      const ts = useTimesheetStore();
+      const picker = usePickerStore();
+      const dayIdx = picker.selectedDayIdx;
       const inToday = new Set(usToday.value.map((u) => u.tpId));
       return [...ts.active, ...ts.pinned]
         .filter((r) => !inToday.has(r.tpId))
@@ -154,7 +154,8 @@ export const useDayStore = defineStore(
           tpHours: 0,
           zucHours: WORKDAY_HOURS,
           emails: 0,
-          commits: dayIdx >= 0 ? (r.git?.[dayIdx] ?? 0) + (r.svn?.[dayIdx] ?? 0) : 0,
+          commits:
+            dayIdx >= 0 ? (r.git?.[dayIdx] ?? 0) + (r.svn?.[dayIdx] ?? 0) : 0,
           meetings: 0,
           color: stateColor(r.state),
           note: "",

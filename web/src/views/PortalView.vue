@@ -57,6 +57,7 @@ import TimesheetView         from '../components/timesheet/TimesheetView.vue';
 import ActivityView          from '../components/activity/ActivityView.vue';
 import TeamsView             from '../components/teams/TeamsView.vue';
 import BrowserView           from '../components/browser/BrowserView.vue';
+import { dateToString, getMonday } from '@shared/dates';
 
 const props = defineProps<{ view: string; date: string }>();
 
@@ -86,12 +87,7 @@ watch(() => [props.view, props.date] as const, ([newView, newDate]) => {
         }
 
         // Fetch week data from backend
-        const monday = (() => {
-            const m   = new Date(yr, mo, d);
-            const dow = m.getDay();
-            m.setDate(m.getDate() - (dow === 0 ? 6 : dow - 1));
-            return `${m.getFullYear()}-${String(m.getMonth() + 1).padStart(2, '0')}-${String(m.getDate()).padStart(2, '0')}`;
-        })();
+        const monday = dateToString(getMonday(new Date(yr, mo, d)));
         ts.fetchWeekData(monday);
     }
 }, { immediate: true });

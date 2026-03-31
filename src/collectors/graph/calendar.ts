@@ -8,7 +8,7 @@ import {
   shouldSkipMonth,
 } from "../utils";
 import { CalendarEventRaw } from "@shared/aggregator";
-import { dateToString, currentMonthString, lastDayOfMonth } from "@shared/dates";
+import { dateToString, currentMonthString, startOfMonth, addMonths, getApiStartOfDay, getApiEndOfDay, extractMonthStr } from "@shared/dates";
 
 const CAL_DIR = path.join(process.cwd(), "data", "raw", "graph-calendar");
 
@@ -16,9 +16,8 @@ async function fetchMonthEvents(
   client: Client,
   month: string,
 ): Promise<CalendarEventRaw[]> {
-  const lastDay = lastDayOfMonth(month);
-  const startDateTime = `${month}-01T00:00:00Z`;
-  const endDateTime = `${lastDay}T23:59:59Z`;
+  const startDateTime = getApiStartOfDay(month);
+  const endDateTime = getApiEndOfDay(month);
 
   const response = (await client
     .api("/me/calendarView")
@@ -46,7 +45,7 @@ export async function collectGraphCalendar(
 
   if (date) {
     // Single-day mode: update only the file for that month
-    const month = date.slice(0, 7);
+    const month = extractMonthStr(date);
     const isCurrentMonth = month === currentMonthString();
     const outPath = path.join(CAL_DIR, `${month}.json`);
 
@@ -62,8 +61,8 @@ export async function collectGraphCalendar(
     const response = (await client
       .api("/me/calendarView")
       .query({
-        startDateTime: `${date}T00:00:00Z`,
-        endDateTime: `${date}T23:59:59Z`,
+        startDateTime: getApiStartOfDay(date),
+        endDateTime: getApiEndOfDay(date),
       })
       .select(
         "id,subject,start,end,organizer,attendees,isOnlineMeeting,webLink",
@@ -83,14 +82,11 @@ export async function collectGraphCalendar(
   }
 
   // Full-range mode: iterate months from COLLECT_SINCE to today
-  const sinceDate = new Date(since);
-  let current = new Date(sinceDate.getFullYear(), sinceDate.getMonth(), 1);
+  let current = startOfMonth(since);
   const now = new Date();
 
   while (current <= now) {
-    const year = current.getFullYear();
-    const mo = current.getMonth() + 1;
-    const month = `${year}-${String(mo).padStart(2, "0")}`;
+    const month = currentMonthString(current);
     const isCurrentMonth = month === currentMonthString();
     const outPath = path.join(CAL_DIR, `${month}.json`);
 
@@ -121,7 +117,7 @@ export async function collectGraphCalendar(
       }
     }
 
-    current = new Date(year, mo, 1); // advance to next month
+    current = addMonths(current, 1); // advance to next month
   }
 
   return outPaths;

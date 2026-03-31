@@ -15,6 +15,7 @@ import { findHoliday } from "@shared/holidays";
 import { AggregatedDay, NibolBooking } from "@shared/aggregator";
 import { parseZucchettiLocation } from "../../analysis/aggregator";
 import { readMeta } from "../../collectors/utils";
+import { WORKDAY_HOURS } from "@shared/standards";
 
 export const weekRouter = Router();
 
@@ -132,7 +133,7 @@ weekRouter.get("/:date", async (req: Request, res: Response) => {
     const isWd =
       agg?.isWorkday ?? (zuccDay ? isWorkday(zuccDay) : isWeekday && !holiday);
     const rawOre = zuccDay?.hOrd ? hhmmToHours(zuccDay.hOrd) : null;
-    const oreTarget = agg?.oreTarget ?? (isWd ? (rawOre ?? 8) : 0);
+    const oreTarget = agg?.oreTarget ?? (isWd ? (rawOre ?? WORKDAY_HOURS) : 0);
     // Location: Nibol is the primary source (desk booking is authoritative).
     const monthStr = currentMonthString(dateStr);
     const nibolLastScraped = nibolMeta[monthStr]?.lastExtractedDate ?? null;
