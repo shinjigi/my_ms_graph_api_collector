@@ -2,17 +2,10 @@
     <div>
         <div class="flex items-center gap-3 mb-4">
             <h2 class="text-base font-bold">Teams · Chat — {{ dateLabel }}</h2>
-            <span class="badge badge-outline badge-sm">{{ data?.messages.length ?? 0 }} messaggi</span>
+            <span class="badge badge-outline badge-sm">{{ day.teams.length }} messaggi</span>
         </div>
 
-        <div v-if="loading" class="flex items-center gap-2 py-8 justify-center text-base-content/40">
-            <span class="loading loading-spinner loading-sm"></span>
-            <span class="text-xs">Caricamento messaggi Teams…</span>
-        </div>
-
-        <div v-else-if="error" class="alert alert-error text-sm">{{ error }}</div>
-
-        <div v-else-if="!data || data.messages.length === 0"
+        <div v-if="day.teams.length === 0"
              class="text-center py-12 text-base-content/30 text-sm">
             Nessun messaggio Teams registrato per questo giorno.
         </div>
@@ -52,28 +45,24 @@
 <script setup lang="ts">
 import { ref, computed, watch }  from 'vue';
 import { usePickerStore }        from '../../stores/usePickerStore';
-import { fetchDayTeams }         from '../../api';
-import type { TeamsResponse, TeamsMessage } from '../../api';
-import { dateToString, getTimeString } from '@shared/dates';
+import { useDayStore }           from '../../stores/useDayStore';
+import type { TeamsMessageRaw }  from '../../types';
+import { getTimeString } from '@shared/dates';
 
 const picker = usePickerStore();
-
-const loading = ref(false);
-const error   = ref('');
-const data    = ref<TeamsResponse | null>(null);
+const day    = useDayStore();
 
 const dateLabel = ref('');
 
 interface MessageGroup {
     chatId:   string;
     topic:    string | null;
-    messages: TeamsMessage[];
+    messages: TeamsMessageRaw[];
 }
 
 const groupedMessages = computed<MessageGroup[]>(() => {
-    if (!data.value) return [];
     const map = new Map<string, MessageGroup>();
-    for (const m of data.value.messages) {
+    for (const m of day.teams) {
         if (!map.has(m.chatId)) {
             map.set(m.chatId, { chatId: m.chatId, topic: m.chatTopic, messages: [] });
         }
@@ -94,21 +83,7 @@ function truncate(text: string, max: number): string {
     return text.length <= max ? text : text.slice(0, max) + '…';
 }
 
-async function load(date: string) {
-    loading.value = true;
-    error.value   = '';
-    try {
-        data.value = await fetchDayTeams(date);
-    } catch (e) {
-        error.value = (e as Error).message;
-        data.value  = null;
-    } finally {
-        loading.value = false;
-    }
-}
-
 watch(() => picker.pickerSelected, (d) => {
     dateLabel.value = d.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'short' });
-    load(dateToString(d));
 }, { immediate: true });
 </script>
