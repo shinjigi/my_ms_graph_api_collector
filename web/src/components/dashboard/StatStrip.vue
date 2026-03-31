@@ -104,6 +104,7 @@ import { useRouter }            from 'vue-router';
 import { useDayStore }          from '../../stores/useDayStore';
 import { useAnalysisStore }     from '../../stores/useAnalysisStore';
 import { usePickerStore }       from '../../stores/usePickerStore';
+import { dateToString }         from '@shared/dates';
 import type { ActiveView }      from '../../types';
 
 const day      = useDayStore();
@@ -112,11 +113,7 @@ const picker   = usePickerStore();
 const router   = useRouter();
 
 function navigate(view: ActiveView) {
-    const d  = picker.pickerSelected;
-    const yr = d.getFullYear();
-    const mo = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    router.push(`/${view}/${yr}-${mo}-${dd}`);
+    router.push(`/${view}/${dateToString(picker.pickerSelected)}`);
 }
 
 // Zucchetti hours derived from store (decimal -> h + m display)
@@ -146,11 +143,7 @@ const providerShort = computed(() => {
 });
 
 function selectedDateStr(): string {
-    const d = picker.pickerSelected;
-    const yr  = d.getFullYear();
-    const mo  = String(d.getMonth() + 1).padStart(2, '0');
-    const dd  = String(d.getDate()).padStart(2, '0');
-    return `${yr}-${mo}-${dd}`;
+    return dateToString(picker.pickerSelected);
 }
 
 function runAnalysis() {

@@ -3,7 +3,7 @@ import { createLogger } from "../../logger";
 import { startZucchettiSession } from "./session";
 import { scrapeCartellino, validateDay } from "./scraper";
 import { MonthData } from "@shared/zucchetti";
-import { parseDateString } from "@shared/dates";
+import { parseDateString, getYearMonth, addMonths } from "@shared/dates";
 
 const log = createLogger("zucchetti-collector");
 
@@ -27,9 +27,9 @@ const endMonth = values.end;
 
 // If date is provided, extract month and year from it
 if (values.date) {
-  const d = parseDateString(values.date);
-  targetMonth = (d.getMonth() + 1).toString();
-  targetYear = d.getFullYear().toString();
+  const { month, year } = getYearMonth(values.date);
+  targetMonth = month.toString();
+  targetYear = year.toString();
 }
 
 void (async () => {
@@ -52,14 +52,11 @@ void (async () => {
   // Determine the list of months to scrape
   const monthsToScrape: { month: number; year: number }[] = [];
   if (startMonth && endMonth) {
-    let current = new Date(startMonth + "-01");
-    const end = new Date(endMonth + "-01");
+    let current = parseDateString(startMonth);
+    const end = parseDateString(endMonth);
     while (current <= end) {
-      monthsToScrape.push({
-        month: current.getMonth() + 1,
-        year: current.getFullYear(),
-      });
-      current = new Date(current.getFullYear(), current.getMonth() + 1, 1);
+      monthsToScrape.push(getYearMonth(current));
+      current = addMonths(current, 1);
     }
   } else if (targetMonth && targetYear) {
     monthsToScrape.push({
@@ -68,8 +65,7 @@ void (async () => {
     });
   } else {
     // Default to current month if nothing specified
-    const now = new Date();
-    monthsToScrape.push({ month: now.getMonth() + 1, year: now.getFullYear() });
+    monthsToScrape.push(getYearMonth());
   }
 
   const allResults: MonthData[] = [];

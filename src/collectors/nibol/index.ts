@@ -10,7 +10,7 @@
 import path from "node:path";
 import * as nodeFs from "node:fs/promises";
 import { chromium } from "playwright";
-import { dateToString, currentMonthString } from "@shared/dates";
+import { dateToString, currentMonthString, getYearMonth } from "@shared/dates";
 import { readMeta, writeMeta, shouldSkipMonth } from "../utils";
 import type { NibolBooking } from "@shared/aggregator";
 
@@ -354,31 +354,25 @@ export async function nibolFetchCalendarData(range?: {
           const year = Number.parseInt(match[2], 10);
           const date = new Date(`${monthName} 1, ${year}`);
           if (!isNaN(date.getTime())) {
-            return { month: date.getMonth(), year };
+            return { month: date.getMonth() + 1, year };
           }
         }
       }
-      return { month: new Date().getMonth(), year: new Date().getFullYear() };
+      return getYearMonth();
     }
 
     const { month: startMonth, year: startYear } = range
-      ? {
-          month: new Date(range.start).getMonth(),
-          year: new Date(range.start).getFullYear(),
-        }
-      : { month: new Date().getMonth(), year: new Date().getFullYear() };
+      ? getYearMonth(range.start)
+      : getYearMonth();
 
     const { month: endMonth, year: endYear } = range
-      ? {
-          month: new Date(range.end).getMonth(),
-          year: new Date(range.end).getFullYear(),
-        }
-      : { month: new Date().getMonth(), year: new Date().getFullYear() };
+      ? getYearMonth(range.end)
+      : getYearMonth();
 
     // Navigate to the start month
     let current = await getVisibleMonthYear();
     console.log(
-      `Current visible: ${current.month + 1}/${current.year}, Target start: ${startMonth + 1}/${startYear}`,
+      `Current visible: ${current.month}/${current.year}, Target start: ${startMonth}/${startYear}`,
     );
 
     // Navigate backward if needed
@@ -411,7 +405,7 @@ export async function nibolFetchCalendarData(range?: {
     let finished = false;
 
     while (!finished) {
-      console.log(`Scraping month: ${current.month + 1}/${current.year}`);
+      console.log(`Scraping month: ${current.month}/${current.year}`);
       await page.waitForTimeout(2000); // Give it time to load the grid contents
 
       const monthBookings: NibolBooking[] = await page.evaluate(
@@ -463,7 +457,7 @@ export async function nibolFetchCalendarData(range?: {
             }
 
             if (type) {
-              const monthStr = String(month + 1).padStart(2, "0");
+              const monthStr = String(month).padStart(2, "0");
               const dayStr = String(day).padStart(2, "0");
               list.push({
                 date: `${year}-${monthStr}-${dayStr}`,

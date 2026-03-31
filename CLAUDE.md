@@ -128,3 +128,9 @@ registry=https://registry.npmjs.org/
 - Language in code comments and console output is **Italian**.
 - The app requires an Azure Entra ID App Registration with **"Allow public client flows"** enabled and **Delegated** permissions (not Application).
 - `.token-cache.json` contains sensitive tokens and is gitignored.
+
+## Development Guidelines
+
+- **Date Manipulation**: Always use `@shared/dates.ts` for any date or date-string manipulation (formatting, offsets, extraction). Never use manual `slice(0, 10)`, `substring`, or `padStart` for ISO dates. Use `dateToString()`, `getMonday()`, `extractMonthStr()`, `getApiStartOfDay()`, etc.
+- **Standards & Constants**: Use `@shared/standards.ts` for shared business logic constants like `WORKDAY_HOURS`.
+- **Personal registry**: Always use the public npm registry (`https://registry.npmjs.org/`).

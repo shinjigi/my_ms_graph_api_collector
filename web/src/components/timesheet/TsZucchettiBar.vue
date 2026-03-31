@@ -44,8 +44,8 @@ import { useTimesheetStore }       from '../../stores/useTimesheetStore';
 import { usePickerStore }          from '../../stores/usePickerStore';
 import { submitZucchettiRequest }  from '../../api';
 import type { WeekDayResponse }    from '../../types';
-import { HALF_WORKDAY_HOURS, WORKDAY_HOURS } from '../../standards';
-import { DAYABB_IT } from '@shared/dates';
+import { HALF_WORKDAY_HOURS, WORKDAY_HOURS } from '@shared/standards';
+import { DAYABB_IT, dateToString } from '@shared/dates';
 
 const ts     = useTimesheetStore();
 const picker = usePickerStore();
@@ -60,11 +60,7 @@ const selectedDayLabel = computed(() => {
 const fillDisabled = computed(() => picker.selectedDayIdx < 0);
 
 function selectedDateStr(): string {
-    const d = picker.pickerSelected;
-    const yr  = d.getFullYear();
-    const mo  = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${yr}-${mo}-${day}`;
+    return dateToString(picker.pickerSelected);
 }
 
 const busy   = ref(false);

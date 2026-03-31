@@ -51,14 +51,12 @@
 <script setup lang="ts">
 import { computed }      from 'vue';
 import { usePickerStore } from '../../stores/usePickerStore';
+import { dateToString } from '@shared/dates';
 import type { ActiveView } from '../../types';
 
 const picker = usePickerStore();
 
-const currentDateStr = computed(() => {
-    const d = picker.pickerSelected;
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-});
+const currentDateStr = computed(() => dateToString(picker.pickerSelected));
 
 const navItems: { view: ActiveView; label: string; icon: string }[] = [
     { view:'dashboard',  label:'Dashboard',  icon:'M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zM14 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z' },

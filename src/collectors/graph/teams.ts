@@ -3,7 +3,7 @@ import * as path from "node:path";
 import { Client } from "@microsoft/microsoft-graph-client";
 import { mergeByKey, readMeta, writeMeta } from "../utils";
 import { ChatState, TeamsMessageRaw } from "@shared/aggregator";
-import { dateToString, getISOTimestamp } from "@shared/dates";
+import { dateToString, oneMonthAgo, extractMonthStr } from "@shared/dates";
 
 const TEAMS_DIR = path.join(process.cwd(), "data", "raw", "graph-teams");
 const CHAT_STATES_FILE = path.join(TEAMS_DIR, "chat-states.json");
@@ -25,13 +25,6 @@ async function saveChatStates(
     JSON.stringify(states, null, 2),
     "utf-8",
   );
-}
-
-/** Default since: 1 month ago from today. */
-function oneMonthAgo(): string {
-  const d = new Date();
-  d.setMonth(d.getMonth() - 1);
-  return getISOTimestamp(d);
 }
 
 /**
@@ -125,7 +118,7 @@ export async function collectGraphTeams(
 
   // In single-day mode narrow to the target month only for writing,
   // but still need to fetch from all chats.
-  const targetMonth = date ? date.slice(0, 7) : null;
+  const targetMonth = date ? extractMonthStr(date) : null;
 
   for (const chat of allChats) {
     // Determine the since threshold for this chat
@@ -157,7 +150,7 @@ export async function collectGraphTeams(
           messageType: m.messageType,
         };
 
-        const month = m.createdDateTime?.slice(0, 7);
+        const month = m.createdDateTime ? extractMonthStr(m.createdDateTime) : undefined;
         if (!month) continue;
 
         // In single-day mode only accumulate the relevant month

@@ -96,7 +96,7 @@ import { useTimesheetStore } from '../../stores/useTimesheetStore';
 import { usePickerStore }    from '../../stores/usePickerStore';
 import { useUiStore }        from '../../stores/useUiStore';
 import { stateColor, tpLink as makeTpLink } from '../../utils';
-import { hoursToHhmm } from '@shared/dates';
+import { hoursToHhmm, getMonday } from '@shared/dates';
 import type { TsRow, Day }   from '../../types';
 import TimeCellWidget        from '../TimeCellWidget.vue';
 import TsNoteCell            from './TsNoteCell.vue';
@@ -116,10 +116,7 @@ const ui     = useUiStore();
 const days   = computed(() => ts.days);
 
 function selectDay(dayIdx: number) {
-    const sel = picker.pickerSelected;
-    const dow = sel.getDay();
-    const monday = new Date(sel);
-    monday.setDate(sel.getDate() - (dow === 0 ? 6 : dow - 1));
+    const monday = getMonday(picker.pickerSelected);
     const d = new Date(monday);
     d.setDate(monday.getDate() + dayIdx);
     picker.selectDay(d.getFullYear(), d.getMonth(), d.getDate());

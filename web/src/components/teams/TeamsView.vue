@@ -54,6 +54,7 @@ import { ref, computed, watch }  from 'vue';
 import { usePickerStore }        from '../../stores/usePickerStore';
 import { fetchDayTeams }         from '../../api';
 import type { TeamsResponse, TeamsMessage } from '../../api';
+import { dateToString, getTimeString } from '@shared/dates';
 
 const picker = usePickerStore();
 
@@ -82,8 +83,7 @@ const groupedMessages = computed<MessageGroup[]>(() => {
 });
 
 function formatTime(iso: string): string {
-    const d = new Date(iso);
-    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    return getTimeString(iso).slice(0, 5);
 }
 
 function stripHtml(html: string): string {
@@ -108,10 +108,7 @@ async function load(date: string) {
 }
 
 watch(() => picker.pickerSelected, (d) => {
-    const yr = d.getFullYear();
-    const mo = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
     dateLabel.value = d.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'short' });
-    load(`${yr}-${mo}-${dd}`);
+    load(dateToString(d));
 }, { immediate: true });
 </script>

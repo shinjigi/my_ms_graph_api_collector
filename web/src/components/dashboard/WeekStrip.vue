@@ -52,6 +52,7 @@ import { useTimesheetStore }  from '../../stores/useTimesheetStore';
 import { locationEmoji, locationTitle, giustActivityEmojis } from '../../utils';
 import type { ZucchettiJustification } from '@shared/zucchetti';
 import DayLocationPopover from '../timesheet/DayLocationPopover.vue';
+import { getMonday } from '@shared/dates';
 
 const picker  = usePickerStore();
 const ts      = useTimesheetStore();
@@ -59,9 +60,7 @@ const popover = ref<InstanceType<typeof DayLocationPopover> | null>(null);
 
 const weekCards = computed(() => {
     const sel = picker.pickerSelected;
-    const dow = sel.getDay();
-    const monday = new Date(sel);
-    monday.setDate(sel.getDate() - (dow === 0 ? 6 : dow - 1));
+    const monday = getMonday(sel);
 
     return ts.days.slice(0, 5).map((d, i) => {
         const date      = new Date(monday);

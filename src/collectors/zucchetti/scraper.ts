@@ -11,6 +11,7 @@ import {
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { Page, Locator } from "playwright";
+import { extractMonthStr } from "@shared/dates";
 
 const ZUCC_DIR = path.join(process.cwd(), "data", "raw", "zucchetti");
 
@@ -289,7 +290,7 @@ export async function patchRawZucchettiFile(
   date: string,
   day: ZucchettiDay,
 ): Promise<void> {
-  const monthStr = date.slice(0, 7);
+  const monthStr = extractMonthStr(date);
   const filePath = path.join(ZUCC_DIR, `${monthStr}.json`);
 
   let days: ZucchettiDay[] = [];

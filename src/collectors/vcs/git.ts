@@ -4,7 +4,7 @@ import { execSync } from "child_process";
 import { globSync } from "glob";
 import { mergeByKey, readMeta, writeMeta, shouldSkipMonth } from "../utils";
 import { GitCommit } from "@shared/aggregator";
-import { dateToString, currentMonthString } from "@shared/dates";
+import { dateToString, currentMonthString, extractMonthStr } from "@shared/dates";
 
 const GIT_DIR = path.join(process.cwd(), "data", "raw", "git");
 
@@ -91,7 +91,7 @@ export async function collectGitCommits(force = false): Promise<string[]> {
   // Group by month
   const byMonth = new Map<string, GitCommit[]>();
   for (const commit of filtered) {
-    const month = commit.date?.slice(0, 7);
+    const month = commit.date ? extractMonthStr(commit.date) : undefined;
     if (!month) continue;
     if (!byMonth.has(month)) byMonth.set(month, []);
     byMonth.get(month)!.push(commit);

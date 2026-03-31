@@ -8,7 +8,7 @@ import {
   shouldSkipMonth,
 } from "../utils";
 import { EmailRaw } from "@shared/aggregator";
-import { dateToString, currentMonthString, lastDayOfMonth } from "@shared/dates";
+import { dateToString, currentMonthString, startOfMonth, addMonths, getApiStartOfDay, getApiEndOfDay, extractMonthStr } from "@shared/dates";
 
 const EMAIL_DIR = path.join(process.cwd(), "data", "raw", "graph-email");
 
@@ -17,8 +17,7 @@ async function fetchMonthEmails(
   month: string,
   top: number,
 ): Promise<EmailRaw[]> {
-  const lastDay = lastDayOfMonth(month);
-  const filter = `receivedDateTime ge ${month}-01T00:00:00Z and receivedDateTime le ${lastDay}T23:59:59Z`;
+  const filter = `receivedDateTime ge ${getApiStartOfDay(month)} and receivedDateTime le ${getApiEndOfDay(month)}`;
 
   const response = (await client
     .api("/me/messages")
@@ -47,7 +46,7 @@ export async function collectGraphEmail(
 
   if (date) {
     // Single-day mode: update only the file for that month
-    const month = date.slice(0, 7);
+    const month = extractMonthStr(date);
     const isCurrentMonth = month === currentMonthString();
     const outPath = path.join(EMAIL_DIR, `${month}.json`);
 
@@ -60,7 +59,7 @@ export async function collectGraphEmail(
       return [outPath];
     }
 
-    const filter = `receivedDateTime ge ${date}T00:00:00Z and receivedDateTime le ${date}T23:59:59Z`;
+    const filter = `receivedDateTime ge ${getApiStartOfDay(date)} and receivedDateTime le ${getApiEndOfDay(date)}`;
 
     const response = (await client
       .api("/me/messages")
@@ -81,14 +80,11 @@ export async function collectGraphEmail(
   }
 
   // Full-range mode: iterate months from COLLECT_SINCE to today
-  const sinceDate = new Date(since);
-  let current = new Date(sinceDate.getFullYear(), sinceDate.getMonth(), 1);
+  let current = startOfMonth(since);
   const now = new Date();
 
   while (current <= now) {
-    const year = current.getFullYear();
-    const mo = current.getMonth() + 1;
-    const month = `${year}-${String(mo).padStart(2, "0")}`;
+    const month = currentMonthString(current);
     const isCurrentMonth = month === currentMonthString();
     const outPath = path.join(EMAIL_DIR, `${month}.json`);
 
@@ -115,7 +111,7 @@ export async function collectGraphEmail(
       }
     }
 
-    current = new Date(year, mo, 1);
+    current = addMonths(current, 1);
   }
 
   return outPaths;

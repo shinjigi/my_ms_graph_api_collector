@@ -94,6 +94,7 @@ import { useDayStore }      from '../../stores/useDayStore';
 import { useUiStore }       from '../../stores/useUiStore';
 import { usePickerStore }   from '../../stores/usePickerStore';
 import { BROWSER_DOMAINS, BROWSER_TOTAL_VISITS, BROWSER_TOTAL_DOMAINS, TEAMS_MSG_COUNT } from '../../mock/data';
+import { dateToString }     from '@shared/dates';
 import type { ActiveView }  from '../../types';
 
 const day    = useDayStore();
@@ -102,11 +103,7 @@ const picker = usePickerStore();
 const router = useRouter();
 
 function navigate(view: ActiveView) {
-    const d  = picker.pickerSelected;
-    const yr = d.getFullYear();
-    const mo = String(d.getMonth() + 1).padStart(2, '0');
-    const dd = String(d.getDate()).padStart(2, '0');
-    router.push(`/${view}/${yr}-${mo}-${dd}`);
+    router.push(`/${view}/${dateToString(picker.pickerSelected)}`);
 }
 
 // Derive email counts from store data
