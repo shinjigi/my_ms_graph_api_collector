@@ -300,10 +300,28 @@ export const useTimesheetStore = defineStore(
     }> {
       const monday = currentMonday.value;
       if (!monday) throw new Error("No week loaded");
-      const result = await submitWeekHoursApi(monday, buildEdits());
+
+      const edits = buildEdits();
+      const result = await submitWeekHoursApi(monday, edits);
       if (result.errors.length === 0) {
+        // Optimistic update: merge submitted edits into local rows immediately
+        // so cells don't "go blank" during the indexing delay on TP side.
+        edits.forEach((e) => {
+          const row = [...active.value, ...pinned.value].find(
+            (r) => r.tpId === e.tpId,
+          );
+          if (row) {
+            if (!row.hours) row.hours = [0, 0, 0, 0, 0, 0, 0];
+            row.hours[e.dayIdx] = e.hours;
+            if (!row.notes) row.notes = [];
+            row.notes[e.dayIdx] = e.description || null;
+          }
+        });
+
         clearEdits();
-        await fetchWeekData(monday);
+        // Give TP a moment to index the new entries before we re-fetch
+        await new Promise((r) => setTimeout(r, 500));
+        await fetchWeekData(monday, true);
       }
       return result;
     }
@@ -318,15 +336,32 @@ export const useTimesheetStore = defineStore(
       const monday = currentMonday.value;
       if (!monday) throw new Error("No week loaded");
       if (dayIdx < 0 || dayIdx > 4) throw new Error("Invalid day index");
-      const result = await submitWeekHoursApi(monday, buildEdits(dayIdx));
+
+      const edits = buildEdits(dayIdx);
+      const result = await submitWeekHoursApi(monday, edits);
       if (result.errors.length === 0) {
+        // Optimistic update for this specific day
+        edits.forEach((e) => {
+          const row = [...active.value, ...pinned.value].find(
+            (r) => r.tpId === e.tpId,
+          );
+          if (row) {
+            if (!row.hours) row.hours = [0, 0, 0, 0, 0, 0, 0];
+            row.hours[e.dayIdx] = e.hours;
+            if (!row.notes) row.notes = [];
+            row.notes[e.dayIdx] = e.description || null;
+          }
+        });
+
         for (const key of Object.keys(hoursEdits.value)) {
           if (key.endsWith(`_${dayIdx}`)) {
             delete hoursEdits.value[key];
             delete noteEdits.value[key];
           }
         }
-        await fetchWeekData(monday);
+        // Give TP a moment to index the new entries before we re-fetch
+        await new Promise((r) => setTimeout(r, 500));
+        await fetchWeekData(monday, true);
       }
       return result;
     }

@@ -119,18 +119,28 @@ export const useDayStore = defineStore(
       if (dayIdx >= 0 && ts.active.length > 0) {
         const activeTasks = ts.active
           .filter((r) => ts.getHours(r.tpId, dayIdx) > 0)
-          .map((r) => ({
-            us: r.us,
-            tpId: r.tpId,
-            state: r.state,
-            tpHours: ts.getHours(r.tpId, dayIdx),
-            zucHours: WORKDAY_HOURS,
-            emails: 0,
-            commits: (r.git?.[dayIdx] ?? 0) + (r.svn?.[dayIdx] ?? 0),
-            meetings: calEvents.length,
-            color: stateColor(r.state),
-            note: ts.getNote(r.tpId, dayIdx),
-          }));
+          .map((r) => {
+            const currentNote = ts.getNote(r.tpId, dayIdx);
+            const persistedNote = usNotes.value[r.tpId];
+            
+            // Sync persisted notes from dashboard state to timesheet submission store if missing
+            if (persistedNote && !currentNote) {
+                ts.setNote(r.tpId, dayIdx, persistedNote);
+            }
+
+            return {
+              us: r.us,
+              tpId: r.tpId,
+              state: r.state,
+              tpHours: ts.getHours(r.tpId, dayIdx),
+              zucHours: WORKDAY_HOURS,
+              emails: 0,
+              commits: (r.git?.[dayIdx] ?? 0) + (r.svn?.[dayIdx] ?? 0),
+              meetings: calEvents.length,
+              color: stateColor(r.state),
+              note: ts.getNote(r.tpId, dayIdx),
+            };
+          });
 
         // Preserve user-added items not managed by TP
         const tsIds = new Set([...ts.active, ...ts.pinned].map((r) => r.tpId));
@@ -201,6 +211,11 @@ export const useDayStore = defineStore(
 
     function setUsNote(tpId: number, text: string) {
       usNotes.value[tpId] = text;
+      // Bridge to timesheet store so dashboard edits are included in the submit flow.
+      const ts = useTimesheetStore();
+      const picker = usePickerStore();
+      const dayIdx = picker.selectedDayIdx;
+      if (dayIdx >= 0) ts.setNote(tpId, dayIdx, text);
     }
 
     function setTpHours(tpId: number, val: number) {
