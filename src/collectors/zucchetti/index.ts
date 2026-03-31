@@ -80,14 +80,16 @@ function extractJson(output: string): MonthData[] {
   return parsed as MonthData[];
 }
 
+import { currentMonthString, dateToString } from "@shared/dates";
+
 export async function collectZucchetti(
   force = false,
   range?: { start: string; end: string },
 ): Promise<string[]> {
   const sinceStr = range?.start || process.env["COLLECT_SINCE"] || "2025-01-01";
-  const endStr = range?.end || new Date().toISOString().slice(0, 7); // Default to current month YYYY-MM
+  const endStr = range?.end || currentMonthString(); // Default to current month YYYY-MM
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = dateToString();
   await fs.mkdir(ZUCC_DIR, { recursive: true });
 
   // Optimization: find the first month that needs collection
@@ -101,7 +103,7 @@ export async function collectZucchetti(
   if (!force) {
     // Skip already collected months from the beginning
     while (startMonthDate <= endMonthDate) {
-      const mStr = startMonthDate.toISOString().slice(0, 7);
+      const mStr = currentMonthString(startMonthDate);
       if (shouldSkipMonth(meta[mStr], mStr, ["zucchetti"])) {
         startMonthDate.setMonth(startMonthDate.getMonth() + 1);
       } else {
@@ -115,8 +117,8 @@ export async function collectZucchetti(
     return [];
   }
 
-  const actualStart = startMonthDate.toISOString().slice(0, 7);
-  const actualEnd = endMonthDate.toISOString().slice(0, 7);
+  const actualStart = currentMonthString(startMonthDate);
+  const actualEnd = currentMonthString(endMonthDate);
 
   log.info(`Avvio raccolta batch: ${actualStart} -> ${actualEnd}...`);
 

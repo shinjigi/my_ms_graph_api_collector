@@ -4,6 +4,7 @@ import * as path from "node:path";
 import { createRequire } from "node:module";
 import { mergeByKey, readMeta, writeMeta, shouldSkipMonth } from "../utils";
 import { BrowserVisit } from "@shared/aggregator";
+import { dateToString, currentMonthString, getISOTimestamp } from "@shared/dates";
 
 const _require = createRequire(__filename);
 
@@ -40,13 +41,13 @@ async function copyToTemp(srcPath: string): Promise<string> {
 function chromeTimeToIso(chromeUs: bigint): string {
   // Chrome stores timestamps as microseconds since Jan 1, 1601 (Windows FILETIME)
   const unixMs = Number((chromeUs - CHROME_EPOCH_OFFSET_US) / BigInt(1000));
-  return new Date(unixMs).toISOString();
+  return getISOTimestamp(new Date(unixMs));
 }
 
 function firefoxTimeToIso(firefoxUs: bigint): string {
   // Firefox stores timestamps as microseconds since Unix epoch
   const unixMs = Number(firefoxUs / BigInt(1000));
-  return new Date(unixMs).toISOString();
+  return getISOTimestamp(new Date(unixMs));
 }
 
 async function queryChromeProfile(
@@ -96,7 +97,7 @@ async function queryChromeProfile(
         url: url ?? "",
         title: title ?? null,
         visitTime: isoTime,
-        date: isoTime.slice(0, 10),
+        date: dateToString(isoTime),
       };
     });
   } finally {
@@ -151,7 +152,7 @@ async function queryFirefoxProfile(
         url: url ?? "",
         title: title ?? null,
         visitTime: isoTime,
-        date: isoTime.slice(0, 10),
+        date: dateToString(isoTime),
       };
     });
   } finally {
@@ -168,13 +169,13 @@ async function writeByMonth(
   force: boolean,
 ): Promise<string[]> {
   const meta = await readMeta(dir);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = dateToString();
   const outPaths: string[] = [];
 
   // Group visits by month
   const byMonth = new Map<string, BrowserVisit[]>();
   for (const v of visits) {
-    const month = v.date.slice(0, 7);
+    const month = currentMonthString(v.date);
     if (!byMonth.has(month)) byMonth.set(month, []);
     byMonth.get(month)!.push(v);
   }
@@ -182,7 +183,7 @@ async function writeByMonth(
   const months = Array.from(byMonth.keys()).sort((a, b) => a.localeCompare(b));
 
   for (const month of months) {
-    const isCurrentMonth = month === today.slice(0, 7);
+    const isCurrentMonth = month === currentMonthString();
     const outPath = path.join(dir, `${month}.json`);
 
     if (

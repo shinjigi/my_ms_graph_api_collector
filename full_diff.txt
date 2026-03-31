@@ -1,0 +1,1608 @@
+diff --git a/scripts/nibol/book_desk.ts b/scripts/nibol/book_desk.ts
+index 49df24c..ea24f47 100644
+--- a/scripts/nibol/book_desk.ts
++++ b/scripts/nibol/book_desk.ts
+@@ -1,5 +1,6 @@
+ import { nibolBookDesk } from '../../src/collectors/nibol';
+ import * as dotenv from 'dotenv';
++import { dateToString } from '../../shared/dates';
+ 
+ dotenv.config();
+ 
+@@ -12,7 +13,7 @@ async function main() {
+     const dateArg = args.find(a => a.startsWith('--date='))?.split('=')[1];
+     
+     // Default to today if no date provided
+-    const date = dateArg || new Date().toISOString().split('T')[0];
++    const date = dateArg || dateToString();
+ 
+     console.log(`[Nibol] Booking desk for date: ${date}`);
+     
+diff --git a/scripts/test-nibol.ts b/scripts/test-nibol.ts
+index 86cba60..a187b94 100644
+--- a/scripts/test-nibol.ts
++++ b/scripts/test-nibol.ts
+@@ -1,10 +1,11 @@
+ import { nibolBookDesk, nibolCheckIn } from '../src/collectors/nibol';
+ import * as dotenv from 'dotenv';
++import { dateToString } from '../shared/dates';
+ 
+ dotenv.config();
+ 
+ async function test() {
+-    const date = new Date().toISOString().split('T')[0];
++    const date = dateToString();
+     console.log(`Testing Nibol automation for date: ${date}`);
+ 
+     try {
+diff --git a/scripts/tp/client.ts b/scripts/tp/client.ts
+index 08a109f..371d20e 100644
+--- a/scripts/tp/client.ts
++++ b/scripts/tp/client.ts
+@@ -12,6 +12,7 @@ import type {
+ } from "./types";
+ 
+ dotenv.config();
++import { dateToString, parseTpDate } from "../../shared/dates";
+ 
+ export class TargetprocessClient {
+   private readonly baseUrl: string;
+@@ -81,7 +82,7 @@ export class TargetprocessClient {
+     const me = await this.request<{ Id: number }>("v1", "Users/loggeduser", {
+       include: "[Id]",
+     });
+-    const date = input.date ?? new Date().toISOString().slice(0, 10);
++    const date = input.date ?? dateToString();
+ 
+     const payload = {
+       Assignable: { Id: input.usId },
+@@ -122,14 +123,7 @@ export class TargetprocessClient {
+ 
+     return {
+       id: raw.Id,
+-      date: new Date(
+-        Number.parseInt(
+-          raw.Date.replaceAll(/\/Date\((\d+)[+-]\d+\)\//, "$1"),
+-          10,
+-        ),
+-      )
+-        .toISOString()
+-        .slice(0, 10),
++      date: parseTpDate(raw.Date),
+       spent: raw.Spent,
+       description: raw.Description,
+       user: raw.User.FullName,
+diff --git a/scripts/tp/format.ts b/scripts/tp/format.ts
+index feb474f..1a15cf5 100644
+--- a/scripts/tp/format.ts
++++ b/scripts/tp/format.ts
+@@ -25,11 +25,4 @@ export function printTable<T>(rows: T[], columns: ColumnDef<T>[]): void {
+   });
+ }
+ 
+-export function parseTpDate(tpDate: string | null | undefined): string {
+-  if (!tpDate) return "-";
+-  const ms = Number.parseInt(
+-    tpDate.replaceAll(/\/Date\((\d+)[+-]\d+\)\//, "$1"),
+-    10,
+-  );
+-  return new Date(ms).toISOString().slice(0, 10);
+-}
++export { parseTpDate } from "../../shared/dates";
+diff --git a/shared/holidays.ts b/shared/holidays.ts
+index a7317c8..5fba21c 100644
+--- a/shared/holidays.ts
++++ b/shared/holidays.ts
+@@ -57,13 +57,7 @@ export function getItalianHolidays(year: number): Holiday[] {
+ // Creiamo una cache per evitare ricalcoli inutili
+ const holidaysCache = new Map<number, Holiday[]>();
+ 
+-export function dateToString(d: Date): string {
+-  // Use local date components — toISOString() uses UTC and shifts in CET/CEST
+-  const yr = d.getFullYear();
+-  const mo = String(d.getMonth() + 1).padStart(2, "0");
+-  const day = String(d.getDate()).padStart(2, "0");
+-  return `${yr}-${mo}-${day}`;
+-}
++import { dateToString } from "./dates";
+ 
+ export function findHoliday(date: Date): Holiday | undefined {
+   const year = date.getFullYear();
+diff --git a/src/aiRaw.ts b/src/aiRaw.ts
+index a3e3605..4d11109 100644
+--- a/src/aiRaw.ts
++++ b/src/aiRaw.ts
+@@ -10,6 +10,8 @@
+ import * as fs from "fs/promises";
+ import * as path from "path";
+ 
++import { getTimestampFilename } from "@shared/dates";
++
+ const RAW_DIR = path.join(process.cwd(), "data", "raw", "ai-responses");
+ 
+ export interface RawResponseRecord {
+@@ -31,10 +33,8 @@ export async function saveRawResponse(
+   await fs.mkdir(RAW_DIR, { recursive: true });
+ 
+   const now = new Date();
+-  const date = now.toISOString().slice(0, 10);
+-  const time = now.toTimeString().slice(0, 8).replaceAll(/:/g, "");
+   const safe = opts.context.replaceAll(/[^a-zA-Z0-9_-]/g, "-");
+-  const filename = `${date}_${time}_${opts.provider}_${safe}.json`;
++  const filename = `${getTimestampFilename(now)}_${opts.provider}_${safe}.json`;
+   const filePath = path.join(RAW_DIR, filename);
+ 
+   const record: RawResponseRecord = { savedAt: now.toISOString(), ...opts };
+diff --git a/src/analysis/analyzer.ts b/src/analysis/analyzer.ts
+index d88b0fe..2a851b9 100644
+--- a/src/analysis/analyzer.ts
++++ b/src/analysis/analyzer.ts
+@@ -16,6 +16,7 @@ import * as dotenv from "dotenv";
+ 
+ dotenv.config();
+ 
++import { shiftDate, getISOTimestamp } from "@shared/dates";
+ import type { ProposalEntry, DayProposal } from "@shared/analysis";
+ import type { KbEntry, KbStore } from "@shared/kb";
+ import { SYSTEM_PROMPT, userInstruction } from "./prompts";
+@@ -170,12 +171,6 @@ export function buildProviders(forceProvider?: string): AnalyzerProvider[] {
+   return [all["claude"], all["ollama"], all["gemini"], all["cli"]];
+ }
+ 
+-/** Adds `days` calendar days to a YYYY-MM-DD string. */
+-function shiftDate(dateStr: string, days: number): string {
+-  const d = new Date(dateStr);
+-  d.setUTCDate(d.getUTCDate() + days);
+-  return d.toISOString().slice(0, 10);
+-}
+ 
+ /**
+  * Filters KB items to those relevant to the analysis period.
+@@ -184,14 +179,14 @@ function shiftDate(dateStr: string, days: number): string {
+  */
+ function filterKbByPeriod(items: KbEntry[], batchDates: string[]): KbEntry[] {
+   if (batchDates.length === 0) return items;
+-  const windowDays  = Number(process.env["KB_RELEVANCE_WINDOW_DAYS"] ?? 90);
+-  const batchMin    = batchDates.reduce((a, b) => (a < b ? a : b));
+-  const batchMax    = batchDates.reduce((a, b) => (a > b ? a : b));
++  const windowDays = Number(process.env["KB_RELEVANCE_WINDOW_DAYS"] ?? 90);
++  const batchMin = batchDates.reduce((a, b) => (a < b ? a : b));
++  const batchMax = batchDates.reduce((a, b) => (a > b ? a : b));
+   const windowStart = shiftDate(batchMin, -windowDays);
+-  const windowEnd   = shiftDate(batchMax,  windowDays);
++  const windowEnd = shiftDate(batchMax, windowDays);
+ 
+   return items.filter((e) => {
+-    if (!e.createDate)          return true;   // legacy entry — keep
++    if (!e.createDate) return true; // legacy entry — keep
+     if (e.isFinalState === false) return true; // still open — always keep
+     // Closed or unknown: keep only if created or active within window
+     const inWindow =
+@@ -204,17 +199,17 @@ function filterKbByPeriod(items: KbEntry[], batchDates: string[]): KbEntry[] {
+ /** Sorts KB items by relevance to the batch period (most relevant first). */
+ function sortKbByRelevance(items: KbEntry[], batchDates: string[]): KbEntry[] {
+   if (batchDates.length === 0) return items;
+-  const batchSet    = new Set(batchDates);
+-  const batchMin    = batchDates.reduce((a, b) => (a < b ? a : b));
+-  const windowDays  = Number(process.env["KB_RELEVANCE_WINDOW_DAYS"] ?? 90);
++  const batchSet = new Set(batchDates);
++  const batchMin = batchDates.reduce((a, b) => (a < b ? a : b));
++  const windowDays = Number(process.env["KB_RELEVANCE_WINDOW_DAYS"] ?? 90);
+   const windowStart = shiftDate(batchMin, -windowDays);
+ 
+   const score = (e: KbEntry): number => {
+     let s = 0;
+     if (e.lastActivityDate) {
+-      if (batchSet.has(e.lastActivityDate))      s += 3;
++      if (batchSet.has(e.lastActivityDate)) s += 3;
+       else if (e.lastActivityDate >= windowStart) s += 2;
+-      else                                        s += 1;
++      else s += 1;
+     }
+     if (e.isFinalState === false) s += 1;
+     return s;
+@@ -232,7 +227,7 @@ function fitKbItems(items: KbEntry[], budgetChars: number): KbEntry[] {
+   let total = 0;
+   const result: KbEntry[] = [];
+   for (const item of items) {
+-    const est = (item.name.length + (item.summary?.length ?? 0) + 40);
++    const est = item.name.length + (item.summary?.length ?? 0) + 40;
+     if (total + est > budgetChars) break;
+     result.push(item);
+     total += est;
+@@ -249,15 +244,17 @@ export async function analyzeBatch(
+ ): Promise<DayProposal[]> {
+   const system = buildSystemPrompt();
+ 
+-  const batchDates   = batch.map((d) => d.date);
+-  const filteredKb   = filterKbByPeriod(kbItems, batchDates);
+-  const sortedKb     = sortKbByRelevance(filteredKb, batchDates);
+-  log.info(`KB filtrata: ${sortedKb.length}/${kbItems.length} items per il periodo`);
++  const batchDates = batch.map((d) => d.date);
++  const filteredKb = filterKbByPeriod(kbItems, batchDates);
++  const sortedKb = sortKbByRelevance(filteredKb, batchDates);
++  log.info(
++    `KB filtrata: ${sortedKb.length}/${kbItems.length} items per il periodo`,
++  );
+ 
+   let lastError: Error | null = null;
+   for (const provider of providers) {
+     // Fit KB items within 60% of the provider's budget — leave the rest for day data + response
+-    const kbBudgetChars      = Math.floor(provider.maxInputChars * 0.6);
++    const kbBudgetChars = Math.floor(provider.maxInputChars * 0.6);
+     const kbItemsForProvider = fitKbItems(sortedKb, kbBudgetChars);
+     if (kbItemsForProvider.length < sortedKb.length) {
+       log.warn(
+@@ -265,9 +262,11 @@ export async function analyzeBatch(
+       );
+     }
+ 
+-    const user        = buildUserPromptBatched(batch, kbItemsForProvider, defaults);
++    const user = buildUserPromptBatched(batch, kbItemsForProvider, defaults);
+     const promptChars = system.length + user.length;
+-    log.info(`Batch di ${batch.length} giorni — prompt ~${promptChars} chars (KB: ${kbItemsForProvider.length} items)`);
++    log.info(
++      `Batch di ${batch.length} giorni — prompt ~${promptChars} chars (KB: ${kbItemsForProvider.length} items)`,
++    );
+ 
+     if (promptChars > provider.maxInputChars) {
+       log.warn(
+@@ -276,30 +275,37 @@ export async function analyzeBatch(
+     }
+ 
+     try {
+-      log.info(`[${provider.name}] avvio analisi per ${batch.length} giorni...`);
+-      const t0      = Date.now();
++      log.info(
++        `[${provider.name}] avvio analisi per ${batch.length} giorni...`,
++      );
++      const t0 = Date.now();
+       const results = await provider.analyzeBatch(system, user);
+       const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+ 
+-      const batchDates   = new Set(batch.map((d) => d.date));
++      const batchDates = new Set(batch.map((d) => d.date));
+       const validResults = results.filter((r) => batchDates.has(r.date));
+       if (validResults.length < results.length) {
+         log.warn(
+-          `[${provider.name}] scartati ${results.length - validResults.length} risultati con date fuori dal batch (allucinazioni: ${results.filter((r) => !batchDates.has(r.date)).map((r) => r.date).join(", ")})`,
++          `[${provider.name}] scartati ${results.length - validResults.length} risultati con date fuori dal batch (allucinazioni: ${results
++            .filter((r) => !batchDates.has(r.date))
++            .map((r) => r.date)
++            .join(", ")})`,
+         );
+       }
+ 
+-      log.info(`[${provider.name}] analisi completata in ${elapsed}s — ${validResults.length}/${results.length} giorni validi`);
++      log.info(
++        `[${provider.name}] analisi completata in ${elapsed}s — ${validResults.length}/${results.length} giorni validi`,
++      );
+       return validResults.map((r) => {
+-        const day        = batch.find((d) => d.date === r.date)!;
++        const day = batch.find((d) => d.date === r.date)!;
+         const totalHours = r.entries.reduce((s, e) => s + e.inferredHours, 0);
+         return {
+-          date:        r.date,
+-          oreTarget:   day?.oreTarget ?? 0,
+-          totalHours:  Math.round(totalHours * 100) / 100,
+-          entries:     r.entries,
+-          generatedAt: new Date().toISOString(),
+-          provider:    provider.name,
++          date: r.date,
++          oreTarget: day?.oreTarget ?? 0,
++          totalHours: Math.round(totalHours * 100) / 100,
++          entries: r.entries,
++          generatedAt: getISOTimestamp(),
++          provider: provider.name,
+         };
+       });
+     } catch (err) {
+@@ -359,16 +365,20 @@ async function run(): Promise<void> {
+ 
+   const defaults = await loadDefaults();
+   const allProviders = buildProviders(providerArg);
+-  const sinceDate    = process.env["COLLECT_SINCE"] ?? "2025-01-01";
++  const sinceDate = process.env["COLLECT_SINCE"] ?? "2025-01-01";
+ 
+-  log.info(`Provider configurati: ${allProviders.map((p) => p.name).join(", ")}`);
++  log.info(
++    `Provider configurati: ${allProviders.map((p) => p.name).join(", ")}`,
++  );
+   log.info("Verifica disponibilità provider...");
+ 
+   const providers: AnalyzerProvider[] = [];
+   for (const p of allProviders) {
+     const ok = await p.isAvailable();
+     if (ok) {
+-      log.info(`  ✓ ${p.name} — max ${p.maxInputChars.toLocaleString()} chars per batch`);
++      log.info(
++        `  ✓ ${p.name} — max ${p.maxInputChars.toLocaleString()} chars per batch`,
++      );
+       providers.push(p);
+     } else {
+       log.warn(`  ✗ ${p.name} — non disponibile`);
+@@ -376,7 +386,9 @@ async function run(): Promise<void> {
+   }
+ 
+   if (providers.length === 0) {
+-    log.error("[FATAL] Nessun provider disponibile. Controlla le variabili d'ambiente.");
++    log.error(
++      "[FATAL] Nessun provider disponibile. Controlla le variabili d'ambiente.",
++    );
+     process.exit(1);
+   }
+ 
+@@ -402,10 +414,11 @@ async function run(): Promise<void> {
+ 
+   // Use the most restrictive provider's char budget to avoid oversized prompts
+   const maxInputChars = Math.min(...providers.map((p) => p.maxInputChars));
+-  log.info(`Batch budget: ${maxInputChars.toLocaleString()} chars (provider più restrittivo: ${providers.find((p) => p.maxInputChars === maxInputChars)?.name})`);
++  log.info(
++    `Batch budget: ${maxInputChars.toLocaleString()} chars (provider più restrittivo: ${providers.find((p) => p.maxInputChars === maxInputChars)?.name})`,
++  );
+ 
+   let currentBatch: AggregatedDay[] = [];
+-  let currentTokens = 0;
+ 
+   const processBatch = async () => {
+     if (currentBatch.length === 0) return;
+@@ -443,7 +456,6 @@ async function run(): Promise<void> {
+     }
+ 
+     currentBatch = [];
+-    currentTokens = 0;
+   };
+ 
+   for (const file of aggFiles) {
+@@ -469,21 +481,26 @@ async function run(): Promise<void> {
+     }
+ 
+     // Measure actual prompt size (not raw file — which includes browser history etc.)
+-    const system          = buildSystemPrompt();
+-    const testUser        = buildUserPromptBatched([...currentBatch, day], kbItems, defaults);
+-    const projectedChars  = system.length + testUser.length;
++    const system = buildSystemPrompt();
++    const testUser = buildUserPromptBatched(
++      [...currentBatch, day],
++      kbItems,
++      defaults,
++    );
++    const projectedChars = system.length + testUser.length;
+ 
+     log.info(
+       `  Accodo ${date} — target ${day.oreTarget.toFixed(2)}h, ${day.calendar.length} eventi, ${day.gitCommits.length} commit — prompt proiettato ~${projectedChars} chars`,
+     );
+ 
+     if (projectedChars > maxInputChars && currentBatch.length > 0) {
+-      log.debug(`Batch pieno (${projectedChars} > ${maxInputChars}) — flush prima di aggiungere ${date}`);
++      log.debug(
++        `Batch pieno (${projectedChars} > ${maxInputChars}) — flush prima di aggiungere ${date}`,
++      );
+       await processBatch();
+     }
+ 
+     currentBatch.push(day);
+-    currentTokens = projectedChars;
+   }
+ 
+   await processBatch();
+diff --git a/src/analysis/geminiProvider.ts b/src/analysis/geminiProvider.ts
+index d02a707..b19f4b6 100644
+--- a/src/analysis/geminiProvider.ts
++++ b/src/analysis/geminiProvider.ts
+@@ -2,7 +2,7 @@
+  * Gemini analyzer provider using the @google/genai SDK.
+  */
+ import { GoogleGenAI, Type, Schema } from "@google/genai";
+-import { AnalyzerProvider, stripCodeFence, tpmToChars } from "./base";
++import { AnalyzerProvider, tpmToChars } from "./base";
+ import { createLogger } from "../logger";
+ import { saveRawResponse } from "../aiRaw";
+ import { ProposalEntry } from "@shared/analysis";
+diff --git a/src/collectors/browser/history.ts b/src/collectors/browser/history.ts
+index ca50e55..b871ba2 100644
+--- a/src/collectors/browser/history.ts
++++ b/src/collectors/browser/history.ts
+@@ -4,6 +4,7 @@ import * as path from "node:path";
+ import { createRequire } from "node:module";
+ import { mergeByKey, readMeta, writeMeta, shouldSkipMonth } from "../utils";
+ import { BrowserVisit } from "@shared/aggregator";
++import { dateToString, currentMonthString, getISOTimestamp } from "@shared/dates";
+ 
+ const _require = createRequire(__filename);
+ 
+@@ -40,13 +41,13 @@ async function copyToTemp(srcPath: string): Promise<string> {
+ function chromeTimeToIso(chromeUs: bigint): string {
+   // Chrome stores timestamps as microseconds since Jan 1, 1601 (Windows FILETIME)
+   const unixMs = Number((chromeUs - CHROME_EPOCH_OFFSET_US) / BigInt(1000));
+-  return new Date(unixMs).toISOString();
++  return getISOTimestamp(new Date(unixMs));
+ }
+ 
+ function firefoxTimeToIso(firefoxUs: bigint): string {
+   // Firefox stores timestamps as microseconds since Unix epoch
+   const unixMs = Number(firefoxUs / BigInt(1000));
+-  return new Date(unixMs).toISOString();
++  return getISOTimestamp(new Date(unixMs));
+ }
+ 
+ async function queryChromeProfile(
+@@ -96,7 +97,7 @@ async function queryChromeProfile(
+         url: url ?? "",
+         title: title ?? null,
+         visitTime: isoTime,
+-        date: isoTime.slice(0, 10),
++        date: dateToString(isoTime),
+       };
+     });
+   } finally {
+@@ -151,7 +152,7 @@ async function queryFirefoxProfile(
+         url: url ?? "",
+         title: title ?? null,
+         visitTime: isoTime,
+-        date: isoTime.slice(0, 10),
++        date: dateToString(isoTime),
+       };
+     });
+   } finally {
+@@ -168,13 +169,13 @@ async function writeByMonth(
+   force: boolean,
+ ): Promise<string[]> {
+   const meta = await readMeta(dir);
+-  const today = new Date().toISOString().slice(0, 10);
++  const today = dateToString();
+   const outPaths: string[] = [];
+ 
+   // Group visits by month
+   const byMonth = new Map<string, BrowserVisit[]>();
+   for (const v of visits) {
+-    const month = v.date.slice(0, 7);
++    const month = currentMonthString(v.date);
+     if (!byMonth.has(month)) byMonth.set(month, []);
+     byMonth.get(month)!.push(v);
+   }
+@@ -182,7 +183,7 @@ async function writeByMonth(
+   const months = Array.from(byMonth.keys()).sort((a, b) => a.localeCompare(b));
+ 
+   for (const month of months) {
+-    const isCurrentMonth = month === today.slice(0, 7);
++    const isCurrentMonth = month === currentMonthString();
+     const outPath = path.join(dir, `${month}.json`);
+ 
+     if (
+diff --git a/src/collectors/graph/calendar.ts b/src/collectors/graph/calendar.ts
+index 851ad02..52df958 100644
+--- a/src/collectors/graph/calendar.ts
++++ b/src/collectors/graph/calendar.ts
+@@ -6,9 +6,9 @@ import {
+   readMeta,
+   writeMeta,
+   shouldSkipMonth,
+-  lastDayOfMonth,
+ } from "../utils";
+ import { CalendarEventRaw } from "@shared/aggregator";
++import { dateToString, currentMonthString, lastDayOfMonth } from "@shared/dates";
+ 
+ const CAL_DIR = path.join(process.cwd(), "data", "raw", "graph-calendar");
+ 
+@@ -37,7 +37,7 @@ export async function collectGraphCalendar(
+   force = false,
+ ): Promise<string[]> {
+   const since = process.env["COLLECT_SINCE"] ?? "2025-01-01";
+-  const today = new Date().toISOString().slice(0, 10);
++  const today = dateToString();
+ 
+   await fs.mkdir(CAL_DIR, { recursive: true });
+ 
+@@ -47,7 +47,7 @@ export async function collectGraphCalendar(
+   if (date) {
+     // Single-day mode: update only the file for that month
+     const month = date.slice(0, 7);
+-    const isCurrentMonth = month === today.slice(0, 7);
++    const isCurrentMonth = month === currentMonthString();
+     const outPath = path.join(CAL_DIR, `${month}.json`);
+ 
+     if (
+@@ -91,7 +91,7 @@ export async function collectGraphCalendar(
+     const year = current.getFullYear();
+     const mo = current.getMonth() + 1;
+     const month = `${year}-${String(mo).padStart(2, "0")}`;
+-    const isCurrentMonth = month === today.slice(0, 7);
++    const isCurrentMonth = month === currentMonthString();
+     const outPath = path.join(CAL_DIR, `${month}.json`);
+ 
+     if (
+diff --git a/src/collectors/graph/email.ts b/src/collectors/graph/email.ts
+index a666993..39791cb 100644
+--- a/src/collectors/graph/email.ts
++++ b/src/collectors/graph/email.ts
+@@ -6,9 +6,9 @@ import {
+   readMeta,
+   writeMeta,
+   shouldSkipMonth,
+-  lastDayOfMonth,
+ } from "../utils";
+ import { EmailRaw } from "@shared/aggregator";
++import { dateToString, currentMonthString, lastDayOfMonth } from "@shared/dates";
+ 
+ const EMAIL_DIR = path.join(process.cwd(), "data", "raw", "graph-email");
+ 
+@@ -38,7 +38,7 @@ export async function collectGraphEmail(
+ ): Promise<string[]> {
+   const since = process.env["COLLECT_SINCE"] ?? "2025-01-01";
+   const top = Number(process.env["TOP"] ?? 500);
+-  const today = new Date().toISOString().slice(0, 10);
++  const today = dateToString();
+ 
+   await fs.mkdir(EMAIL_DIR, { recursive: true });
+ 
+@@ -48,7 +48,7 @@ export async function collectGraphEmail(
+   if (date) {
+     // Single-day mode: update only the file for that month
+     const month = date.slice(0, 7);
+-    const isCurrentMonth = month === today.slice(0, 7);
++    const isCurrentMonth = month === currentMonthString();
+     const outPath = path.join(EMAIL_DIR, `${month}.json`);
+ 
+     if (
+@@ -89,7 +89,7 @@ export async function collectGraphEmail(
+     const year = current.getFullYear();
+     const mo = current.getMonth() + 1;
+     const month = `${year}-${String(mo).padStart(2, "0")}`;
+-    const isCurrentMonth = month === today.slice(0, 7);
++    const isCurrentMonth = month === currentMonthString();
+     const outPath = path.join(EMAIL_DIR, `${month}.json`);
+ 
+     if (
+diff --git a/src/collectors/graph/teams.ts b/src/collectors/graph/teams.ts
+index 4d14f4a..aa4fa9e 100644
+--- a/src/collectors/graph/teams.ts
++++ b/src/collectors/graph/teams.ts
+@@ -3,6 +3,7 @@ import * as path from "node:path";
+ import { Client } from "@microsoft/microsoft-graph-client";
+ import { mergeByKey, readMeta, writeMeta } from "../utils";
+ import { ChatState, TeamsMessageRaw } from "@shared/aggregator";
++import { dateToString, getISOTimestamp } from "@shared/dates";
+ 
+ const TEAMS_DIR = path.join(process.cwd(), "data", "raw", "graph-teams");
+ const CHAT_STATES_FILE = path.join(TEAMS_DIR, "chat-states.json");
+@@ -30,7 +31,7 @@ async function saveChatStates(
+ function oneMonthAgo(): string {
+   const d = new Date();
+   d.setMonth(d.getMonth() - 1);
+-  return d.toISOString();
++  return getISOTimestamp(d);
+ }
+ 
+ /**
+@@ -90,7 +91,7 @@ export async function collectGraphTeams(
+   date?: string,
+   force = false,
+ ): Promise<string[]> {
+-  const today = new Date().toISOString().slice(0, 10);
++  const today = dateToString();
+ 
+   await fs.mkdir(TEAMS_DIR, { recursive: true });
+ 
+diff --git a/src/collectors/nibol/index.ts b/src/collectors/nibol/index.ts
+index 29de500..ad302dd 100644
+--- a/src/collectors/nibol/index.ts
++++ b/src/collectors/nibol/index.ts
+@@ -10,6 +10,7 @@
+ import path from "node:path";
+ import * as nodeFs from "node:fs/promises";
+ import { chromium } from "playwright";
++import { dateToString, currentMonthString } from "@shared/dates";
+ import { readMeta, writeMeta, shouldSkipMonth } from "../utils";
+ import type { NibolBooking } from "@shared/aggregator";
+ 
+@@ -521,13 +522,11 @@ export async function collectNibol(
+ 
+   await nodeFs.mkdir(NIBOL_DIR, { recursive: true });
+ 
+-  const today = new Date().toISOString().slice(0, 10);
+-  const currentMonth = today.slice(0, 7);
++  const today = dateToString();
++  const currentMonth = currentMonthString();
+ 
+   const effectiveRange = range ?? {
+-    start:
+-      process.env["COLLECT_SINCE"] ??
+-      `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-01`,
++    start: `${currentMonth}-01`,
+     end: today,
+   };
+ 
+@@ -549,7 +548,7 @@ export async function collectNibol(
+   // Group by month
+   const grouped: Record<string, NibolBooking[]> = {};
+   for (const b of bookings) {
+-    const monthStr = b.date.slice(0, 7);
++    const monthStr = currentMonthString(b.date);
+     if (!grouped[monthStr]) grouped[monthStr] = [];
+     grouped[monthStr].push(b);
+   }
+diff --git a/src/collectors/utils.ts b/src/collectors/utils.ts
+index 61aa2f4..426f283 100644
+--- a/src/collectors/utils.ts
++++ b/src/collectors/utils.ts
+@@ -40,12 +40,7 @@ export async function writeMeta(dir: string, month: string, meta: MonthMeta): Pr
+     await fs.writeFile(path.join(dir, '.meta.json'), JSON.stringify(existing, null, 2), 'utf-8');
+ }
+ 
+-/** Returns the last day of a month as "YYYY-MM-DD". */
+-export function lastDayOfMonth(month: string): string {
+-    const [y, m] = month.split('-').map(Number);
+-    // Use UTC to avoid timezone offset shifting the result to the previous day
+-    return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+-}
++import { lastDayOfMonth } from "@shared/dates";
+ 
+ /**
+  * Returns true if the stored metadata indicates the month is fully collected
+diff --git a/src/collectors/vcs/git.ts b/src/collectors/vcs/git.ts
+index ef48c75..cc0d130 100644
+--- a/src/collectors/vcs/git.ts
++++ b/src/collectors/vcs/git.ts
+@@ -4,6 +4,7 @@ import { execSync } from "child_process";
+ import { globSync } from "glob";
+ import { mergeByKey, readMeta, writeMeta, shouldSkipMonth } from "../utils";
+ import { GitCommit } from "@shared/aggregator";
++import { dateToString, currentMonthString } from "@shared/dates";
+ 
+ const GIT_DIR = path.join(process.cwd(), "data", "raw", "git");
+ 
+@@ -63,7 +64,7 @@ export async function collectGitCommits(force = false): Promise<string[]> {
+     .map((e) => e.trim().toLowerCase())
+     .filter(Boolean);
+   const since = process.env["COLLECT_SINCE"] ?? "2025-01-01";
+-  const today = new Date().toISOString().slice(0, 10);
++  const today = dateToString();
+ 
+   if (roots.length === 0) {
+     console.warn("GIT_ROOTS non configurato — collector Git saltato.");
+@@ -101,7 +102,7 @@ export async function collectGitCommits(force = false): Promise<string[]> {
+   const months = Array.from(byMonth.keys()).sort();
+ 
+   for (const month of months) {
+-    const isCurrentMonth = month === today.slice(0, 7);
++    const isCurrentMonth = month === currentMonthString();
+     const outPath = path.join(GIT_DIR, `${month}.json`);
+ 
+     if (
+diff --git a/src/collectors/vcs/svn.ts b/src/collectors/vcs/svn.ts
+index 6f36df4..d12fa10 100644
+--- a/src/collectors/vcs/svn.ts
++++ b/src/collectors/vcs/svn.ts
+@@ -7,9 +7,9 @@ import {
+   readMeta,
+   writeMeta,
+   shouldSkipMonth,
+-  lastDayOfMonth,
+ } from "../utils";
+ import { SvnCommit } from "@shared/aggregator";
++import { dateToString, currentMonthString, lastDayOfMonth } from "@shared/dates";
+ 
+ function parseXml(xml: string): Promise<unknown> {
+   return new Promise((resolve, reject) =>
+@@ -86,7 +86,7 @@ async function fetchMonthCommits(
+       {
+         revision: e.$.revision,
+         author: (e.author ?? [""])[0],
+-        date: d.toISOString().slice(0, 10),
++        date: dateToString(rawDate),
+         message: ((e.msg ?? [""])[0] ?? "").trim(),
+         paths: (e.paths?.[0]?.path ?? []).map((p: { _: string }) => p._),
+       },
+@@ -107,7 +107,7 @@ export async function collectSvnCommits(force = false): Promise<string[]> {
+   const since = process.env["COLLECT_SINCE"] ?? "2025-01-01";
+   const user = process.env["SVN_USERNAME"];
+   const pass = process.env["SVN_PASSWORD"];
+-  const today = new Date().toISOString().slice(0, 10);
++  const today = dateToString();
+ 
+   if (!svnUrl) {
+     console.warn("SVN_URL non configurato — collector SVN saltato.");
+@@ -128,7 +128,7 @@ export async function collectSvnCommits(force = false): Promise<string[]> {
+     const year = current.getFullYear();
+     const mo = current.getMonth() + 1;
+     const month = `${year}-${String(mo).padStart(2, "0")}`;
+-    const isCurrentMonth = month === today.slice(0, 7);
++    const isCurrentMonth = month === currentMonthString();
+     const outPath = path.join(SVN_DIR, `${month}.json`);
+ 
+     if (
+diff --git a/src/collectors/zucchetti/getTimesheet.ts b/src/collectors/zucchetti/getTimesheet.ts
+index 2de505a..dd09f0b 100644
+--- a/src/collectors/zucchetti/getTimesheet.ts
++++ b/src/collectors/zucchetti/getTimesheet.ts
+@@ -2,8 +2,8 @@ import { parseArgs } from "node:util";
+ import { createLogger } from "../../logger";
+ import { startZucchettiSession } from "./session";
+ import { scrapeCartellino, validateDay } from "./scraper";
+-import type { TimesheetData } from "./scraper";
+-import type { MonthData } from "@shared/zucchetti";
++import { MonthData } from "@shared/zucchetti";
++import { parseDateString } from "@shared/dates";
+ 
+ const log = createLogger("zucchetti-collector");
+ 
+@@ -27,11 +27,9 @@ const endMonth = values.end;
+ 
+ // If date is provided, extract month and year from it
+ if (values.date) {
+-  const d = new Date(values.date);
+-  if (!Number.isNaN(d.getTime())) {
+-    targetMonth = (d.getMonth() + 1).toString();
+-    targetYear = d.getFullYear().toString();
+-  }
++  const d = parseDateString(values.date);
++  targetMonth = (d.getMonth() + 1).toString();
++  targetYear = d.getFullYear().toString();
+ }
+ 
+ void (async () => {
+diff --git a/src/collectors/zucchetti/index.ts b/src/collectors/zucchetti/index.ts
+index dd1978e..7c60ca6 100644
+--- a/src/collectors/zucchetti/index.ts
++++ b/src/collectors/zucchetti/index.ts
+@@ -80,14 +80,16 @@ function extractJson(output: string): MonthData[] {
+   return parsed as MonthData[];
+ }
+ 
++import { currentMonthString, dateToString } from "@shared/dates";
++
+ export async function collectZucchetti(
+   force = false,
+   range?: { start: string; end: string },
+ ): Promise<string[]> {
+   const sinceStr = range?.start || process.env["COLLECT_SINCE"] || "2025-01-01";
+-  const endStr = range?.end || new Date().toISOString().slice(0, 7); // Default to current month YYYY-MM
++  const endStr = range?.end || currentMonthString(); // Default to current month YYYY-MM
+ 
+-  const today = new Date().toISOString().slice(0, 10);
++  const today = dateToString();
+   await fs.mkdir(ZUCC_DIR, { recursive: true });
+ 
+   // Optimization: find the first month that needs collection
+@@ -101,7 +103,7 @@ export async function collectZucchetti(
+   if (!force) {
+     // Skip already collected months from the beginning
+     while (startMonthDate <= endMonthDate) {
+-      const mStr = startMonthDate.toISOString().slice(0, 7);
++      const mStr = currentMonthString(startMonthDate);
+       if (shouldSkipMonth(meta[mStr], mStr, ["zucchetti"])) {
+         startMonthDate.setMonth(startMonthDate.getMonth() + 1);
+       } else {
+@@ -115,8 +117,8 @@ export async function collectZucchetti(
+     return [];
+   }
+ 
+-  const actualStart = startMonthDate.toISOString().slice(0, 7);
+-  const actualEnd = endMonthDate.toISOString().slice(0, 7);
++  const actualStart = currentMonthString(startMonthDate);
++  const actualEnd = currentMonthString(endMonthDate);
+ 
+   log.info(`Avvio raccolta batch: ${actualStart} -> ${actualEnd}...`);
+ 
+diff --git a/src/logger.ts b/src/logger.ts
+index c79f1ea..104aba2 100644
+--- a/src/logger.ts
++++ b/src/logger.ts
+@@ -12,6 +12,7 @@
+  */
+ import * as fs   from 'fs';
+ import * as path from 'path';
++import { dateToString, getTimeString } from '@shared/dates';
+ 
+ // ─── Level ordering ───────────────────────────────────────────────────────────
+ export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+@@ -41,7 +42,7 @@ function getFileStream(): fs.WriteStream {
+     if (!fileStream) {
+         const logDir  = path.join(process.cwd(), 'data', 'logs');
+         fs.mkdirSync(logDir, { recursive: true });
+-        const today   = new Date().toISOString().slice(0, 10);
++        const today   = dateToString();
+         fileStream    = fs.createWriteStream(path.join(logDir, `${today}.log`), { flags: 'a' });
+     }
+     return fileStream;
+@@ -60,7 +61,7 @@ export function createLogger(namespace: string): Logger {
+     function write(level: LogLevel, msg: string, args: unknown[]): void {
+         if (LEVEL_ORDER[level] < minLevel) return;
+ 
+-        const ts     = new Date().toTimeString().slice(0, 8);  // HH:MM:SS
++        const ts     = getTimeString();  // HH:MM:SS
+         const label  = level.toUpperCase().padEnd(5);
+         const suffix = args.length
+             ? ' ' + args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ')
+diff --git a/src/server/app.ts b/src/server/app.ts
+index 2267815..eb2c9d8 100644
+--- a/src/server/app.ts
++++ b/src/server/app.ts
+@@ -9,6 +9,7 @@ dotenv.config();
+ 
+ import express from 'express';
+ import cors    from 'cors';
++import { getISOTimestamp } from "@shared/dates";
+ 
+ import { proposalsRouter } from './routes/proposals';
+ import { submitRouter }    from './routes/submit';
+@@ -35,7 +36,7 @@ app.use('/api/day',       signalsRouter);
+ app.use('/api/sync',      syncRouter);
+ 
+ app.get('/api/health', (_req, res) => {
+-    res.json({ status: 'ok', ts: new Date().toISOString() });
++    res.json({ status: 'ok', ts: getISOTimestamp() });
+ });
+ 
+ app.listen(PORT, () => {
+diff --git a/src/server/routes/analyze.ts b/src/server/routes/analyze.ts
+index 7832230..c2901ce 100644
+--- a/src/server/routes/analyze.ts
++++ b/src/server/routes/analyze.ts
+@@ -65,20 +65,14 @@ async function proposalExists(date: string): Promise<boolean> {
+   }
+ }
+ 
++import { getMonday, shiftDate, getISOTimestamp } from "@shared/dates";
++
+ /** Get Monday-to-Friday dates for the week containing the given date. */
+ function weekDates(dateStr: string): string[] {
+-  const d = new Date(dateStr);
+-  const day = d.getDay();
+-  // Monday offset: if Sunday (0) treat as 6, else day - 1
+-  const mondayOffset = day === 0 ? -6 : 1 - day;
+-  const monday = new Date(d);
+-  monday.setDate(d.getDate() + mondayOffset);
+-
++  const monday = getMonday(dateStr);
+   const dates: string[] = [];
+   for (let i = 0; i < 5; i++) {
+-    const dd = new Date(monday);
+-    dd.setDate(monday.getDate() + i);
+-    dates.push(dd.toISOString().slice(0, 10));
++    dates.push(shiftDate(monday, i));
+   }
+   return dates;
+ }
+@@ -172,7 +166,7 @@ analyzeRouter.post("/:date", async (req: Request, res: Response) => {
+     dates: [date],
+     results: {},
+     errors: {},
+-    startedAt: new Date().toISOString(),
++    startedAt: getISOTimestamp(),
+   };
+   jobs.set(jobId, job);
+ 
+@@ -207,7 +201,7 @@ analyzeRouter.post("/week/:date", async (req: Request, res: Response) => {
+     dates,
+     results: {},
+     errors: {},
+-    startedAt: new Date().toISOString(),
++    startedAt: getISOTimestamp(),
+   };
+   jobs.set(jobId, job);
+ 
+diff --git a/src/server/routes/sync.ts b/src/server/routes/sync.ts
+index 4e256c4..a6067a5 100644
+--- a/src/server/routes/sync.ts
++++ b/src/server/routes/sync.ts
+@@ -11,54 +11,46 @@
+  * excluded from on-demand sync.
+  */
+ import { Router, Request, Response } from "express";
+-import * as fs   from "node:fs/promises";
++import * as fs from "node:fs/promises";
+ import * as path from "node:path";
+ 
+ import { collectZucchetti } from "../../collectors/zucchetti/index";
+-import { collectNibol }     from "../../collectors/nibol/index";
++import { collectNibol } from "../../collectors/nibol/index";
+ import { aggregateSingleDay } from "../../analysis/aggregator";
+-import { readMeta }          from "../../collectors/utils";
+-import { ZucchettiDay }      from "@shared/zucchetti";
+-import { dateToString }      from "@shared/holidays";
++import { readMeta } from "../../collectors/utils";
++import { ZucchettiDay } from "@shared/zucchetti";
++import { getMonday, shiftDate, currentMonthString } from "@shared/dates";
+ 
+ export const syncRouter = Router();
+ 
+-const RAW_DIR  = path.join(process.cwd(), "data", "raw");
++const RAW_DIR = path.join(process.cwd(), "data", "raw");
+ const ZUCC_DIR = path.join(RAW_DIR, "zucchetti");
+ const NIBOL_DIR = path.join(RAW_DIR, "nibol");
+ 
+ interface SyncRequest {
+-    scope: "day" | "week";
+-    date:  string;
+-    force?: boolean;
++  scope: "day" | "week";
++  date: string;
++  force?: boolean;
+ }
+ 
+ interface SyncResponse {
+-    synced:     string[];  // collectors that were actually run
+-    skipped:    string[];  // collectors that were up-to-date
+-    aggregated: string[];  // dates successfully re-aggregated
+-    errors:     string[];
++  synced: string[]; // collectors that were actually run
++  skipped: string[]; // collectors that were up-to-date
++  aggregated: string[]; // dates successfully re-aggregated
++  errors: string[];
+ }
+ 
+-/** Returns the Monday of the week containing the given date. */
+-function getMonday(dateStr: string): Date {
+-    const d   = new Date(dateStr);
+-    d.setHours(0, 0, 0, 0);
+-    const dow = d.getDay();
+-    d.setDate(d.getDate() - (dow === 0 ? 6 : dow - 1));
+-    return d;
+-}
+ 
+ /** Reads a Zucchetti monthly raw file and returns its day entries. */
+ async function loadZucchettiMonth(month: string): Promise<ZucchettiDay[]> {
+-    const filePath = path.join(ZUCC_DIR, `${month}.json`);
+-    try {
+-        const raw    = await fs.readFile(filePath, "utf-8");
+-        const parsed = JSON.parse(raw);
+-        return Array.isArray(parsed) ? parsed : (parsed.days ?? []);
+-    } catch {
+-        return [];
+-    }
++  const filePath = path.join(ZUCC_DIR, `${month}.json`);
++  try {
++    const raw = await fs.readFile(filePath, "utf-8");
++    const parsed = JSON.parse(raw);
++    return Array.isArray(parsed) ? parsed : (parsed.days ?? []);
++  } catch {
++    return [];
++  }
+ }
+ 
+ /**
+@@ -67,84 +59,87 @@ async function loadZucchettiMonth(month: string): Promise<ZucchettiDay[]> {
+  * the month file exists).
+  */
+ async function isUpToDate(dir: string, dates: string[]): Promise<boolean> {
+-    const meta = await readMeta(dir);
+-    for (const date of dates) {
+-        const month = date.slice(0, 7);
+-        const last  = meta[month]?.lastExtractedDate ?? null;
+-        if (last === null || last < date) return false;
+-    }
+-    return true;
++  const meta = await readMeta(dir);
++  for (const date of dates) {
++    const month = currentMonthString(date);
++    const last = meta[month]?.lastExtractedDate ?? null;
++    if (last === null || last < date) return false;
++  }
++  return true;
+ }
+ 
+ // POST /api/sync
+ syncRouter.post("/", async (req: Request, res: Response) => {
+-    const { scope, date, force = false } = req.body as SyncRequest;
+-
+-    if (!scope || !date) {
+-        res.status(400).json({ error: "scope and date are required" });
+-        return;
++  const { scope, date, force = false } = req.body as SyncRequest;
++
++  if (!scope || !date) {
++    res.status(400).json({ error: "scope and date are required" });
++    return;
++  }
++
++  // Build the list of target dates
++  const dates: string[] = [];
++  if (scope === "day") {
++    dates.push(date);
++  } else {
++    const monday = getMonday(date);
++    for (let i = 0; i < 5; i++) {
++        dates.push(shiftDate(monday, i));
+     }
+-
+-    // Build the list of target dates
+-    const dates: string[] = [];
+-    if (scope === "day") {
+-        dates.push(date);
++  }
++
++  const rangeStart = dates[0];
++  const rangeEnd = dates[dates.length - 1];
++
++  const result: SyncResponse = {
++    synced: [],
++    skipped: [],
++    aggregated: [],
++    errors: [],
++  };
++
++  // --- Zucchetti ---
++  try {
++    const zucUpToDate = !force && (await isUpToDate(ZUCC_DIR, dates));
++    if (zucUpToDate) {
++      result.skipped.push("zucchetti");
+     } else {
+-        const monday = getMonday(date);
+-        for (let i = 0; i < 5; i++) {
+-            const d = new Date(monday);
+-            d.setDate(monday.getDate() + i);
+-            dates.push(dateToString(d));
+-        }
++      await collectZucchetti(force, { start: rangeStart, end: rangeEnd });
++      result.synced.push("zucchetti");
+     }
+-
+-    const rangeStart = dates[0];
+-    const rangeEnd   = dates[dates.length - 1];
+-
+-    const result: SyncResponse = { synced: [], skipped: [], aggregated: [], errors: [] };
+-
+-    // --- Zucchetti ---
+-    try {
+-        const zucUpToDate = !force && await isUpToDate(ZUCC_DIR, dates);
+-        if (zucUpToDate) {
+-            result.skipped.push("zucchetti");
+-        } else {
+-            await collectZucchetti(force, { start: rangeStart, end: rangeEnd });
+-            result.synced.push("zucchetti");
+-        }
+-    } catch (err) {
+-        result.errors.push(`zucchetti: ${(err as Error).message}`);
++  } catch (err) {
++    result.errors.push(`zucchetti: ${(err as Error).message}`);
++  }
++
++  // --- Nibol ---
++  try {
++    const nibolUpToDate = !force && (await isUpToDate(NIBOL_DIR, dates));
++    if (nibolUpToDate) {
++      result.skipped.push("nibol");
++    } else {
++      await collectNibol(force, { start: rangeStart, end: rangeEnd });
++      result.synced.push("nibol");
+     }
++  } catch (err) {
++    result.errors.push(`nibol: ${(err as Error).message}`);
++  }
+ 
+-    // --- Nibol ---
++  // --- Re-aggregate each date ---
++  for (const d of dates) {
+     try {
+-        const nibolUpToDate = !force && await isUpToDate(NIBOL_DIR, dates);
+-        if (nibolUpToDate) {
+-            result.skipped.push("nibol");
+-        } else {
+-            await collectNibol(force, { start: rangeStart, end: rangeEnd });
+-            result.synced.push("nibol");
+-        }
++      const month = currentMonthString(d);
++      const zDays = await loadZucchettiMonth(month);
++      const zDay = zDays.find((z) => z.date === d);
++      if (!zDay) {
++        result.errors.push(`aggregation: no Zucchetti data for ${d}`);
++        continue;
++      }
++      await aggregateSingleDay(d, zDay);
++      result.aggregated.push(d);
+     } catch (err) {
+-        result.errors.push(`nibol: ${(err as Error).message}`);
+-    }
+-
+-    // --- Re-aggregate each date ---
+-    for (const d of dates) {
+-        try {
+-            const month  = d.slice(0, 7);
+-            const zDays  = await loadZucchettiMonth(month);
+-            const zDay   = zDays.find((z) => z.date === d);
+-            if (!zDay) {
+-                result.errors.push(`aggregation: no Zucchetti data for ${d}`);
+-                continue;
+-            }
+-            await aggregateSingleDay(d, zDay);
+-            result.aggregated.push(d);
+-        } catch (err) {
+-            result.errors.push(`aggregation ${d}: ${(err as Error).message}`);
+-        }
++      result.errors.push(`aggregation ${d}: ${(err as Error).message}`);
+     }
++  }
+ 
+-    res.json(result);
++  res.json(result);
+ });
+diff --git a/src/server/routes/week.ts b/src/server/routes/week.ts
+index 2edb00f..430ac80 100644
+--- a/src/server/routes/week.ts
++++ b/src/server/routes/week.ts
+@@ -11,7 +11,7 @@ import { parseTpDate, hhmmToHours } from "../../targetprocess/format";
+ import type { WeekDayData } from "@shared/week";
+ import type { SubmitEdit } from "@shared/submit";
+ import { ZucchettiDay } from "@shared/zucchetti";
+-import { dateToString, findHoliday } from "@shared/holidays";
++import { findHoliday } from "@shared/holidays";
+ import { AggregatedDay, NibolBooking } from "@shared/aggregator";
+ import { parseZucchettiLocation } from "../../analysis/aggregator";
+ import { readMeta } from "../../collectors/utils";
+@@ -43,14 +43,7 @@ interface TpWeekResponse {
+   openItems: unknown[];
+ }
+ 
+-function getMonday(dateStr: string): Date {
+-  const d = new Date(dateStr);
+-  d.setHours(0, 0, 0, 0);
+-  const day = d.getDay();
+-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+-  d.setDate(diff);
+-  return d;
+-}
++import { dateToString, currentMonthString, getMonday, shiftDate, parseDateString } from "../../../shared/dates";
+ 
+ async function readAggregatedDay(date: string): Promise<AggregatedDay | null> {
+   const filePath = path.join(AGG_DIR, `${date}.json`);
+@@ -85,7 +78,6 @@ async function loadNibolMonth(month: string): Promise<NibolBooking[] | null> {
+   }
+ }
+ 
+-
+ function isWorkday(day: ZucchettiDay): boolean {
+   // Zucchetti marks non-workdays explicitly via the "orario" field.
+   // Future or unfilled days have an empty hOrd — do NOT treat that as non-workday.
+@@ -101,11 +93,9 @@ weekRouter.get("/:date", async (req: Request, res: Response) => {
+   const weekDays: WeekDayData[] = [];
+   const monthsToLoad = new Set<string>();
+ 
+-  // Plan which Zucchetti months to load (use local date string to avoid UTC shift)
++  // Plan which Zucchetti months to load
+   for (let i = 0; i < 7; i++) {
+-    const d = new Date(monday);
+-    d.setDate(monday.getDate() + i);
+-    monthsToLoad.add(dateToString(d).slice(0, 7));
++    monthsToLoad.add(currentMonthString(shiftDate(monday, i)));
+   }
+ 
+   // Load raw Zucchetti data as fallback for days without aggregated files
+@@ -125,9 +115,8 @@ weekRouter.get("/:date", async (req: Request, res: Response) => {
+ 
+   // Build 7-day week response
+   for (let i = 0; i < 7; i++) {
+-    const d = new Date(monday);
+-    d.setDate(monday.getDate() + i);
+-    const dateStr = dateToString(d);
++    const dateStr = shiftDate(monday, i);
++    const d = parseDateString(dateStr);
+ 
+     // Aggregated file is the primary source — already contains isWorkday, oreTarget, location
+     const agg = await readAggregatedDay(dateStr);
+@@ -145,10 +134,13 @@ weekRouter.get("/:date", async (req: Request, res: Response) => {
+     const rawOre = zuccDay?.hOrd ? hhmmToHours(zuccDay.hOrd) : null;
+     const oreTarget = agg?.oreTarget ?? (isWd ? (rawOre ?? 8) : 0);
+     // Location: Nibol is the primary source (desk booking is authoritative).
+-    const monthStr = dateStr.slice(0, 7);
++    const monthStr = currentMonthString(dateStr);
+     const nibolLastScraped = nibolMeta[monthStr]?.lastExtractedDate ?? null;
+-    const nibolDayScraped = nibolLastScraped !== null && dateStr <= nibolLastScraped;
+-    const nibolBooking = nibolByDate.get(dateStr) ?? (nibolDayScraped ? agg?.nibol ?? null : null);
++    const nibolDayScraped =
++      nibolLastScraped !== null && dateStr <= nibolLastScraped;
++    const nibolBooking =
++      nibolByDate.get(dateStr) ??
++      (nibolDayScraped ? (agg?.nibol ?? null) : null);
+ 
+     let location: WeekDayData["location"] = "unknown";
+     if (nibolBooking) {
+@@ -201,11 +193,8 @@ weekRouter.get("/:date/tp-hours", async (req: Request, res: Response) => {
+   try {
+     const dateStr = req.params.date as string;
+     const monday = getMonday(dateStr);
+-    const friday = new Date(monday);
+-    friday.setDate(monday.getDate() + 4);
+-
+     const mondayStr = dateToString(monday);
+-    const fridayStr = dateToString(friday);
++    const fridayStr = shiftDate(monday, 4);
+ 
+     const tpClient = new TargetprocessClient();
+     const me = await tpClient.getMe();
+diff --git a/src/targetprocess/client.ts b/src/targetprocess/client.ts
+index 28beb0f..fb93a08 100644
+--- a/src/targetprocess/client.ts
++++ b/src/targetprocess/client.ts
+@@ -17,6 +17,7 @@ import type {
+   TpUserStat,
+ } from "./types";
+ import { parseTpDate, normalizeName } from "./format";
++import { dateToString } from "../../shared/dates";
+ 
+ dotenv.config();
+ 
+@@ -103,7 +104,7 @@ export class TargetprocessClient {
+ 
+   async logTime(input: TpLogTimeInput): Promise<TpLogTimeResult> {
+     const me = await this.getMe();
+-    const date = input.date ?? new Date().toISOString().slice(0, 10);
++    const date = input.date ?? dateToString();
+ 
+     const payload = {
+       Assignable: { Id: input.usId },
+diff --git a/src/targetprocess/collector.ts b/src/targetprocess/collector.ts
+index aa139d2..862162c 100644
+--- a/src/targetprocess/collector.ts
++++ b/src/targetprocess/collector.ts
+@@ -19,6 +19,7 @@ dotenv.config();
+ import { createLogger } from "../logger";
+ import { saveRawResponse } from "../aiRaw";
+ import { TargetprocessClient } from "./client";
++import { dateToString, getISOTimestamp } from "@shared/dates";
+ import { AnalysisPrompts } from "./prompts";
+ import type { TpOpenItem, TpUserStat, TpTimeEntry } from "./types";
+ import type { KbEntry, KbStore } from "@shared/kb";
+@@ -140,7 +141,7 @@ async function loadKb(): Promise<KbStore> {
+ 
+ export async function saveKb(items: KbEntry[]): Promise<void> {
+   await fs.mkdir(KB_DIR, { recursive: true });
+-  const store: KbStore = { updatedAt: new Date().toISOString(), items };
++  const store: KbStore = { updatedAt: getISOTimestamp(), items };
+   await fs.writeFile(KB_FILE, JSON.stringify(store, null, 2), "utf-8");
+ }
+ 
+@@ -150,10 +151,10 @@ async function saveEnriched(
+   userName: string,
+ ): Promise<string> {
+   await fs.mkdir(ENRICHED_DIR, { recursive: true });
+-  const today = new Date().toISOString().slice(0, 10);
++  const today = dateToString();
+   const outPath = path.join(ENRICHED_DIR, `enriched-${today}.json`);
+   const store: EnrichedStore = {
+-    savedAt: new Date().toISOString(),
++    savedAt: getISOTimestamp(),
+     userId,
+     userName,
+     items,
+@@ -296,7 +297,7 @@ function applyResults(
+       tags:                 result.tags ?? [],
+       userActivities:       result.userActivities ?? {},
+       stakeholders:         (result.stakeholders || result.stakeholder) ?? [],
+-      cachedAt:             new Date().toISOString(),
++      cachedAt:             getISOTimestamp(),
+       createDate:           original.item.createDate,
+       currentState:         original.item.stateName,
+       isFinalState:         original.item.isFinalState,
+@@ -695,7 +696,7 @@ async function run(): Promise<void> {
+   // Auto-detect today's enriched file when --from-enriched is not explicit and --force is not set
+   const todayEnrichedPath = path.join(
+     ENRICHED_DIR,
+-    `enriched-${new Date().toISOString().slice(0, 10)}.json`,
++    `enriched-${dateToString()}.json`,
+   );
+   const enrichedSource = args.fromEnriched ?? (
+     !args.force && await fs.access(todayEnrichedPath).then(() => true).catch(() => false)
+diff --git a/src/targetprocess/format.ts b/src/targetprocess/format.ts
+index bb92636..5fa7bac 100644
+--- a/src/targetprocess/format.ts
++++ b/src/targetprocess/format.ts
+@@ -45,38 +45,8 @@ export function printTable<T>(rows: T[], columns: ColumnDef<T>[]): void {
+   });
+ }
+ 
+-/**
+- * Parses a TargetProcess date string in /Date(ms±hhmm)/ format.
+- * Returns ISO date string (YYYY-MM-DD) or '-' if input is falsy.
+- *
+- * The ms value is UTC epoch, but TP dates represent local midnight (e.g. CET
+- * mezzanotte = UTC -1h). Adding the tz offset back gives the correct local date.
+- */
+-export function parseTpDate(tpDate: string | null | undefined): string {
+-  if (!tpDate) return "-";
+-  const match = new RegExp(/\/Date\((\d+)([+-])(\d{2})(\d{2})\)\//).exec(
+-    tpDate,
+-  );
+-  if (!match) return "-";
+-  const ms = Number.parseInt(match[1], 10);
+-  const sign = match[2] === "+" ? 1 : -1;
+-  const tzMs =
+-    sign *
+-    (Number.parseInt(match[3], 10) * 60 + Number.parseInt(match[4], 10)) *
+-    60_000;
+-  return new Date(ms + tzMs).toISOString().slice(0, 10);
+-}
+-
+-/** Converts decimal hours to HH:MM string, e.g. 7.7 → "7:42". */
+-export function hoursToHhmm(h: number): string {
+-  const totalMinutes = Math.round(h * 60);
+-  const hh = Math.floor(totalMinutes / 60);
+-  const mm = totalMinutes % 60;
+-  return `${hh}:${String(mm).padStart(2, "0")}`;
+-}
+-
+-/** Parses an HH:MM or H:MM string to decimal hours, e.g. "7:42" → 7.7. */
+-export function hhmmToHours(hhmm: string): number {
+-  const [h, m] = hhmm.split(":").map(Number);
+-  return h + (m ?? 0) / 60;
+-}
++export {
++  parseTpDate,
++  hoursToHhmm,
++  hhmmToHours,
++} from "../../shared/dates";
+diff --git a/web/src/components/timesheet/DayLocationPopover.vue b/web/src/components/timesheet/DayLocationPopover.vue
+index a9ef13c..3fe8da4 100644
+--- a/web/src/components/timesheet/DayLocationPopover.vue
++++ b/web/src/components/timesheet/DayLocationPopover.vue
+@@ -88,7 +88,7 @@ import { usePickerStore }             from '../../stores/usePickerStore';
+ import { syncData }                   from '../../api';
+ import { submitZucchettiRequest }     from '../../api';
+ import { locationEmoji, locationTitle } from '../../utils';
+-import { WORKDAY_HOURS, HALF_WORKDAY_HOURS, DAYABB_IT, MONTH_IT } from '../../standards';
++import { WORKDAY_HOURS, HALF_WORKDAY_HOURS } from '../../standards';
+ import type { WeekDayResponse }       from '../../types';
+ import type { ZucchettiJustification } from '@shared/zucchetti';
+ 
+@@ -102,14 +102,11 @@ const dayIdx  = ref(0);
+ 
+ const dayData = computed(() => ts.weekData?.days[dayIdx.value] ?? null);
+ 
++import { formatDateLabel } from "@shared/dates";
++
+ const dateLabel = computed(() => {
+     const d = dayData.value;
+-    if (!d) return '–';
+-    const parts = d.date.split('-');
+-    const dt    = new Date(+parts[0], +parts[1] - 1, +parts[2]);
+-    const dow   = DAYABB_IT[dt.getDay()];
+-    const mon   = MONTH_IT[dt.getMonth()];
+-    return `${dow} ${dt.getDate()} ${mon}`;
++    return d ? formatDateLabel(d.date) : "–";
+ });
+ 
+ const nibolLabel = computed(() => {
+diff --git a/web/src/components/timesheet/TsZucchettiBar.vue b/web/src/components/timesheet/TsZucchettiBar.vue
+index 8878257..308f0db 100644
+--- a/web/src/components/timesheet/TsZucchettiBar.vue
++++ b/web/src/components/timesheet/TsZucchettiBar.vue
+@@ -44,7 +44,8 @@ import { useTimesheetStore }       from '../../stores/useTimesheetStore';
+ import { usePickerStore }          from '../../stores/usePickerStore';
+ import { submitZucchettiRequest }  from '../../api';
+ import type { WeekDayResponse }    from '../../types';
+-import { DAYABB_IT, HALF_WORKDAY_HOURS, WORKDAY_HOURS } from '../../standards';
++import { HALF_WORKDAY_HOURS, WORKDAY_HOURS } from '../../standards';
++import { DAYABB_IT } from '@shared/dates';
+ 
+ const ts     = useTimesheetStore();
+ const picker = usePickerStore();
+diff --git a/web/src/router/index.ts b/web/src/router/index.ts
+index 36d37c0..eb28db5 100644
+--- a/web/src/router/index.ts
++++ b/web/src/router/index.ts
+@@ -8,13 +8,7 @@ import type { ActiveView } from '../types';
+ 
+ const VALID_VIEWS: ActiveView[] = ['dashboard', 'timesheet', 'activity', 'teams', 'browser'];
+ 
+-function todayStr(): string {
+-    const d = new Date();
+-    const yr  = d.getFullYear();
+-    const mo  = String(d.getMonth() + 1).padStart(2, '0');
+-    const day = String(d.getDate()).padStart(2, '0');
+-    return `${yr}-${mo}-${day}`;
+-}
++import { dateToString } from "@shared/dates";
+ 
+ export const router = createRouter({
+     history: createWebHashHistory(),
+@@ -22,12 +16,12 @@ export const router = createRouter({
+         // Root → redirect to dashboard/today
+         {
+             path: '/',
+-            redirect: () => `/dashboard/${todayStr()}`,
++            redirect: () => `/dashboard/${dateToString()}`,
+         },
+         // /:view (no date) → append today
+         {
+             path: '/:view',
+-            redirect: (to) => `/${to.params.view}/${todayStr()}`,
++            redirect: (to) => `/${to.params.view}/${dateToString()}`,
+         },
+         // Main route
+         {
+@@ -41,7 +35,7 @@ export const router = createRouter({
+                     return `/dashboard/${date}`;
+                 }
+                 if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+-                    return `/${view}/${todayStr()}`;
++                    return `/${view}/${dateToString()}`;
+                 }
+             },
+         },
+diff --git a/web/src/standards/index.ts b/web/src/standards/index.ts
+index c299495..3fb847e 100644
+--- a/web/src/standards/index.ts
++++ b/web/src/standards/index.ts
+@@ -3,19 +3,3 @@ export const WORKDAY_HOURS = 7.7;
+ 
+ /** Half contractual workday: 3h 51min = 3.85 decimal hours. */
+ export const HALF_WORKDAY_HOURS = 3.85;
+-
+-export const MONTH_IT = [
+-  "Gennaio",
+-  "Febbraio",
+-  "Marzo",
+-  "Aprile",
+-  "Maggio",
+-  "Giugno",
+-  "Luglio",
+-  "Agosto",
+-  "Settembre",
+-  "Ottobre",
+-  "Novembre",
+-  "Dicembre",
+-];
+-export const DAYABB_IT = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
+diff --git a/web/src/stores/useDayStore.ts b/web/src/stores/useDayStore.ts
+index bb3dbff..051d917 100644
+--- a/web/src/stores/useDayStore.ts
++++ b/web/src/stores/useDayStore.ts
+@@ -11,6 +11,7 @@ import type {
+   TlEventType,
+ } from "../types";
+ import { WORKDAY_HOURS } from "../standards";
++import { dateToString, getTimeString } from "@shared/dates";
+ 
+ export const useDayStore = defineStore(
+   "day",
+@@ -69,19 +70,18 @@ export const useDayStore = defineStore(
+ 
+       dayData.emails.forEach((e, idx) => {
+         const dt = new Date(e.receivedDateTime);
+-        const hh = String(dt.getHours()).padStart(2, "0");
+-        const mm = String(dt.getMinutes()).padStart(2, "0");
++        const hm = getTimeString(dt).slice(0, 5);
+         emailList.push({
+           dir: "in",
+           from: e.from?.emailAddress?.address ?? "",
+           to: "me",
+           subject: e.subject,
+-          time: `${hh}:${mm}`,
++          time: hm,
+           body: e.bodyPreview,
+         });
+         emailEvents.push({
+           type: "email-in" as TlEventType,
+-          time: `${hh}:${mm}`,
++          time: hm,
+           label: e.subject,
+           top: 0,
+           h: 18,
+@@ -136,11 +136,7 @@ export const useDayStore = defineStore(
+       ],
+       () => {
+         const picker = usePickerStore();
+-        const d = picker.pickerSelected;
+-        const yr = d.getFullYear();
+-        const mo = String(d.getMonth() + 1).padStart(2, "0");
+-        const day = String(d.getDate()).padStart(2, "0");
+-        loadDay(`${yr}-${mo}-${day}`);
++        loadDay(dateToString(picker.pickerSelected));
+       },
+     );
+ 
+diff --git a/web/src/stores/usePickerStore.ts b/web/src/stores/usePickerStore.ts
+index 0514d9c..e3cfe87 100644
+--- a/web/src/stores/usePickerStore.ts
++++ b/web/src/stores/usePickerStore.ts
+@@ -1,7 +1,6 @@
+ import { defineStore } from "pinia";
+ import { ref, computed } from "vue";
+ import { useRouter } from "vue-router";
+-import { DAYABB_IT, MONTH_IT } from "../standards";
+ import { useUiStore } from "./useUiStore";
+ import { findHoliday } from "@shared/holidays";
+ 
+@@ -16,18 +15,7 @@ interface PickerDay {
+   holidayName: string;
+ }
+ 
+-function todayMidnight(): Date {
+-  const d = new Date();
+-  d.setHours(0, 0, 0, 0);
+-  return d;
+-}
+-
+-function localDateStr(d: Date): string {
+-  const yr = d.getFullYear();
+-  const mo = String(d.getMonth() + 1).padStart(2, "0");
+-  const day = String(d.getDate()).padStart(2, "0");
+-  return `${yr}-${mo}-${day}`;
+-}
++import { todayMidnight, dateToString, getMonday, shiftDate, DAYABB_IT, MONTH_IT } from "@shared/dates";
+ 
+ export const usePickerStore = defineStore(
+   "picker",
+@@ -80,14 +68,10 @@ export const usePickerStore = defineStore(
+ 
+     // Column index (0-4) of pickerToday in the currently displayed week, or -1.
+     const todayDayIdx = computed<number>(() => {
+-      const sel = pickerSelected.value;
+-      const dow = sel.getDay();
+-      const monday = new Date(sel);
+-      monday.setDate(sel.getDate() - (dow === 0 ? 6 : dow - 1));
++      const monday = getMonday(pickerSelected.value);
++      const todayStr = dateToString(pickerToday.value);
+       for (let i = 0; i < 5; i++) {
+-        const d = new Date(monday);
+-        d.setDate(monday.getDate() + i);
+-        if (d.toDateString() === pickerToday.value.toDateString()) return i;
++        if (shiftDate(monday, i) === todayStr) return i;
+       }
+       return -1;
+     });
+@@ -97,7 +81,7 @@ export const usePickerStore = defineStore(
+      * The PortalView route watch updates picker state from the URL.
+      */
+     function selectDay(yr: number, mo: number, d: number) {
+-      const dateStr = `${yr}-${String(mo + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
++      const dateStr = dateToString(new Date(yr, mo, d));
+       const ui = useUiStore();
+       router.push(`/${ui.activeView}/${dateStr}`);
+     }
+@@ -119,7 +103,7 @@ export const usePickerStore = defineStore(
+     }
+ 
+     function goToday() {
+-      const today = localDateStr(pickerToday.value);
++      const today = dateToString(pickerToday.value);
+       const ui = useUiStore();
+       router.push(`/${ui.activeView}/${today}`);
+     }
+diff --git a/web/src/stores/useTimesheetStore.ts b/web/src/stores/useTimesheetStore.ts
+index 5757b23..cb75e35 100644
+--- a/web/src/stores/useTimesheetStore.ts
++++ b/web/src/stores/useTimesheetStore.ts
+@@ -12,7 +12,7 @@ import type {
+   SubmitEdit,
+   WeekDayResponse,
+ } from "../types";
+-import { DAYABB_IT, MONTH_IT } from "../standards";
++import { dateToString, DAYABB_IT, MONTH_IT, parseDateString } from "@shared/dates";
+ 
+ export const useTimesheetStore = defineStore(
+   "timesheet",
+@@ -61,13 +61,7 @@ export const useTimesheetStore = defineStore(
+         days.value = weekRes.days.map((d, idx) => {
+           const dow = idx; // 0=Mon...6=Sun
+           const dayLabel = DAYABB_IT[[1, 2, 3, 4, 5, 6, 0][dow] % 7] ?? "?";
+-          // Parse ISO date (YYYY-MM-DD) as local midnight to avoid UTC offset issues
+-          const parts = d.date.split("-");
+-          const dateObj = new Date(
+-            Number.parseInt(parts[0]),
+-            Number.parseInt(parts[1]) - 1,
+-            Number.parseInt(parts[2]),
+-          );
++          const dateObj = parseDateString(d.date);
+           const dateLabel = `${dateObj.getDate()} ${MONTH_IT[dateObj.getMonth()].substring(0, 3)}`;
+ 
+           return {
+@@ -262,15 +256,13 @@ export const useTimesheetStore = defineStore(
+ 
+         const mondayDate = new Date(monday);
+         mondayDate.setDate(mondayDate.getDate() + dayIdx);
+-        const yr = mondayDate.getFullYear();
+-        const mo = String(mondayDate.getMonth() + 1).padStart(2, "0");
+-        const day = String(mondayDate.getDate()).padStart(2, "0");
++        const date = dateToString(mondayDate);
+ 
+         edits.push({
+           tpId,
+           dayIdx,
+           hours,
+-          date: `${yr}-${mo}-${day}`,
++          date,
+           description: noteEdits.value[key] ?? "",
+         });
+       }

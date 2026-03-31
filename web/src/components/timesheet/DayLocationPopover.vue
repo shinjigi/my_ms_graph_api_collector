@@ -88,7 +88,7 @@ import { usePickerStore }             from '../../stores/usePickerStore';
 import { syncData }                   from '../../api';
 import { submitZucchettiRequest }     from '../../api';
 import { locationEmoji, locationTitle } from '../../utils';
-import { WORKDAY_HOURS, HALF_WORKDAY_HOURS, DAYABB_IT, MONTH_IT } from '../../standards';
+import { WORKDAY_HOURS, HALF_WORKDAY_HOURS } from '../../standards';
 import type { WeekDayResponse }       from '../../types';
 import type { ZucchettiJustification } from '@shared/zucchetti';
 
@@ -102,14 +102,11 @@ const dayIdx  = ref(0);
 
 const dayData = computed(() => ts.weekData?.days[dayIdx.value] ?? null);
 
+import { formatDateLabel } from "@shared/dates";
+
 const dateLabel = computed(() => {
     const d = dayData.value;
-    if (!d) return '–';
-    const parts = d.date.split('-');
-    const dt    = new Date(+parts[0], +parts[1] - 1, +parts[2]);
-    const dow   = DAYABB_IT[dt.getDay()];
-    const mon   = MONTH_IT[dt.getMonth()];
-    return `${dow} ${dt.getDate()} ${mon}`;
+    return d ? formatDateLabel(d.date) : "–";
 });
 
 const nibolLabel = computed(() => {

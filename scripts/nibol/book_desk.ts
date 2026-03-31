@@ -1,5 +1,6 @@
 import { nibolBookDesk } from '../../src/collectors/nibol';
 import * as dotenv from 'dotenv';
+import { dateToString } from '../../shared/dates';
 
 dotenv.config();
 
@@ -12,7 +13,7 @@ async function main() {
     const dateArg = args.find(a => a.startsWith('--date='))?.split('=')[1];
     
     // Default to today if no date provided
-    const date = dateArg || new Date().toISOString().split('T')[0];
+    const date = dateArg || dateToString();
 
     console.log(`[Nibol] Booking desk for date: ${date}`);
     

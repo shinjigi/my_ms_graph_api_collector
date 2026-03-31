@@ -7,9 +7,9 @@ import {
   readMeta,
   writeMeta,
   shouldSkipMonth,
-  lastDayOfMonth,
 } from "../utils";
 import { SvnCommit } from "@shared/aggregator";
+import { dateToString, currentMonthString, lastDayOfMonth } from "@shared/dates";
 
 function parseXml(xml: string): Promise<unknown> {
   return new Promise((resolve, reject) =>
@@ -86,7 +86,7 @@ async function fetchMonthCommits(
       {
         revision: e.$.revision,
         author: (e.author ?? [""])[0],
-        date: d.toISOString().slice(0, 10),
+        date: dateToString(rawDate),
         message: ((e.msg ?? [""])[0] ?? "").trim(),
         paths: (e.paths?.[0]?.path ?? []).map((p: { _: string }) => p._),
       },
@@ -107,7 +107,7 @@ export async function collectSvnCommits(force = false): Promise<string[]> {
   const since = process.env["COLLECT_SINCE"] ?? "2025-01-01";
   const user = process.env["SVN_USERNAME"];
   const pass = process.env["SVN_PASSWORD"];
-  const today = new Date().toISOString().slice(0, 10);
+  const today = dateToString();
 
   if (!svnUrl) {
     console.warn("SVN_URL non configurato — collector SVN saltato.");
@@ -128,7 +128,7 @@ export async function collectSvnCommits(force = false): Promise<string[]> {
     const year = current.getFullYear();
     const mo = current.getMonth() + 1;
     const month = `${year}-${String(mo).padStart(2, "0")}`;
-    const isCurrentMonth = month === today.slice(0, 7);
+    const isCurrentMonth = month === currentMonthString();
     const outPath = path.join(SVN_DIR, `${month}.json`);
 
     if (

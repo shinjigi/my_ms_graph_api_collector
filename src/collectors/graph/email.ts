@@ -6,9 +6,9 @@ import {
   readMeta,
   writeMeta,
   shouldSkipMonth,
-  lastDayOfMonth,
 } from "../utils";
 import { EmailRaw } from "@shared/aggregator";
+import { dateToString, currentMonthString, lastDayOfMonth } from "@shared/dates";
 
 const EMAIL_DIR = path.join(process.cwd(), "data", "raw", "graph-email");
 
@@ -38,7 +38,7 @@ export async function collectGraphEmail(
 ): Promise<string[]> {
   const since = process.env["COLLECT_SINCE"] ?? "2025-01-01";
   const top = Number(process.env["TOP"] ?? 500);
-  const today = new Date().toISOString().slice(0, 10);
+  const today = dateToString();
 
   await fs.mkdir(EMAIL_DIR, { recursive: true });
 
@@ -48,7 +48,7 @@ export async function collectGraphEmail(
   if (date) {
     // Single-day mode: update only the file for that month
     const month = date.slice(0, 7);
-    const isCurrentMonth = month === today.slice(0, 7);
+    const isCurrentMonth = month === currentMonthString();
     const outPath = path.join(EMAIL_DIR, `${month}.json`);
 
     if (
@@ -89,7 +89,7 @@ export async function collectGraphEmail(
     const year = current.getFullYear();
     const mo = current.getMonth() + 1;
     const month = `${year}-${String(mo).padStart(2, "0")}`;
-    const isCurrentMonth = month === today.slice(0, 7);
+    const isCurrentMonth = month === currentMonthString();
     const outPath = path.join(EMAIL_DIR, `${month}.json`);
 
     if (

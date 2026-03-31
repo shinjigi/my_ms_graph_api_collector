@@ -12,6 +12,7 @@
  */
 import * as fs   from 'fs';
 import * as path from 'path';
+import { dateToString, getTimeString } from '@shared/dates';
 
 // ─── Level ordering ───────────────────────────────────────────────────────────
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
@@ -41,7 +42,7 @@ function getFileStream(): fs.WriteStream {
     if (!fileStream) {
         const logDir  = path.join(process.cwd(), 'data', 'logs');
         fs.mkdirSync(logDir, { recursive: true });
-        const today   = new Date().toISOString().slice(0, 10);
+        const today   = dateToString();
         fileStream    = fs.createWriteStream(path.join(logDir, `${today}.log`), { flags: 'a' });
     }
     return fileStream;
@@ -60,7 +61,7 @@ export function createLogger(namespace: string): Logger {
     function write(level: LogLevel, msg: string, args: unknown[]): void {
         if (LEVEL_ORDER[level] < minLevel) return;
 
-        const ts     = new Date().toTimeString().slice(0, 8);  // HH:MM:SS
+        const ts     = getTimeString();  // HH:MM:SS
         const label  = level.toUpperCase().padEnd(5);
         const suffix = args.length
             ? ' ' + args.map(a => (typeof a === 'object' ? JSON.stringify(a) : String(a))).join(' ')

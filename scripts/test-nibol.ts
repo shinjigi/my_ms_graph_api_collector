@@ -1,10 +1,11 @@
 import { nibolBookDesk, nibolCheckIn } from '../src/collectors/nibol';
 import * as dotenv from 'dotenv';
+import { dateToString } from '../shared/dates';
 
 dotenv.config();
 
 async function test() {
-    const date = new Date().toISOString().split('T')[0];
+    const date = dateToString();
     console.log(`Testing Nibol automation for date: ${date}`);
 
     try {

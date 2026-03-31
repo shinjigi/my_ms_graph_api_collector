@@ -9,6 +9,7 @@ dotenv.config();
 
 import express from 'express';
 import cors    from 'cors';
+import { getISOTimestamp } from "@shared/dates";
 
 import { proposalsRouter } from './routes/proposals';
 import { submitRouter }    from './routes/submit';
@@ -35,7 +36,7 @@ app.use('/api/day',       signalsRouter);
 app.use('/api/sync',      syncRouter);
 
 app.get('/api/health', (_req, res) => {
-    res.json({ status: 'ok', ts: new Date().toISOString() });
+    res.json({ status: 'ok', ts: getISOTimestamp() });
 });
 
 app.listen(PORT, () => {

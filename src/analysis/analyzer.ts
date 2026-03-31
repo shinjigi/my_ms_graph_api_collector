@@ -16,6 +16,7 @@ import * as dotenv from "dotenv";
 
 dotenv.config();
 
+import { shiftDate, getISOTimestamp } from "@shared/dates";
 import type { ProposalEntry, DayProposal } from "@shared/analysis";
 import type { KbEntry, KbStore } from "@shared/kb";
 import { SYSTEM_PROMPT, userInstruction } from "./prompts";
@@ -170,12 +171,6 @@ export function buildProviders(forceProvider?: string): AnalyzerProvider[] {
   return [all["claude"], all["ollama"], all["gemini"], all["cli"]];
 }
 
-/** Adds `days` calendar days to a YYYY-MM-DD string. */
-function shiftDate(dateStr: string, days: number): string {
-  const d = new Date(dateStr);
-  d.setUTCDate(d.getUTCDate() + days);
-  return d.toISOString().slice(0, 10);
-}
 
 /**
  * Filters KB items to those relevant to the analysis period.
@@ -184,14 +179,14 @@ function shiftDate(dateStr: string, days: number): string {
  */
 function filterKbByPeriod(items: KbEntry[], batchDates: string[]): KbEntry[] {
   if (batchDates.length === 0) return items;
-  const windowDays  = Number(process.env["KB_RELEVANCE_WINDOW_DAYS"] ?? 90);
-  const batchMin    = batchDates.reduce((a, b) => (a < b ? a : b));
-  const batchMax    = batchDates.reduce((a, b) => (a > b ? a : b));
+  const windowDays = Number(process.env["KB_RELEVANCE_WINDOW_DAYS"] ?? 90);
+  const batchMin = batchDates.reduce((a, b) => (a < b ? a : b));
+  const batchMax = batchDates.reduce((a, b) => (a > b ? a : b));
   const windowStart = shiftDate(batchMin, -windowDays);
-  const windowEnd   = shiftDate(batchMax,  windowDays);
+  const windowEnd = shiftDate(batchMax, windowDays);
 
   return items.filter((e) => {
-    if (!e.createDate)          return true;   // legacy entry — keep
+    if (!e.createDate) return true; // legacy entry — keep
     if (e.isFinalState === false) return true; // still open — always keep
     // Closed or unknown: keep only if created or active within window
     const inWindow =
@@ -204,17 +199,17 @@ function filterKbByPeriod(items: KbEntry[], batchDates: string[]): KbEntry[] {
 /** Sorts KB items by relevance to the batch period (most relevant first). */
 function sortKbByRelevance(items: KbEntry[], batchDates: string[]): KbEntry[] {
   if (batchDates.length === 0) return items;
-  const batchSet    = new Set(batchDates);
-  const batchMin    = batchDates.reduce((a, b) => (a < b ? a : b));
-  const windowDays  = Number(process.env["KB_RELEVANCE_WINDOW_DAYS"] ?? 90);
+  const batchSet = new Set(batchDates);
+  const batchMin = batchDates.reduce((a, b) => (a < b ? a : b));
+  const windowDays = Number(process.env["KB_RELEVANCE_WINDOW_DAYS"] ?? 90);
   const windowStart = shiftDate(batchMin, -windowDays);
 
   const score = (e: KbEntry): number => {
     let s = 0;
     if (e.lastActivityDate) {
-      if (batchSet.has(e.lastActivityDate))      s += 3;
+      if (batchSet.has(e.lastActivityDate)) s += 3;
       else if (e.lastActivityDate >= windowStart) s += 2;
-      else                                        s += 1;
+      else s += 1;
     }
     if (e.isFinalState === false) s += 1;
     return s;
@@ -232,7 +227,7 @@ function fitKbItems(items: KbEntry[], budgetChars: number): KbEntry[] {
   let total = 0;
   const result: KbEntry[] = [];
   for (const item of items) {
-    const est = (item.name.length + (item.summary?.length ?? 0) + 40);
+    const est = item.name.length + (item.summary?.length ?? 0) + 40;
     if (total + est > budgetChars) break;
     result.push(item);
     total += est;
@@ -249,15 +244,17 @@ export async function analyzeBatch(
 ): Promise<DayProposal[]> {
   const system = buildSystemPrompt();
 
-  const batchDates   = batch.map((d) => d.date);
-  const filteredKb   = filterKbByPeriod(kbItems, batchDates);
-  const sortedKb     = sortKbByRelevance(filteredKb, batchDates);
-  log.info(`KB filtrata: ${sortedKb.length}/${kbItems.length} items per il periodo`);
+  const batchDates = batch.map((d) => d.date);
+  const filteredKb = filterKbByPeriod(kbItems, batchDates);
+  const sortedKb = sortKbByRelevance(filteredKb, batchDates);
+  log.info(
+    `KB filtrata: ${sortedKb.length}/${kbItems.length} items per il periodo`,
+  );
 
   let lastError: Error | null = null;
   for (const provider of providers) {
     // Fit KB items within 60% of the provider's budget — leave the rest for day data + response
-    const kbBudgetChars      = Math.floor(provider.maxInputChars * 0.6);
+    const kbBudgetChars = Math.floor(provider.maxInputChars * 0.6);
     const kbItemsForProvider = fitKbItems(sortedKb, kbBudgetChars);
     if (kbItemsForProvider.length < sortedKb.length) {
       log.warn(
@@ -265,9 +262,11 @@ export async function analyzeBatch(
       );
     }
 
-    const user        = buildUserPromptBatched(batch, kbItemsForProvider, defaults);
+    const user = buildUserPromptBatched(batch, kbItemsForProvider, defaults);
     const promptChars = system.length + user.length;
-    log.info(`Batch di ${batch.length} giorni — prompt ~${promptChars} chars (KB: ${kbItemsForProvider.length} items)`);
+    log.info(
+      `Batch di ${batch.length} giorni — prompt ~${promptChars} chars (KB: ${kbItemsForProvider.length} items)`,
+    );
 
     if (promptChars > provider.maxInputChars) {
       log.warn(
@@ -276,30 +275,37 @@ export async function analyzeBatch(
     }
 
     try {
-      log.info(`[${provider.name}] avvio analisi per ${batch.length} giorni...`);
-      const t0      = Date.now();
+      log.info(
+        `[${provider.name}] avvio analisi per ${batch.length} giorni...`,
+      );
+      const t0 = Date.now();
       const results = await provider.analyzeBatch(system, user);
       const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
 
-      const batchDates   = new Set(batch.map((d) => d.date));
+      const batchDates = new Set(batch.map((d) => d.date));
       const validResults = results.filter((r) => batchDates.has(r.date));
       if (validResults.length < results.length) {
         log.warn(
-          `[${provider.name}] scartati ${results.length - validResults.length} risultati con date fuori dal batch (allucinazioni: ${results.filter((r) => !batchDates.has(r.date)).map((r) => r.date).join(", ")})`,
+          `[${provider.name}] scartati ${results.length - validResults.length} risultati con date fuori dal batch (allucinazioni: ${results
+            .filter((r) => !batchDates.has(r.date))
+            .map((r) => r.date)
+            .join(", ")})`,
         );
       }
 
-      log.info(`[${provider.name}] analisi completata in ${elapsed}s — ${validResults.length}/${results.length} giorni validi`);
+      log.info(
+        `[${provider.name}] analisi completata in ${elapsed}s — ${validResults.length}/${results.length} giorni validi`,
+      );
       return validResults.map((r) => {
-        const day        = batch.find((d) => d.date === r.date)!;
+        const day = batch.find((d) => d.date === r.date)!;
         const totalHours = r.entries.reduce((s, e) => s + e.inferredHours, 0);
         return {
-          date:        r.date,
-          oreTarget:   day?.oreTarget ?? 0,
-          totalHours:  Math.round(totalHours * 100) / 100,
-          entries:     r.entries,
-          generatedAt: new Date().toISOString(),
-          provider:    provider.name,
+          date: r.date,
+          oreTarget: day?.oreTarget ?? 0,
+          totalHours: Math.round(totalHours * 100) / 100,
+          entries: r.entries,
+          generatedAt: getISOTimestamp(),
+          provider: provider.name,
         };
       });
     } catch (err) {
@@ -359,16 +365,20 @@ async function run(): Promise<void> {
 
   const defaults = await loadDefaults();
   const allProviders = buildProviders(providerArg);
-  const sinceDate    = process.env["COLLECT_SINCE"] ?? "2025-01-01";
+  const sinceDate = process.env["COLLECT_SINCE"] ?? "2025-01-01";
 
-  log.info(`Provider configurati: ${allProviders.map((p) => p.name).join(", ")}`);
+  log.info(
+    `Provider configurati: ${allProviders.map((p) => p.name).join(", ")}`,
+  );
   log.info("Verifica disponibilità provider...");
 
   const providers: AnalyzerProvider[] = [];
   for (const p of allProviders) {
     const ok = await p.isAvailable();
     if (ok) {
-      log.info(`  ✓ ${p.name} — max ${p.maxInputChars.toLocaleString()} chars per batch`);
+      log.info(
+        `  ✓ ${p.name} — max ${p.maxInputChars.toLocaleString()} chars per batch`,
+      );
       providers.push(p);
     } else {
       log.warn(`  ✗ ${p.name} — non disponibile`);
@@ -376,7 +386,9 @@ async function run(): Promise<void> {
   }
 
   if (providers.length === 0) {
-    log.error("[FATAL] Nessun provider disponibile. Controlla le variabili d'ambiente.");
+    log.error(
+      "[FATAL] Nessun provider disponibile. Controlla le variabili d'ambiente.",
+    );
     process.exit(1);
   }
 
@@ -402,10 +414,11 @@ async function run(): Promise<void> {
 
   // Use the most restrictive provider's char budget to avoid oversized prompts
   const maxInputChars = Math.min(...providers.map((p) => p.maxInputChars));
-  log.info(`Batch budget: ${maxInputChars.toLocaleString()} chars (provider più restrittivo: ${providers.find((p) => p.maxInputChars === maxInputChars)?.name})`);
+  log.info(
+    `Batch budget: ${maxInputChars.toLocaleString()} chars (provider più restrittivo: ${providers.find((p) => p.maxInputChars === maxInputChars)?.name})`,
+  );
 
   let currentBatch: AggregatedDay[] = [];
-  let currentTokens = 0;
 
   const processBatch = async () => {
     if (currentBatch.length === 0) return;
@@ -443,7 +456,6 @@ async function run(): Promise<void> {
     }
 
     currentBatch = [];
-    currentTokens = 0;
   };
 
   for (const file of aggFiles) {
@@ -469,21 +481,26 @@ async function run(): Promise<void> {
     }
 
     // Measure actual prompt size (not raw file — which includes browser history etc.)
-    const system          = buildSystemPrompt();
-    const testUser        = buildUserPromptBatched([...currentBatch, day], kbItems, defaults);
-    const projectedChars  = system.length + testUser.length;
+    const system = buildSystemPrompt();
+    const testUser = buildUserPromptBatched(
+      [...currentBatch, day],
+      kbItems,
+      defaults,
+    );
+    const projectedChars = system.length + testUser.length;
 
     log.info(
       `  Accodo ${date} — target ${day.oreTarget.toFixed(2)}h, ${day.calendar.length} eventi, ${day.gitCommits.length} commit — prompt proiettato ~${projectedChars} chars`,
     );
 
     if (projectedChars > maxInputChars && currentBatch.length > 0) {
-      log.debug(`Batch pieno (${projectedChars} > ${maxInputChars}) — flush prima di aggiungere ${date}`);
+      log.debug(
+        `Batch pieno (${projectedChars} > ${maxInputChars}) — flush prima di aggiungere ${date}`,
+      );
       await processBatch();
     }
 
     currentBatch.push(day);
-    currentTokens = projectedChars;
   }
 
   await processBatch();

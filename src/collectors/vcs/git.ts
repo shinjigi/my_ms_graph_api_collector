@@ -4,6 +4,7 @@ import { execSync } from "child_process";
 import { globSync } from "glob";
 import { mergeByKey, readMeta, writeMeta, shouldSkipMonth } from "../utils";
 import { GitCommit } from "@shared/aggregator";
+import { dateToString, currentMonthString } from "@shared/dates";
 
 const GIT_DIR = path.join(process.cwd(), "data", "raw", "git");
 
@@ -63,7 +64,7 @@ export async function collectGitCommits(force = false): Promise<string[]> {
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
   const since = process.env["COLLECT_SINCE"] ?? "2025-01-01";
-  const today = new Date().toISOString().slice(0, 10);
+  const today = dateToString();
 
   if (roots.length === 0) {
     console.warn("GIT_ROOTS non configurato — collector Git saltato.");
@@ -101,7 +102,7 @@ export async function collectGitCommits(force = false): Promise<string[]> {
   const months = Array.from(byMonth.keys()).sort();
 
   for (const month of months) {
-    const isCurrentMonth = month === today.slice(0, 7);
+    const isCurrentMonth = month === currentMonthString();
     const outPath = path.join(GIT_DIR, `${month}.json`);
 
     if (

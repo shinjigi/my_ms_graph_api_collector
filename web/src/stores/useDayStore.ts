@@ -11,6 +11,7 @@ import type {
   TlEventType,
 } from "../types";
 import { WORKDAY_HOURS } from "../standards";
+import { dateToString, getTimeString } from "@shared/dates";
 
 export const useDayStore = defineStore(
   "day",
@@ -69,19 +70,18 @@ export const useDayStore = defineStore(
 
       dayData.emails.forEach((e, idx) => {
         const dt = new Date(e.receivedDateTime);
-        const hh = String(dt.getHours()).padStart(2, "0");
-        const mm = String(dt.getMinutes()).padStart(2, "0");
+        const hm = getTimeString(dt).slice(0, 5);
         emailList.push({
           dir: "in",
           from: e.from?.emailAddress?.address ?? "",
           to: "me",
           subject: e.subject,
-          time: `${hh}:${mm}`,
+          time: hm,
           body: e.bodyPreview,
         });
         emailEvents.push({
           type: "email-in" as TlEventType,
-          time: `${hh}:${mm}`,
+          time: hm,
           label: e.subject,
           top: 0,
           h: 18,
@@ -136,11 +136,7 @@ export const useDayStore = defineStore(
       ],
       () => {
         const picker = usePickerStore();
-        const d = picker.pickerSelected;
-        const yr = d.getFullYear();
-        const mo = String(d.getMonth() + 1).padStart(2, "0");
-        const day = String(d.getDate()).padStart(2, "0");
-        loadDay(`${yr}-${mo}-${day}`);
+        loadDay(dateToString(picker.pickerSelected));
       },
     );
 

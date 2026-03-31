@@ -6,9 +6,9 @@ import {
   readMeta,
   writeMeta,
   shouldSkipMonth,
-  lastDayOfMonth,
 } from "../utils";
 import { CalendarEventRaw } from "@shared/aggregator";
+import { dateToString, currentMonthString, lastDayOfMonth } from "@shared/dates";
 
 const CAL_DIR = path.join(process.cwd(), "data", "raw", "graph-calendar");
 
@@ -37,7 +37,7 @@ export async function collectGraphCalendar(
   force = false,
 ): Promise<string[]> {
   const since = process.env["COLLECT_SINCE"] ?? "2025-01-01";
-  const today = new Date().toISOString().slice(0, 10);
+  const today = dateToString();
 
   await fs.mkdir(CAL_DIR, { recursive: true });
 
@@ -47,7 +47,7 @@ export async function collectGraphCalendar(
   if (date) {
     // Single-day mode: update only the file for that month
     const month = date.slice(0, 7);
-    const isCurrentMonth = month === today.slice(0, 7);
+    const isCurrentMonth = month === currentMonthString();
     const outPath = path.join(CAL_DIR, `${month}.json`);
 
     if (
@@ -91,7 +91,7 @@ export async function collectGraphCalendar(
     const year = current.getFullYear();
     const mo = current.getMonth() + 1;
     const month = `${year}-${String(mo).padStart(2, "0")}`;
-    const isCurrentMonth = month === today.slice(0, 7);
+    const isCurrentMonth = month === currentMonthString();
     const outPath = path.join(CAL_DIR, `${month}.json`);
 
     if (
