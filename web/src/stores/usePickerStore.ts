@@ -1,7 +1,6 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { useRouter } from "vue-router";
-import { DAYABB_IT, MONTH_IT } from "../standards";
 import { useUiStore } from "./useUiStore";
 import { findHoliday } from "@shared/holidays";
 
@@ -16,18 +15,7 @@ interface PickerDay {
   holidayName: string;
 }
 
-function todayMidnight(): Date {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function localDateStr(d: Date): string {
-  const yr = d.getFullYear();
-  const mo = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${yr}-${mo}-${day}`;
-}
+import { todayMidnight, dateToString, getMonday, shiftDate, DAYABB_IT, MONTH_IT } from "@shared/dates";
 
 export const usePickerStore = defineStore(
   "picker",
@@ -80,14 +68,10 @@ export const usePickerStore = defineStore(
 
     // Column index (0-4) of pickerToday in the currently displayed week, or -1.
     const todayDayIdx = computed<number>(() => {
-      const sel = pickerSelected.value;
-      const dow = sel.getDay();
-      const monday = new Date(sel);
-      monday.setDate(sel.getDate() - (dow === 0 ? 6 : dow - 1));
+      const monday = getMonday(pickerSelected.value);
+      const todayStr = dateToString(pickerToday.value);
       for (let i = 0; i < 5; i++) {
-        const d = new Date(monday);
-        d.setDate(monday.getDate() + i);
-        if (d.toDateString() === pickerToday.value.toDateString()) return i;
+        if (shiftDate(monday, i) === todayStr) return i;
       }
       return -1;
     });
@@ -97,7 +81,7 @@ export const usePickerStore = defineStore(
      * The PortalView route watch updates picker state from the URL.
      */
     function selectDay(yr: number, mo: number, d: number) {
-      const dateStr = `${yr}-${String(mo + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+      const dateStr = dateToString(new Date(yr, mo, d));
       const ui = useUiStore();
       router.push(`/${ui.activeView}/${dateStr}`);
     }
@@ -119,7 +103,7 @@ export const usePickerStore = defineStore(
     }
 
     function goToday() {
-      const today = localDateStr(pickerToday.value);
+      const today = dateToString(pickerToday.value);
       const ui = useUiStore();
       router.push(`/${ui.activeView}/${today}`);
     }

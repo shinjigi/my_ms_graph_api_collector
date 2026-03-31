@@ -57,13 +57,7 @@ export function getItalianHolidays(year: number): Holiday[] {
 // Creiamo una cache per evitare ricalcoli inutili
 const holidaysCache = new Map<number, Holiday[]>();
 
-export function dateToString(d: Date): string {
-  // Use local date components — toISOString() uses UTC and shifts in CET/CEST
-  const yr = d.getFullYear();
-  const mo = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${yr}-${mo}-${day}`;
-}
+import { dateToString } from "./dates";
 
 export function findHoliday(date: Date): Holiday | undefined {
   const year = date.getFullYear();

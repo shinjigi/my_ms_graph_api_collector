@@ -10,6 +10,8 @@
 import * as fs from "fs/promises";
 import * as path from "path";
 
+import { getTimestampFilename } from "@shared/dates";
+
 const RAW_DIR = path.join(process.cwd(), "data", "raw", "ai-responses");
 
 export interface RawResponseRecord {
@@ -31,10 +33,8 @@ export async function saveRawResponse(
   await fs.mkdir(RAW_DIR, { recursive: true });
 
   const now = new Date();
-  const date = now.toISOString().slice(0, 10);
-  const time = now.toTimeString().slice(0, 8).replaceAll(/:/g, "");
   const safe = opts.context.replaceAll(/[^a-zA-Z0-9_-]/g, "-");
-  const filename = `${date}_${time}_${opts.provider}_${safe}.json`;
+  const filename = `${getTimestampFilename(now)}_${opts.provider}_${safe}.json`;
   const filePath = path.join(RAW_DIR, filename);
 
   const record: RawResponseRecord = { savedAt: now.toISOString(), ...opts };

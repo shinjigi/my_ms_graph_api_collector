@@ -40,12 +40,7 @@ export async function writeMeta(dir: string, month: string, meta: MonthMeta): Pr
     await fs.writeFile(path.join(dir, '.meta.json'), JSON.stringify(existing, null, 2), 'utf-8');
 }
 
-/** Returns the last day of a month as "YYYY-MM-DD". */
-export function lastDayOfMonth(month: string): string {
-    const [y, m] = month.split('-').map(Number);
-    // Use UTC to avoid timezone offset shifting the result to the previous day
-    return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
-}
+import { lastDayOfMonth } from "@shared/dates";
 
 /**
  * Returns true if the stored metadata indicates the month is fully collected

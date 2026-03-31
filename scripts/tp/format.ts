@@ -25,11 +25,4 @@ export function printTable<T>(rows: T[], columns: ColumnDef<T>[]): void {
   });
 }
 
-export function parseTpDate(tpDate: string | null | undefined): string {
-  if (!tpDate) return "-";
-  const ms = Number.parseInt(
-    tpDate.replaceAll(/\/Date\((\d+)[+-]\d+\)\//, "$1"),
-    10,
-  );
-  return new Date(ms).toISOString().slice(0, 10);
-}
+export { parseTpDate } from "../../shared/dates";

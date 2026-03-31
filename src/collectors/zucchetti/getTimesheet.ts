@@ -2,8 +2,8 @@ import { parseArgs } from "node:util";
 import { createLogger } from "../../logger";
 import { startZucchettiSession } from "./session";
 import { scrapeCartellino, validateDay } from "./scraper";
-import type { TimesheetData } from "./scraper";
-import type { MonthData } from "@shared/zucchetti";
+import { MonthData } from "@shared/zucchetti";
+import { parseDateString } from "@shared/dates";
 
 const log = createLogger("zucchetti-collector");
 
@@ -27,11 +27,9 @@ const endMonth = values.end;
 
 // If date is provided, extract month and year from it
 if (values.date) {
-  const d = new Date(values.date);
-  if (!Number.isNaN(d.getTime())) {
-    targetMonth = (d.getMonth() + 1).toString();
-    targetYear = d.getFullYear().toString();
-  }
+  const d = parseDateString(values.date);
+  targetMonth = (d.getMonth() + 1).toString();
+  targetYear = d.getFullYear().toString();
 }
 
 void (async () => {

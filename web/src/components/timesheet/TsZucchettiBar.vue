@@ -44,7 +44,8 @@ import { useTimesheetStore }       from '../../stores/useTimesheetStore';
 import { usePickerStore }          from '../../stores/usePickerStore';
 import { submitZucchettiRequest }  from '../../api';
 import type { WeekDayResponse }    from '../../types';
-import { DAYABB_IT, HALF_WORKDAY_HOURS, WORKDAY_HOURS } from '../../standards';
+import { HALF_WORKDAY_HOURS, WORKDAY_HOURS } from '../../standards';
+import { DAYABB_IT } from '@shared/dates';
 
 const ts     = useTimesheetStore();
 const picker = usePickerStore();

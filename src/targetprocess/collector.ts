@@ -19,6 +19,7 @@ dotenv.config();
 import { createLogger } from "../logger";
 import { saveRawResponse } from "../aiRaw";
 import { TargetprocessClient } from "./client";
+import { dateToString, getISOTimestamp } from "@shared/dates";
 import { AnalysisPrompts } from "./prompts";
 import type { TpOpenItem, TpUserStat, TpTimeEntry } from "./types";
 import type { KbEntry, KbStore } from "@shared/kb";
@@ -140,7 +141,7 @@ async function loadKb(): Promise<KbStore> {
 
 export async function saveKb(items: KbEntry[]): Promise<void> {
   await fs.mkdir(KB_DIR, { recursive: true });
-  const store: KbStore = { updatedAt: new Date().toISOString(), items };
+  const store: KbStore = { updatedAt: getISOTimestamp(), items };
   await fs.writeFile(KB_FILE, JSON.stringify(store, null, 2), "utf-8");
 }
 
@@ -150,10 +151,10 @@ async function saveEnriched(
   userName: string,
 ): Promise<string> {
   await fs.mkdir(ENRICHED_DIR, { recursive: true });
-  const today = new Date().toISOString().slice(0, 10);
+  const today = dateToString();
   const outPath = path.join(ENRICHED_DIR, `enriched-${today}.json`);
   const store: EnrichedStore = {
-    savedAt: new Date().toISOString(),
+    savedAt: getISOTimestamp(),
     userId,
     userName,
     items,
@@ -296,7 +297,7 @@ function applyResults(
       tags:                 result.tags ?? [],
       userActivities:       result.userActivities ?? {},
       stakeholders:         (result.stakeholders || result.stakeholder) ?? [],
-      cachedAt:             new Date().toISOString(),
+      cachedAt:             getISOTimestamp(),
       createDate:           original.item.createDate,
       currentState:         original.item.stateName,
       isFinalState:         original.item.isFinalState,
@@ -695,7 +696,7 @@ async function run(): Promise<void> {
   // Auto-detect today's enriched file when --from-enriched is not explicit and --force is not set
   const todayEnrichedPath = path.join(
     ENRICHED_DIR,
-    `enriched-${new Date().toISOString().slice(0, 10)}.json`,
+    `enriched-${dateToString()}.json`,
   );
   const enrichedSource = args.fromEnriched ?? (
     !args.force && await fs.access(todayEnrichedPath).then(() => true).catch(() => false)

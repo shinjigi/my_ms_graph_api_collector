@@ -65,20 +65,14 @@ async function proposalExists(date: string): Promise<boolean> {
   }
 }
 
+import { getMonday, shiftDate, getISOTimestamp } from "@shared/dates";
+
 /** Get Monday-to-Friday dates for the week containing the given date. */
 function weekDates(dateStr: string): string[] {
-  const d = new Date(dateStr);
-  const day = d.getDay();
-  // Monday offset: if Sunday (0) treat as 6, else day - 1
-  const mondayOffset = day === 0 ? -6 : 1 - day;
-  const monday = new Date(d);
-  monday.setDate(d.getDate() + mondayOffset);
-
+  const monday = getMonday(dateStr);
   const dates: string[] = [];
   for (let i = 0; i < 5; i++) {
-    const dd = new Date(monday);
-    dd.setDate(monday.getDate() + i);
-    dates.push(dd.toISOString().slice(0, 10));
+    dates.push(shiftDate(monday, i));
   }
   return dates;
 }
@@ -172,7 +166,7 @@ analyzeRouter.post("/:date", async (req: Request, res: Response) => {
     dates: [date],
     results: {},
     errors: {},
-    startedAt: new Date().toISOString(),
+    startedAt: getISOTimestamp(),
   };
   jobs.set(jobId, job);
 
@@ -207,7 +201,7 @@ analyzeRouter.post("/week/:date", async (req: Request, res: Response) => {
     dates,
     results: {},
     errors: {},
-    startedAt: new Date().toISOString(),
+    startedAt: getISOTimestamp(),
   };
   jobs.set(jobId, job);
 

@@ -3,6 +3,7 @@ import * as path from "node:path";
 import { Client } from "@microsoft/microsoft-graph-client";
 import { mergeByKey, readMeta, writeMeta } from "../utils";
 import { ChatState, TeamsMessageRaw } from "@shared/aggregator";
+import { dateToString, getISOTimestamp } from "@shared/dates";
 
 const TEAMS_DIR = path.join(process.cwd(), "data", "raw", "graph-teams");
 const CHAT_STATES_FILE = path.join(TEAMS_DIR, "chat-states.json");
@@ -30,7 +31,7 @@ async function saveChatStates(
 function oneMonthAgo(): string {
   const d = new Date();
   d.setMonth(d.getMonth() - 1);
-  return d.toISOString();
+  return getISOTimestamp(d);
 }
 
 /**
@@ -90,7 +91,7 @@ export async function collectGraphTeams(
   date?: string,
   force = false,
 ): Promise<string[]> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = dateToString();
 
   await fs.mkdir(TEAMS_DIR, { recursive: true });
 

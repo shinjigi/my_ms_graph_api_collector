@@ -10,6 +10,7 @@
 import path from "node:path";
 import * as nodeFs from "node:fs/promises";
 import { chromium } from "playwright";
+import { dateToString, currentMonthString } from "@shared/dates";
 import { readMeta, writeMeta, shouldSkipMonth } from "../utils";
 import type { NibolBooking } from "@shared/aggregator";
 
@@ -521,13 +522,11 @@ export async function collectNibol(
 
   await nodeFs.mkdir(NIBOL_DIR, { recursive: true });
 
-  const today = new Date().toISOString().slice(0, 10);
-  const currentMonth = today.slice(0, 7);
+  const today = dateToString();
+  const currentMonth = currentMonthString();
 
   const effectiveRange = range ?? {
-    start:
-      process.env["COLLECT_SINCE"] ??
-      `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-01`,
+    start: `${currentMonth}-01`,
     end: today,
   };
 
@@ -549,7 +548,7 @@ export async function collectNibol(
   // Group by month
   const grouped: Record<string, NibolBooking[]> = {};
   for (const b of bookings) {
-    const monthStr = b.date.slice(0, 7);
+    const monthStr = currentMonthString(b.date);
     if (!grouped[monthStr]) grouped[monthStr] = [];
     grouped[monthStr].push(b);
   }

@@ -17,6 +17,7 @@ import type {
   TpUserStat,
 } from "./types";
 import { parseTpDate, normalizeName } from "./format";
+import { dateToString } from "../../shared/dates";
 
 dotenv.config();
 
@@ -103,7 +104,7 @@ export class TargetprocessClient {
 
   async logTime(input: TpLogTimeInput): Promise<TpLogTimeResult> {
     const me = await this.getMe();
-    const date = input.date ?? new Date().toISOString().slice(0, 10);
+    const date = input.date ?? dateToString();
 
     const payload = {
       Assignable: { Id: input.usId },

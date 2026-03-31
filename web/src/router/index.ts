@@ -8,13 +8,7 @@ import type { ActiveView } from '../types';
 
 const VALID_VIEWS: ActiveView[] = ['dashboard', 'timesheet', 'activity', 'teams', 'browser'];
 
-function todayStr(): string {
-    const d = new Date();
-    const yr  = d.getFullYear();
-    const mo  = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${yr}-${mo}-${day}`;
-}
+import { dateToString } from "@shared/dates";
 
 export const router = createRouter({
     history: createWebHashHistory(),
@@ -22,12 +16,12 @@ export const router = createRouter({
         // Root → redirect to dashboard/today
         {
             path: '/',
-            redirect: () => `/dashboard/${todayStr()}`,
+            redirect: () => `/dashboard/${dateToString()}`,
         },
         // /:view (no date) → append today
         {
             path: '/:view',
-            redirect: (to) => `/${to.params.view}/${todayStr()}`,
+            redirect: (to) => `/${to.params.view}/${dateToString()}`,
         },
         // Main route
         {
@@ -41,7 +35,7 @@ export const router = createRouter({
                     return `/dashboard/${date}`;
                 }
                 if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-                    return `/${view}/${todayStr()}`;
+                    return `/${view}/${dateToString()}`;
                 }
             },
         },

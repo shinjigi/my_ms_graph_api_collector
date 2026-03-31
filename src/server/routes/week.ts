@@ -11,7 +11,7 @@ import { parseTpDate, hhmmToHours } from "../../targetprocess/format";
 import type { WeekDayData } from "@shared/week";
 import type { SubmitEdit } from "@shared/submit";
 import { ZucchettiDay } from "@shared/zucchetti";
-import { dateToString, findHoliday } from "@shared/holidays";
+import { findHoliday } from "@shared/holidays";
 import { AggregatedDay, NibolBooking } from "@shared/aggregator";
 import { parseZucchettiLocation } from "../../analysis/aggregator";
 import { readMeta } from "../../collectors/utils";
@@ -43,14 +43,7 @@ interface TpWeekResponse {
   openItems: unknown[];
 }
 
-function getMonday(dateStr: string): Date {
-  const d = new Date(dateStr);
-  d.setHours(0, 0, 0, 0);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  d.setDate(diff);
-  return d;
-}
+import { dateToString, currentMonthString, getMonday, shiftDate, parseDateString } from "../../../shared/dates";
 
 async function readAggregatedDay(date: string): Promise<AggregatedDay | null> {
   const filePath = path.join(AGG_DIR, `${date}.json`);
@@ -85,7 +78,6 @@ async function loadNibolMonth(month: string): Promise<NibolBooking[] | null> {
   }
 }
 
-
 function isWorkday(day: ZucchettiDay): boolean {
   // Zucchetti marks non-workdays explicitly via the "orario" field.
   // Future or unfilled days have an empty hOrd — do NOT treat that as non-workday.
@@ -101,11 +93,9 @@ weekRouter.get("/:date", async (req: Request, res: Response) => {
   const weekDays: WeekDayData[] = [];
   const monthsToLoad = new Set<string>();
 
-  // Plan which Zucchetti months to load (use local date string to avoid UTC shift)
+  // Plan which Zucchetti months to load
   for (let i = 0; i < 7; i++) {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    monthsToLoad.add(dateToString(d).slice(0, 7));
+    monthsToLoad.add(currentMonthString(shiftDate(monday, i)));
   }
 
   // Load raw Zucchetti data as fallback for days without aggregated files
@@ -125,9 +115,8 @@ weekRouter.get("/:date", async (req: Request, res: Response) => {
 
   // Build 7-day week response
   for (let i = 0; i < 7; i++) {
-    const d = new Date(monday);
-    d.setDate(monday.getDate() + i);
-    const dateStr = dateToString(d);
+    const dateStr = shiftDate(monday, i);
+    const d = parseDateString(dateStr);
 
     // Aggregated file is the primary source — already contains isWorkday, oreTarget, location
     const agg = await readAggregatedDay(dateStr);
@@ -145,10 +134,13 @@ weekRouter.get("/:date", async (req: Request, res: Response) => {
     const rawOre = zuccDay?.hOrd ? hhmmToHours(zuccDay.hOrd) : null;
     const oreTarget = agg?.oreTarget ?? (isWd ? (rawOre ?? 8) : 0);
     // Location: Nibol is the primary source (desk booking is authoritative).
-    const monthStr = dateStr.slice(0, 7);
+    const monthStr = currentMonthString(dateStr);
     const nibolLastScraped = nibolMeta[monthStr]?.lastExtractedDate ?? null;
-    const nibolDayScraped = nibolLastScraped !== null && dateStr <= nibolLastScraped;
-    const nibolBooking = nibolByDate.get(dateStr) ?? (nibolDayScraped ? agg?.nibol ?? null : null);
+    const nibolDayScraped =
+      nibolLastScraped !== null && dateStr <= nibolLastScraped;
+    const nibolBooking =
+      nibolByDate.get(dateStr) ??
+      (nibolDayScraped ? (agg?.nibol ?? null) : null);
 
     let location: WeekDayData["location"] = "unknown";
     if (nibolBooking) {
@@ -201,11 +193,8 @@ weekRouter.get("/:date/tp-hours", async (req: Request, res: Response) => {
   try {
     const dateStr = req.params.date as string;
     const monday = getMonday(dateStr);
-    const friday = new Date(monday);
-    friday.setDate(monday.getDate() + 4);
-
     const mondayStr = dateToString(monday);
-    const fridayStr = dateToString(friday);
+    const fridayStr = shiftDate(monday, 4);
 
     const tpClient = new TargetprocessClient();
     const me = await tpClient.getMe();

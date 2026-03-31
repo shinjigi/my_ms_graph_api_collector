@@ -12,6 +12,7 @@ import type {
 } from "./types";
 
 dotenv.config();
+import { dateToString, parseTpDate } from "../../shared/dates";
 
 export class TargetprocessClient {
   private readonly baseUrl: string;
@@ -81,7 +82,7 @@ export class TargetprocessClient {
     const me = await this.request<{ Id: number }>("v1", "Users/loggeduser", {
       include: "[Id]",
     });
-    const date = input.date ?? new Date().toISOString().slice(0, 10);
+    const date = input.date ?? dateToString();
 
     const payload = {
       Assignable: { Id: input.usId },
@@ -122,14 +123,7 @@ export class TargetprocessClient {
 
     return {
       id: raw.Id,
-      date: new Date(
-        Number.parseInt(
-          raw.Date.replaceAll(/\/Date\((\d+)[+-]\d+\)\//, "$1"),
-          10,
-        ),
-      )
-        .toISOString()
-        .slice(0, 10),
+      date: parseTpDate(raw.Date),
       spent: raw.Spent,
       description: raw.Description,
       user: raw.User.FullName,
