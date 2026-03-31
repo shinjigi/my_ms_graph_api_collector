@@ -64,7 +64,7 @@
                 <!-- Note -->
                 <NoteEdit
                     class="mt-1.5 pt-1.5 border-t border-base-300/50 text-xs text-base-content/55"
-                    :value="day.usNotes[us.tpId] ?? us.note"
+                    :value="us.note"
                     @update="val => day.setUsNote(us.tpId, val)"
                 />
             </div>

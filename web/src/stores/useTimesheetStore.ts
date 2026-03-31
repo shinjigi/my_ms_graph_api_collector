@@ -20,6 +20,7 @@ export const useTimesheetStore = defineStore(
     const days = ref<Day[]>([]);
     const active = ref<TsRow[]>([]);
     const pinned = ref<TsRow[]>([]);
+    const usExtra = ref<TsRow[]>([]); // User-added items not in TP list
 
     const loading = ref(false);
     const error = ref<string | null>(null);
@@ -113,14 +114,14 @@ export const useTimesheetStore = defineStore(
           svn: Array.from({ length: 7 }, (_, i) => svnCounts.get(`${e.tpId}_${i}`) ?? 0),
         }));
 
-        // Items with at least one hour logged this week → active (prominent)
-        // Items with no hours yet → pinned (available for logging)
-        active.value = allRows.filter((r) =>
-          (r.hours as number[]).slice(0, 5).some((h) => h > 0),
-        );
-        pinned.value = allRows.filter(
-          (r) => !(r.hours as number[]).slice(0, 5).some((h) => h > 0),
-        );
+        // Items with at least one hour logged (server or local edits) → active
+        // Items with no hours yet → pinned
+        const isRowActive = (r: TsRow) => {
+            return [0,1,2,3,4].some(i => getHours(r.tpId, i) > 0);
+        };
+
+        active.value = allRows.filter(isRowActive);
+        pinned.value = allRows.filter(r => !isRowActive(r));
 
         // Set weekData last — triggers useDayStore watcher after active/pinned are populated
         weekData.value = weekRes;
@@ -246,13 +247,16 @@ export const useTimesheetStore = defineStore(
         if (!pendingPromotion.value.includes(tpId)) {
             pendingPromotion.value = [...pendingPromotion.value, tpId];
         }
+        
         const timer = setTimeout(() => {
             promotionTimers.delete(tpId);
             pendingPromotion.value = pendingPromotion.value.filter(id => id !== tpId);
+            
+            // Check if it's still in pinned
             const idx = pinned.value.findIndex(r => r.tpId === tpId);
             if (idx === -1) return;
-            const hasHours = days.value.some((_, i) => getHours(tpId, i) > 0);
-            if (!hasHours) return;
+
+            // Move to active
             const [row] = pinned.value.splice(idx, 1);
             active.value.push(row);
         }, 2000);
@@ -262,6 +266,32 @@ export const useTimesheetStore = defineStore(
     function clearEdits() {
       hoursEdits.value = {};
       noteEdits.value = {};
+    }
+
+    function addExtraTask(name: string, dayIdx: number) {
+        const tpId = Math.floor(Math.random() * 1000000) + 9000000; // 9M range for extras
+        usExtra.value.push({
+            project: 'Extra',
+            us: name,
+            tpId,
+            state: 'Inception',
+            totAllTime: 0,
+            hours: [0, 0, 0, 0, 0, 0, 0],
+            notes: [null, null, null, null, null, null, null],
+            git: [0, 0, 0, 0, 0, 0, 0],
+            svn: [0, 0, 0, 0, 0, 0, 0],
+        });
+        setHours(tpId, dayIdx, 0.5);
+        return tpId;
+    }
+
+    function removeExtraTask(tpId: number) {
+        usExtra.value = usExtra.value.filter(t => t.tpId !== tpId);
+        // Clear its edits
+        [0,1,2,3,4,5,6].forEach(i => {
+            delete hoursEdits.value[`${tpId}_${i}`];
+            delete noteEdits.value[`${tpId}_${i}`];
+        });
     }
 
     function buildEdits(filterDayIdx?: number): SubmitEdit[] {
@@ -376,6 +406,7 @@ export const useTimesheetStore = defineStore(
       currentMonday,
       hoursEdits,
       noteEdits,
+      usExtra,
       pendingPromotion,
       getHours,
       getNote,
@@ -384,6 +415,8 @@ export const useTimesheetStore = defineStore(
       fillDay,
       patchDay,
       clearEdits,
+      addExtraTask,
+      removeExtraTask,
       schedulePromotion,
       fetchWeekData,
       buildEdits,
@@ -397,6 +430,7 @@ export const useTimesheetStore = defineStore(
     persist: [
       { key: "portal_hours", pick: ["hoursEdits"] },
       { key: "portal_ts_notes", pick: ["noteEdits"] },
+      { key: "portal_us_extra", pick: ["usExtra"] },
     ],
   },
 );

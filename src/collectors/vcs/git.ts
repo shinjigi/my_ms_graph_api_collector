@@ -2,6 +2,9 @@ import * as fs from "fs/promises";
 import * as path from "path";
 import { execSync } from "child_process";
 import { globSync } from "glob";
+import { createLogger } from "../../logger";
+
+const log = createLogger("vcs-git");
 import { mergeByKey, readMeta, writeMeta, shouldSkipMonth } from "../utils";
 import { GitCommit } from "@shared/aggregator";
 import { dateToString, currentMonthString, extractMonthStr } from "@shared/dates";
@@ -110,7 +113,7 @@ export async function collectGitCommits(force = false): Promise<string[]> {
       !isCurrentMonth &&
       shouldSkipMonth(meta[month], month, roots)
     ) {
-      console.log(`  [Git] ${month}: skip`);
+      log.info(`${month}: skip`);
       outPaths.push(outPath);
       continue;
     }
@@ -123,7 +126,7 @@ export async function collectGitCommits(force = false): Promise<string[]> {
       sources: roots,
     });
     outPaths.push(outPath);
-    console.log(`  [Git] ${month}: ${newCommits.length} commit`);
+    log.info(`${month}: ${newCommits.length} commit`);
   }
 
   return outPaths;

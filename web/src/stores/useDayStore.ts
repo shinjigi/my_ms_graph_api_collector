@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { ref, computed, watch } from "vue";
+import { computed } from "vue";
 import { usePickerStore } from "./usePickerStore";
 import { useTimesheetStore } from "./useTimesheetStore";
 import { stateColor } from "../utils";
@@ -9,261 +9,197 @@ import type {
   TlEvent,
   Email,
   TlEventType,
-  TeamsMessageRaw,
-  BrowserVisit,
-  GitCommitRaw,
-  SvnCommitRaw,
 } from "../types";
 import { WORKDAY_HOURS } from "@shared/standards";
-import { dateToString, getTimeString } from "@shared/dates";
+import { getTimeString, dateToString } from "@shared/dates";
 
-export const useDayStore = defineStore(
-  "day",
-  () => {
-    const usExtra = ref<UsCard[]>([]);
-    const usToday = ref<UsCard[]>([]);
-    const tlEvents = ref<TlEvent[]>([]);
-    const emails = ref<Email[]>([]);
-    const teams = ref<TeamsMessageRaw[]>([]);
-    const browser = ref<BrowserVisit[]>([]);
-    const gitCommits = ref<GitCommitRaw[]>([]);
-    const svnCommits = ref<SvnCommitRaw[]>([]);
-    const usNotes = ref<Record<number, string>>({});
+export const useDayStore = defineStore("day", () => {
+    const ts = useTimesheetStore();
+    const picker = usePickerStore();
 
-    function loadDay(date: string) {
-      const ts = useTimesheetStore();
-      const picker = usePickerStore();
+    // The single source of indices
+    const dayIdx = computed(() => picker.selectedDayIdx);
+    const dateStr = computed(() => dateToString(picker.pickerSelected));
+    
+    // The specific day data from the week response
+    const dayData = computed(() => {
+        if (dayIdx.value < 0 || !ts.weekData) return null;
+        return ts.weekData.days[dayIdx.value] || null;
+    });
 
-      const dayData = ts.weekData?.days.find((d) => d.date === date);
-      if (!dayData) return;
+    // --- Computed Signals for Dashboard ---
 
-      // Map calendar events to TlEvents
-      const calEvents: TlEvent[] = dayData.calendar.map((ev) => {
-        const start = new Date(ev.start.dateTime);
-        const end = new Date(ev.end.dateTime);
-        const durationMins = Math.max(
-          Math.round((end.getTime() - start.getTime()) / 60_000),
-          18,
-        );
-        return {
-          type: "meeting" as TlEventType,
-          time: getTimeString(start).slice(0, 5),
-          label: ev.subject,
-          top: 0,
-          h: durationMins,
-        };
-      });
+    const teams      = computed(() => dayData.value?.teams || []);
+    const browser    = computed(() => dayData.value?.browserVisits || []);
+    const gitCommits = computed(() => dayData.value?.gitCommits || []);
+    const svnCommits = computed(() => dayData.value?.svnCommits || []);
 
-      // Map git commits to TlEvents (date-only from collector — place at 10:00 as marker)
-      const gitEvents: TlEvent[] = dayData.gitCommits.map((c) => ({
-        type: "commit" as TlEventType,
-        time: "10:00",
-        label: `[${c.repo ?? "git"}] ${c.message.split("\n")[0].slice(0, 80)}`,
-        top: 0,
-        h: 18,
-      }));
-
-      // Map SVN commits to TlEvents
-      const svnEvents: TlEvent[] = dayData.svnCommits.map((c) => ({
-        type: "svn" as TlEventType,
-        time: "11:00",
-        label: c.message.split("\n")[0].slice(0, 80),
-        top: 0,
-        h: 18,
-      }));
-
-      // Map emails to TlEvents + Email view models
-      const emailList: Email[] = [];
-      const emailEvents: TlEvent[] = [];
-
-      dayData.emails.forEach((e, idx) => {
-        const dt = new Date(e.receivedDateTime);
-        const hm = getTimeString(dt).slice(0, 5);
-        emailList.push({
-          dir: "in",
-          from: e.from?.emailAddress?.address ?? "",
-          to: "me",
-          subject: e.subject,
-          time: hm,
-          body: e.bodyPreview,
-        });
-        emailEvents.push({
-          type: "email-in" as TlEventType,
-          time: hm,
-          label: e.subject,
-          top: 0,
-          h: 18,
-          emailId: idx,
-        });
-      });
-
-      // Combine and sort all events by time
-      const allEvents = [
-        ...calEvents,
-        ...gitEvents,
-        ...svnEvents,
-        ...emailEvents,
-      ].sort((a, b) => a.time.localeCompare(b.time));
-
-      tlEvents.value = allEvents.length > 0 ? allEvents : [];
-      emails.value = emailList.length > 0 ? emailList : [];
-
-      // Popola i segnali dettagliati direttamente da dayData (già caricato in weekData)
-      teams.value = dayData.teams || [];
-      browser.value = dayData.browserVisits || [];
-      gitCommits.value = dayData.gitCommits || [];
-      svnCommits.value = dayData.svnCommits || [];
-
-      // Rebuild usToday from active TP tasks that have hours on this day
-      const dayIdx = picker.selectedDayIdx;
-      if (dayIdx >= 0 && ts.active.length > 0) {
-        const activeTasks = ts.active
-          .filter((r) => ts.getHours(r.tpId, dayIdx) > 0)
-          .map((r) => {
-            const currentNote = ts.getNote(r.tpId, dayIdx);
-            const persistedNote = usNotes.value[r.tpId];
-            
-            // Sync persisted notes from dashboard state to timesheet submission store if missing
-            if (persistedNote && !currentNote) {
-                ts.setNote(r.tpId, dayIdx, persistedNote);
-            }
-
-            return {
-              us: r.us,
-              tpId: r.tpId,
-              state: r.state,
-              tpHours: ts.getHours(r.tpId, dayIdx),
-              zucHours: WORKDAY_HOURS,
-              emails: 0,
-              commits: (r.git?.[dayIdx] ?? 0) + (r.svn?.[dayIdx] ?? 0),
-              meetings: calEvents.length,
-              color: stateColor(r.state),
-              note: ts.getNote(r.tpId, dayIdx),
-            };
-          });
-
-        // Preserve user-added items not managed by TP
-        const tsIds = new Set([...ts.active, ...ts.pinned].map((r) => r.tpId));
-        const extras = usExtra.value.filter((u) => !tsIds.has(u.tpId));
-
-        if (activeTasks.length > 0) {
-          usToday.value = [...activeTasks, ...extras];
-        }
-      }
-    }
-
-    // Auto-reload day view when week data or selected date changes
-    watch(
-      [
-        () => useTimesheetStore().weekData,
-        () => usePickerStore().pickerSelected,
-      ],
-      () => {
-        const picker = usePickerStore();
-        loadDay(dateToString(picker.pickerSelected));
-      },
-    );
-
-    const quickLog = computed<QuickLogItem[]>(() => {
-      const ts = useTimesheetStore();
-      const picker = usePickerStore();
-      const dayIdx = picker.selectedDayIdx;
-      const inToday = new Set(usToday.value.map((u) => u.tpId));
-      return [...ts.active, ...ts.pinned]
-        .filter((r) => !inToday.has(r.tpId))
-        .map((r) => ({
-          us: r.us,
-          tpId: r.tpId,
-          state: r.state,
-          tpHours: 0,
-          zucHours: WORKDAY_HOURS,
-          emails: 0,
-          commits:
-            dayIdx >= 0 ? (r.git?.[dayIdx] ?? 0) + (r.svn?.[dayIdx] ?? 0) : 0,
-          meetings: 0,
-          color: stateColor(r.state),
-          note: "",
-          totAllTime: r.totAllTime,
-          rem: r.rem,
+    const emails = computed<Email[]>(() => {
+        if (!dayData.value) return [];
+        return dayData.value.emails.map(e => ({
+            dir: "in",
+            from: e.from?.emailAddress?.address ?? "",
+            to: "me",
+            subject: e.subject,
+            time: getTimeString(new Date(e.receivedDateTime)).slice(0, 5),
+            body: e.bodyPreview,
         }));
     });
 
+    const tlEvents = computed<TlEvent[]>(() => {
+        const d = dayData.value;
+        if (!d) return [];
+
+        const events: TlEvent[] = [];
+
+        // Meetings
+        d.calendar.forEach(ev => {
+            const start = new Date(ev.start.dateTime);
+            const end = new Date(ev.end.dateTime);
+            const durationMins = Math.max(Math.round((end.getTime() - start.getTime()) / 60_000), 18);
+            events.push({
+                type: "meeting",
+                time: getTimeString(start).slice(0, 5),
+                label: ev.subject,
+                top: 0,
+                h: durationMins,
+            });
+        });
+
+        // Git markers (placed at 10:00)
+        d.gitCommits.forEach(c => {
+            events.push({
+                type: "commit",
+                time: "10:00",
+                label: `[${c.repo ?? "git"}] ${c.message.split("\n")[0].slice(0, 80)}`,
+                top: 0,
+                h: 18,
+            });
+        });
+
+        // SVN markers (placed at 11:00)
+        d.svnCommits.forEach(c => {
+            events.push({
+                type: "svn",
+                time: "11:00",
+                label: c.message.split("\n")[0].slice(0, 80),
+                top: 0,
+                h: 18,
+            });
+        });
+
+        // Email markers
+        d.emails.forEach((e, idx) => {
+            const dt = new Date(e.receivedDateTime);
+            const hm = getTimeString(dt).slice(0, 5);
+            events.push({
+                type: "email-in",
+                time: hm,
+                label: e.subject,
+                top: 0,
+                h: 18,
+                emailId: idx,
+            });
+        });
+
+        return events.sort((a, b) => a.time.localeCompare(b.time));
+    });
+
+    // --- Active Work Panel (usToday) ---
+
+    /**
+     * Combines active TP tasks (where hours > 0 on this day) and manual usExtra items.
+     */
+    const usToday = computed<UsCard[]>(() => {
+        if (dayIdx.value < 0) return [];
+
+        // 1. Gather all possible rows (Active, Pinned, Extra)
+        const allPossible = [...ts.active, ...ts.pinned, ...ts.usExtra];
+        
+        // 2. Filter only those that have hours already set for TODAY
+        const activeToday = allPossible.filter(r => ts.getHours(r.tpId, dayIdx.value) > 0);
+
+        // 3. Map to UsCard for the view
+        return activeToday.map(r => ({
+            us: r.us,
+            tpId: r.tpId,
+            state: r.state,
+            tpHours: ts.getHours(r.tpId, dayIdx.value),
+            zucHours: WORKDAY_HOURS, // Target per day
+            emails: 0, // Placeholder if needed
+            commits: (r.git?.[dayIdx.value] ?? 0) + (r.svn?.[dayIdx.value] ?? 0),
+            meetings: dayData.value?.calendar.length ?? 0,
+            color: stateColor(r.state),
+            note: ts.getNote(r.tpId, dayIdx.value),
+        }));
+    });
+
+    const quickLog = computed<QuickLogItem[]>(() => {
+        if (dayIdx.value < 0) return [];
+        const inToday = new Set(usToday.value.map(u => u.tpId));
+        
+        return [...ts.active, ...ts.pinned]
+            .filter(r => !inToday.has(r.tpId))
+            .map(r => ({
+                us: r.us,
+                tpId: r.tpId,
+                state: r.state,
+                tpHours: 0,
+                zucHours: WORKDAY_HOURS,
+                emails: 0,
+                commits: (r.git?.[dayIdx.value] ?? 0) + (r.svn?.[dayIdx.value] ?? 0),
+                meetings: 0,
+                color: stateColor(r.state),
+                note: "",
+                totAllTime: r.totAllTime,
+                rem: r.rem,
+            }));
+    });
+
+    // --- Actions ---
+
     function addToWorkToday(tpId: number) {
-      if (usToday.value.some((u) => u.tpId === tpId)) return;
-      const ts = useTimesheetStore();
-      const src = [...ts.active, ...ts.pinned].find((r) => r.tpId === tpId);
-      if (!src) return;
-      const item: UsCard = {
-        us: src.us,
-        tpId: src.tpId,
-        state: src.state,
-        tpHours: 0,
-        zucHours: WORKDAY_HOURS,
-        emails: 0,
-        commits: 0,
-        meetings: 0,
-        color: stateColor(src.state),
-        note: "",
-      };
-      usToday.value.push(item);
-      usExtra.value.push(item);
+        if (dayIdx.value < 0) return;
+        ts.setHours(tpId, dayIdx.value, 0.1); // Setting minimum hours "activates" it for today view
+    }
+
+    function addManualRow(name: string) {
+        if (dayIdx.value < 0) return;
+        ts.addExtraTask(name, dayIdx.value);
     }
 
     function setUsNote(tpId: number, text: string) {
-      usNotes.value[tpId] = text;
-      // Bridge to timesheet store so dashboard edits are included in the submit flow.
-      const ts = useTimesheetStore();
-      const picker = usePickerStore();
-      const dayIdx = picker.selectedDayIdx;
-      if (dayIdx >= 0) ts.setNote(tpId, dayIdx, text);
+        if (dayIdx.value < 0) return;
+        ts.setNote(tpId, dayIdx.value, text);
     }
 
     function setTpHours(tpId: number, val: number) {
-      const u = usToday.value.find((x) => x.tpId === tpId);
-      if (u) u.tpHours = Math.max(0, +val.toFixed(1));
-      // Bridge to timesheet store so dashboard edits are reflected in the week totals and submit flow.
-      const ts = useTimesheetStore();
-      const picker = usePickerStore();
-      const dayIdx = picker.selectedDayIdx;
-      if (dayIdx >= 0) ts.setHours(tpId, dayIdx, val);
+        if (dayIdx.value < 0) return;
+        ts.setHours(tpId, dayIdx.value, val);
     }
 
     const dayTotals = computed(() => {
-      const picker = usePickerStore();
-      const ts = useTimesheetStore();
-      const dayIdx = picker.selectedDayIdx;
-      const tp =
-        dayIdx < 0
-          ? 0
-          : +[...ts.active, ...ts.pinned]
-              .reduce((acc, r) => acc + ts.getHours(r.tpId, dayIdx), 0)
-              .toFixed(1);
-      const zuc = dayIdx < 0 ? 0 : (ts.days[dayIdx]?.zucHours ?? 0);
-      return { tp, zuc, delta: +(zuc - tp).toFixed(1) };
+        if (dayIdx.value < 0) return { tp: 0, zuc: 0, delta: 0 };
+        const tp = +[...ts.active, ...ts.pinned, ...ts.usExtra]
+            .reduce((acc, r) => acc + ts.getHours(r.tpId, dayIdx.value), 0)
+            .toFixed(1);
+        const zuc = ts.days[dayIdx.value]?.zucHours ?? 0;
+        return { tp, zuc, delta: +(zuc - tp).toFixed(1) };
     });
 
     return {
-      usExtra,
-      usToday,
-      tlEvents,
-      emails,
-      teams,
-      browser,
-      gitCommits,
-      svnCommits,
-      usNotes,
-      quickLog,
-      dayTotals,
-      loadDay,
-      addToWorkToday,
-      setUsNote,
-      setTpHours,
+        usToday,
+        tlEvents,
+        emails,
+        teams,
+        browser,
+        gitCommits,
+        svnCommits,
+        quickLog,
+        dayTotals,
+        addToWorkToday,
+        addManualRow,
+        setUsNote,
+        setTpHours,
     };
-  },
-  {
-    persist: [
-      { key: "portal_us_notes", pick: ["usNotes"] },
-      { key: "portal_us_extra", pick: ["usExtra"] },
-    ],
-  },
-);
+});
