@@ -12,8 +12,9 @@ import type { WeekDayData } from "@shared/week";
 import type { SubmitEdit } from "@shared/submit";
 import { ZucchettiDay } from "@shared/zucchetti";
 import { dateToString, findHoliday } from "@shared/holidays";
-import { AggregatedDay } from "@shared/aggregator";
+import { AggregatedDay, NibolBooking } from "@shared/aggregator";
 import { parseZucchettiLocation } from "../../analysis/aggregator";
+import { readMeta } from "../../collectors/utils";
 
 export const weekRouter = Router();
 
@@ -73,6 +74,17 @@ async function loadZucchettiMonth(month: string): Promise<ZucchettiDay[]> {
   }
 }
 
+/** Returns bookings scraped for the month, or null if the raw file does not exist. */
+async function loadNibolMonth(month: string): Promise<NibolBooking[] | null> {
+  const filePath = path.join(RAW_DIR, "nibol", `${month}.json`);
+  try {
+    const raw = await fs.readFile(filePath, "utf-8");
+    return JSON.parse(raw) as NibolBooking[];
+  } catch {
+    return null; // file absent → not scraped
+  }
+}
+
 
 function isWorkday(day: ZucchettiDay): boolean {
   // Zucchetti marks non-workdays explicitly via the "orario" field.
@@ -98,9 +110,17 @@ weekRouter.get("/:date", async (req: Request, res: Response) => {
 
   // Load raw Zucchetti data as fallback for days without aggregated files
   const zuccAll: ZucchettiDay[] = [];
+  // Load raw Nibol data: track scraping coverage via meta lastExtractedDate
+  const nibolDir = path.join(RAW_DIR, "nibol");
+  const nibolMeta = await readMeta(nibolDir);
+  const nibolByDate = new Map<string, NibolBooking>();
   for (const month of monthsToLoad) {
-    const days = await loadZucchettiMonth(month);
-    zuccAll.push(...days);
+    const zuccDays = await loadZucchettiMonth(month);
+    zuccAll.push(...zuccDays);
+    const nibolBookings = await loadNibolMonth(month);
+    if (nibolBookings !== null) {
+      for (const b of nibolBookings) nibolByDate.set(b.date, b);
+    }
   }
 
   // Build 7-day week response
@@ -124,9 +144,28 @@ weekRouter.get("/:date", async (req: Request, res: Response) => {
       agg?.isWorkday ?? (zuccDay ? isWorkday(zuccDay) : isWeekday && !holiday);
     const rawOre = zuccDay?.hOrd ? hhmmToHours(zuccDay.hOrd) : null;
     const oreTarget = agg?.oreTarget ?? (isWd ? (rawOre ?? 8) : 0);
-    const location =
-      agg?.location ??
-      (zuccDay && isWd ? parseZucchettiLocation(zuccDay) : "unknown");
+    // Location: Nibol is the primary source (desk booking is authoritative).
+    // "Scraped" means the day is on or before meta.lastExtractedDate for its month.
+    // Days beyond that date — or months with no file at all — show "unknown" (→ "?" in UI).
+    const month = dateStr.slice(0, 7);
+    const nibolLastScraped = nibolMeta[month]?.lastExtractedDate ?? null;
+    const nibolDayScraped = nibolLastScraped !== null && dateStr <= nibolLastScraped;
+    const nibolBooking = nibolByDate.get(dateStr) ?? (nibolDayScraped ? agg?.nibol ?? null : null);
+    let location: WeekDayData["location"];
+    if (nibolBooking) {
+      const t = nibolBooking.type.toLowerCase();
+      location = t === "remote" || t === "home" ? "smart" : "office";
+    } else if (nibolDayScraped) {
+      // Scraped but no booking → Zucchetti can confirm explicit declarations only;
+      // absent evidence defaults to "unknown" rather than assuming office.
+      const texts = zuccDay?.giustificativi?.map((g) => g.text?.toUpperCase() ?? "") ?? [];
+      if (texts.some((t) => t.includes("SMART")))            location = "smart";
+      else if (texts.some((t) => t.includes("TRASFERTA")))   location = "travel";
+      else if (texts.some((t) => t.includes("SERVIZIO ESTERNO"))) location = "external";
+      else location = "unknown";
+    } else {
+      location = "unknown";
+    }
 
     const dayData: WeekDayData = {
       date: dateStr,

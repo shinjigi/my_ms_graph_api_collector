@@ -84,7 +84,7 @@ export interface AggregatedDay {
   date: string; // YYYY-MM-DD
   isWorkday: boolean;
   oreTarget: number; // decimal hours from Zucchetti hOrd
-  location: "office" | "smart" | "mixed" | "unknown";
+  location: "office" | "smart" | "travel" | "external" | "mixed" | "unknown";
   nibol: NibolBooking | null;
   zucchetti: ZucchettiDay | null;
   calendar: CalendarEventRaw[];

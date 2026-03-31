@@ -13,7 +13,7 @@ export interface Day {
   date: string;
   rend: "ok" | "warn" | "err" | null;
   zucHours: number;
-  location?: "office" | "smart" | "mixed" | "unknown";
+  location?: "office" | "smart" | "travel" | "external" | "mixed" | "unknown";
   nibol: NibolBooking | null;
   holiday: boolean;
   holidayName?: string;
@@ -152,7 +152,7 @@ export interface WeekDayResponse {
     date:           string;
     isWorkday:      boolean;
     oreTarget:      number;
-    location:       "office" | "smart" | "mixed" | "unknown";
+    location:       "office" | "smart" | "travel" | "external" | "mixed" | "unknown";
     nibol:          NibolBooking | null;
     holiday:        boolean;
     holidayName?:   string;

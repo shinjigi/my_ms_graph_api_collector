@@ -40,20 +40,13 @@ const NIBOL_DIR  = path.join(RAW_DIR, "nibol");
 
 export function parseZucchettiLocation(
   day: ZucchettiDay,
-): "office" | "smart" | "mixed" | "unknown" {
-  const hasSmartWorking = day.giustificativi.some((g) =>
-    g.text.toUpperCase().includes("SMART"),
-  );
-  const hasLeave = day.giustificativi.some(
-    (g) =>
-      g.text.toUpperCase().includes("FERIE") ||
-      g.text.toUpperCase().includes("PERM"),
-  );
-
-  if (hasSmartWorking && hasLeave) return "mixed";
-  if (hasSmartWorking) return "smart";
-  if (day.giustificativi.length === 0) return "office";
-  return "unknown";
+): AggregatedDay["location"] {
+  const texts = day.giustificativi.map((g) => g.text.toUpperCase());
+  if (texts.some((t) => t.includes("SMART")))             return "smart";
+  if (texts.some((t) => t.includes("TRASFERTA")))         return "travel";
+  if (texts.some((t) => t.includes("SERVIZIO ESTERNO")))  return "external";
+  if (day.giustificativi.length === 0)                    return "office";
+  return "unknown"; // has giustificativi but none are location-relevant
 }
 
 export function isWorkday(day: ZucchettiDay): boolean {

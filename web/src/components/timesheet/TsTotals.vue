@@ -15,13 +15,14 @@
             <td colspan="2" class="text-right pr-3 text-base-content/50 text-xs font-semibold">Zucchetti</td>
             <td v-for="(d, i) in ts.days.slice(0, 5)" :key="i" class="text-center text-xs font-bold" :class="totalsCellCls(d, i, 'zuc')">
                 <template v-if="d.holiday">🇮🇹</template>
-                <template v-else-if="d.zucHours > 0">
-                    <span class="inline-flex items-center justify-center gap-0.5">
-                        <span class="text-success">{{ d.zucHours }}</span>
-                        <span v-if="d.location === 'smart'"  class="text-info    text-sm leading-none" title="Smart working">⌂</span>
-                        <span v-else-if="d.location === 'office'" class="text-base-content/30 text-sm leading-none" title="In ufficio">⊡</span>
-                        <span v-else-if="d.location === 'mixed'" class="text-warning text-sm leading-none" title="Misto (uff. + SW)">◐</span>
-                    </span>
+                <template v-else-if="d.zucHours > 0 || zucGiust(i).length > 0">
+                    <div class="flex flex-col items-center gap-0.5 py-0.5">
+                        <span v-if="d.zucHours > 0" class="text-success">{{ d.zucHours }}</span>
+                        <div v-if="zucBadges(d, i).length > 0" class="flex flex-wrap gap-0.5 justify-center">
+                            <span v-for="b in zucBadges(d, i)" :key="b.emoji"
+                                  class="zuc-badge" :title="b.title">{{ b.emoji }}</span>
+                        </div>
+                    </div>
                 </template>
                 <template v-else><span class="err-x font-black text-sm">✗</span></template>
             </td>
@@ -50,10 +51,12 @@
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import { useTimesheetStore } from '../../stores/useTimesheetStore';
-import { usePickerStore }    from '../../stores/usePickerStore';
-import { useUiStore }        from '../../stores/useUiStore';
+import { useTimesheetStore }                     from '../../stores/useTimesheetStore';
+import { usePickerStore }                        from '../../stores/usePickerStore';
+import { useUiStore }                            from '../../stores/useUiStore';
+import { locationEmoji, locationTitle, giustActivityEmojis } from '../../utils';
 import type { Day } from '../../types';
+import type { ZucchettiJustification } from '@shared/zucchetti';
 
 const ts     = useTimesheetStore();
 const picker = usePickerStore();
@@ -81,6 +84,23 @@ function totalsCellCls(d: Day, i: number, row: 'tp' | 'zuc' | 'delta'): string[]
     return cls;
 }
 
+function zucGiust(i: number): ZucchettiJustification[] {
+    return ts.weekData?.days[i]?.zucchetti?.giustificativi ?? [];
+}
+
+interface Badge { emoji: string; title: string }
+
+function zucBadges(d: Day, i: number): Badge[] {
+    const badges: Badge[] = [];
+    if (d.location) {
+        badges.push({ emoji: locationEmoji(d.location), title: locationTitle(d.location) });
+    }
+    for (const emoji of giustActivityEmojis(zucGiust(i))) {
+        badges.push({ emoji, title: emoji });
+    }
+    return badges;
+}
+
 const tpWeekTotal    = computed(() => ts.totalsRow.tp.reduce((a, b) => a + b, 0));
 const zucWeekTotal   = computed(() => ts.days.reduce((a, d) => a + (d.zucHours || 0), 0).toFixed(1));
 const deltaWeekTotal = computed(() => {
@@ -88,3 +108,16 @@ const deltaWeekTotal = computed(() => {
     return (d === 0) ? '✓' : d > 0 ? `−${d}h` : `+${Math.abs(d)}h`;
 });
 </script>
+
+<style scoped>
+.zuc-badge {
+    font-size: 0.7rem;
+    line-height: 1;
+    padding: 1px 3px;
+    border-radius: 3px;
+    background: oklch(var(--b3));
+    display: inline-flex;
+    align-items: center;
+    cursor: default;
+}
+</style>
