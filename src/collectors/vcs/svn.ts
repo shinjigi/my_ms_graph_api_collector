@@ -2,6 +2,9 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { spawn } from "node:child_process";
 import { parseString } from "xml2js";
+import { createLogger } from "../../logger";
+
+const log = createLogger("vcs-svn");
 import {
   mergeByKey,
   readMeta,
@@ -110,7 +113,7 @@ export async function collectSvnCommits(force = false): Promise<string[]> {
   const today = dateToString();
 
   if (!svnUrl) {
-    console.warn("SVN_URL non configurato — collector SVN saltato.");
+    log.warn("SVN_URL non configurato — collector SVN saltato.");
     return [];
   }
 
@@ -133,7 +136,7 @@ export async function collectSvnCommits(force = false): Promise<string[]> {
       !isCurrentMonth &&
       shouldSkipMonth(meta[month], month, sources)
     ) {
-      console.log(`  [SVN] ${month}: skip`);
+      log.info(`${month}: skip`);
       outPaths.push(outPath);
     } else {
       try {
@@ -153,11 +156,9 @@ export async function collectSvnCommits(force = false): Promise<string[]> {
         await fs.writeFile(outPath, JSON.stringify(merged, null, 2), "utf-8");
         await writeMeta(SVN_DIR, month, { lastExtractedDate: today, sources });
         outPaths.push(outPath);
-        console.log(`  [SVN] ${month}: ${commits.length} commit`);
+        log.info(`${month}: ${commits.length} commit`);
       } catch (err) {
-        console.warn(
-          `  [SVN] ${month}: ${(err as Error).message}. Mese saltato.`,
-        );
+        log.warn(`${month}: ${(err as Error).message}. Mese saltato.`);
         // Write empty file so the month is not retried on next run if already past
         if (!isCurrentMonth) {
           try {

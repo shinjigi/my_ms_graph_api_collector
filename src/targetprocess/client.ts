@@ -18,6 +18,9 @@ import type {
 } from "./types";
 import { parseTpDate, normalizeName } from "./format";
 import { dateToString } from "../../shared/dates";
+import { createLogger } from "../logger";
+
+const log = createLogger("tp-client");
 
 dotenv.config();
 
@@ -106,6 +109,10 @@ export class TargetprocessClient {
     const me = await this.getMe();
     const date = input.date ?? dateToString();
 
+    // 1. Check for existing time entries for this user, date and usId
+    const existing = await this.getTimesByUserAndDate(me.Id, date);
+    const matches = existing.filter(e => e.Assignable?.Id === input.usId);
+
     const payload = {
       Assignable: { Id: input.usId },
       User: { Id: me.Id },
@@ -116,41 +123,90 @@ export class TargetprocessClient {
     };
 
     const qs = `format=json&access_token=${this.token}`;
-    const url = `${this.baseUrl}/api/v1/Times?${qs}`;
+    
+    if (matches.length > 0) {
+      // 2. We have at least one entry: UPDATE the first one
+      const targetId = matches[0].Id;
+      log.info(`Updating existing time entry ${targetId} for US#${input.usId} on ${date}`);
+      
+      const url = `${this.baseUrl}/api/v1/Times/${targetId}?${qs}`;
+      const response = await fetch(url, {
+        method: "POST", // TP v1 POST to existing ID = Update
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
 
+      if (!response.ok) {
+        const errorText = await response.text();
+        log.error(`Update Error: ${response.status} - ${errorText}`);
+        throw new Error(`TP API Update Error: ${response.status} - ${errorText}`);
+      }
+
+      // 3. Cleanup: if there were multiple entries (e.g. manual duplicates), DELETE the others
+      if (matches.length > 1) {
+          const others = matches.slice(1);
+          log.info(`Cleaning up ${others.length} extra duplicates for US#${input.usId} on ${date}`);
+          for (const extra of others) {
+              await this.deleteTime(extra.Id);
+          }
+      }
+
+      const raw = await response.json();
+      return {
+        id: raw.Id,
+        date: parseTpDate(raw.Date),
+        spent: raw.Spent,
+        description: raw.Description,
+        user: raw.User.FullName,
+        assignable: raw.Assignable.Name,
+      };
+
+    } else {
+      // 4. No entry exists: CREATE new (original logic)
+      log.info(`Creating new time entry for US#${input.usId} on ${date}`);
+      const url = `${this.baseUrl}/api/v1/Times?${qs}`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: {
+          Accept: "application/json",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        log.error(`Create Error: ${response.status} - ${errorText}`);
+        throw new Error(`TP API Create Error: ${response.status} - ${errorText}`);
+      }
+
+      const raw = await response.json();
+      return {
+        id: raw.Id,
+        date: parseTpDate(raw.Date),
+        spent: raw.Spent,
+        description: raw.Description,
+        user: raw.User.FullName,
+        assignable: raw.Assignable.Name,
+      };
+    }
+  }
+
+  async deleteTime(id: number): Promise<void> {
+    const qs = `access_token=${this.token}`;
+    const url = `${this.baseUrl}/api/v1/Times/${id}?${qs}`;
     const response = await fetch(url, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
+      method: "DELETE",
+      headers: { Accept: "application/json" },
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(
-        `TP API Error: ${response.status} ${response.statusText} - ${errorText}`,
-      );
+      throw new Error(`TP API Delete Error: ${response.status} - ${errorText}`);
     }
-
-    const raw = (await response.json()) as {
-      Id: number;
-      Date: string;
-      Spent: number;
-      Description: string;
-      User: { FullName: string };
-      Assignable: { Name: string };
-    };
-
-    return {
-      id: raw.Id,
-      date: parseTpDate(raw.Date),
-      spent: raw.Spent,
-      description: raw.Description,
-      user: raw.User.FullName,
-      assignable: raw.Assignable.Name,
-    };
   }
 
   async getProjectsAssignedToMe(): Promise<TpProject[]> {

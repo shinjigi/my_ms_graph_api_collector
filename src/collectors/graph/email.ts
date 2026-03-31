@@ -1,6 +1,9 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { Client } from "@microsoft/microsoft-graph-client";
+import { createLogger } from "../../logger";
+
+const log = createLogger("graph-email");
 import {
   mergeByKey,
   readMeta,
@@ -55,7 +58,7 @@ export async function collectGraphEmail(
       !isCurrentMonth &&
       shouldSkipMonth(meta[month], month, ["graph"])
     ) {
-      console.log(`  [Email] ${month}: skip`);
+      log.info(`${month}: skip`);
       return [outPath];
     }
 
@@ -93,7 +96,7 @@ export async function collectGraphEmail(
       !isCurrentMonth &&
       shouldSkipMonth(meta[month], month, ["graph"])
     ) {
-      console.log(`  [Email] ${month}: skip`);
+      log.info(`${month}: skip`);
       outPaths.push(outPath);
     } else {
       try {
@@ -105,9 +108,9 @@ export async function collectGraphEmail(
           sources: ["graph"],
         });
         outPaths.push(outPath);
-        console.log(`  [Email] ${month}: ${emails.length} email`);
+        log.info(`${month}: ${emails.length} email`);
       } catch (err) {
-        console.warn(`  [Email] ${month}: ${(err as Error).message}`);
+        log.warn(`${month}: ${(err as Error).message}`);
       }
     }
 
