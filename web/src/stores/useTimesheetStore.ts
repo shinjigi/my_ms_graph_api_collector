@@ -1,6 +1,5 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
-import { DAYS, TS_ACTIVE, TS_PINNED, DAYABB_IT, MONTH_IT } from "../mock/data";
 import {
   fetchWeek,
   fetchTpWeekHours,
@@ -13,18 +12,14 @@ import type {
   SubmitEdit,
   WeekDayResponse,
 } from "../types";
+import { DAYABB_IT, MONTH_IT } from "../standards";
 
 export const useTimesheetStore = defineStore(
   "timesheet",
   () => {
-    const days = ref<Day[]>(DAYS);
-    const active = ref<TsRow[]>(
-      TS_ACTIVE.map((r) => ({
-        ...r,
-        hours: [...(r.hours ?? [0, 0, 0, 0, 0, 0, 0])],
-      })),
-    );
-    const pinned = ref<TsRow[]>(TS_PINNED.map((r) => ({ ...r })));
+    const days = ref<Day[]>([]);
+    const active = ref<TsRow[]>([]);
+    const pinned = ref<TsRow[]>([]);
 
     const loading = ref(false);
     const error = ref<string | null>(null);
@@ -76,6 +71,7 @@ export const useTimesheetStore = defineStore(
             date: dateLabel,
             rend: null, // computed by rendPerDay
             zucHours: d.oreTarget,
+            location: d.location,
             nibol: d.nibol,
             holiday: d.holiday,
             holidayName: d.holidayName,
@@ -189,6 +185,7 @@ export const useTimesheetStore = defineStore(
       const d = days.value[dayIdx];
       if (!d) return;
       d.zucHours = update.oreTarget;
+      d.location = update.location;
       d.holiday = update.holiday ?? !update.isWorkday;
       d.nibol = update.nibol;
       if (weekData.value?.days?.[dayIdx]) {

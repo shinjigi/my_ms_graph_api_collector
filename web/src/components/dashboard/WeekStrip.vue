@@ -26,7 +26,12 @@
                     <span class="mx-1 text-base-content/20">·</span>
                     <span class="text-primary font-medium">{{ card.tpH }}h</span> TP
                 </div>
-                <div class="text-xs text-base-content/30 mt-0.5">{{ card.nibol || '—' }}</div>
+                <div class="text-xs text-base-content/30 mt-0.5 flex items-center gap-1">
+                    <span v-if="card.location === 'smart'"  class="text-info text-sm leading-none"         title="Smart working">⌂</span>
+                    <span v-else-if="card.location === 'office'" class="text-base-content/30 text-sm leading-none" title="In ufficio">⊡</span>
+                    <span v-else-if="card.location === 'mixed'" class="text-warning text-sm leading-none"  title="Misto">◐</span>
+                    <span>{{ card.nibol?.type || '—' }}</span>
+                </div>
             </div>
         </div>
         <button class="btn btn-ghost btn-xs btn-square shrink-0">
@@ -65,7 +70,7 @@ const weekCards = computed(() => {
         const rendIcon = r === 'ok' ? '✓' : r === 'warn' ? '⚠' : r === 'err' ? '✗' : '·';
         const rendIconCls = r === 'ok' ? 'text-success' : r === 'warn' ? 'text-warning' : r === 'err' ? 'text-error' : 'text-base-content/20';
 
-        return { date, dateLabel, isSelected, isToday, rendCls, rendIcon, rendIconCls, zucH: d.zucHours, tpH, nibol: d.nibol };
+        return { date, dateLabel, isSelected, isToday, rendCls, rendIcon, rendIconCls, zucH: d.zucHours, tpH, nibol: d.nibol, location: d.location };
     });
 });
 </script>

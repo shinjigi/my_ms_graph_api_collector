@@ -1,5 +1,5 @@
 <template>
-    <div class="overflow-x-auto" :class="{ 'we-hidden': !ui.weVisible }">
+    <div class="overflow-x-auto">
         <!-- Loading overlay -->
         <div v-if="ts.loading" class="flex items-center gap-2 py-6 justify-center text-base-content/40">
             <span class="loading loading-spinner loading-sm"></span>
@@ -13,6 +13,7 @@
                 <col class="ts-col-state">
                 <col v-for="i in 5" :key="i" class="ts-col-day">
                 <col class="ts-col-we">
+                <col v-if="ui.weVisible" class="ts-col-we">
                 <col class="ts-col-tot">
                 <col class="ts-col-rem">
             </colgroup>
@@ -144,10 +145,13 @@ function syncCols() {
     const ths = mainTableRef.value?.querySelectorAll('thead th');
     const pin = pinScrollRef.value;
     if (!ths || !pin) return;
+    // Subtract the vertical scrollbar gutter from the last column so the total
+    // width of the pinned table matches the pinned scroll container's clientWidth.
     const gutter = pin.offsetWidth - pin.clientWidth;
-    pinWidths.value = Array.from(ths).map((th, i) => {
+    const arr = Array.from(ths);
+    pinWidths.value = arr.map((th, i) => {
         const w = (th as HTMLElement).offsetWidth;
-        return (i === 0 ? Math.max(180, w - gutter) : w) + 'px';
+        return (i === arr.length - 1 ? Math.max(20, w - gutter) : w) + 'px';
     });
 }
 

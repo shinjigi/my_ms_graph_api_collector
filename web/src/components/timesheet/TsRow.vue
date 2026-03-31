@@ -9,25 +9,12 @@
                 {{ stateAbbr }}
             </span>
         </td>
-        <!-- Day cells -->
-        <td v-for="(d, i) in days.slice(0, 6)" :key="i"
+        <!-- Day cells Mon–Fri -->
+        <td v-for="(d, i) in days.slice(0, 5)" :key="i"
             class="text-center"
             :class="cellCls(d, i)"
-            @click.stop="i < 5 && !d.holiday ? selectDay(i) : undefined">
-            <template v-if="i === 5">
-                <div class="flex flex-col items-center gap-0">
-                    <TimeCellWidget
-                        :model-value="weHours"
-                        :extra-val-cls="'font-bold text-xs opacity-60'"
-                        @update="val => ts.setHours(row.tpId, 5, val)"
-                    />
-                    <div class="flex gap-1 mt-0.5">
-                        <span v-if="(row.git?.[5] ?? 0) + (row.git?.[6] ?? 0)" class="commit-dot source-git" ></span>
-                        <span v-if="(row.svn?.[5] ?? 0) + (row.svn?.[6] ?? 0)" class="commit-dot source-svn" ></span>
-                    </div>
-                </div>
-            </template>
-            <template v-else-if="d.holiday">
+            @click.stop="!d.holiday ? selectDay(i) : undefined">
+            <template v-if="d.holiday">
                 <span class="text-xs ts-holiday-icon">🇮🇹</span>
             </template>
             <template v-else>
@@ -46,6 +33,34 @@
                 </div>
             </template>
         </td>
+        <!-- WE: collapsed = combined Sab+Dom; expanded = Sabato cell -->
+        <td class="text-center weekend-col we-col">
+            <div class="flex flex-col items-center gap-0">
+                <TimeCellWidget
+                    :model-value="ui.weVisible ? ts.getHours(row.tpId, 5) : weHours"
+                    :extra-val-cls="'font-bold text-xs opacity-60'"
+                    @update="val => ts.setHours(row.tpId, 5, val)"
+                />
+                <div class="flex gap-1 mt-0.5">
+                    <span v-if="ui.weVisible ? row.git?.[5] : (row.git?.[5] ?? 0) + (row.git?.[6] ?? 0)" class="commit-dot source-git"></span>
+                    <span v-if="ui.weVisible ? row.svn?.[5] : (row.svn?.[5] ?? 0) + (row.svn?.[6] ?? 0)" class="commit-dot source-svn"></span>
+                </div>
+            </div>
+        </td>
+        <!-- Domenica — solo quando WE espanso -->
+        <td v-if="ui.weVisible" class="text-center weekend-col">
+            <div class="flex flex-col items-center gap-0">
+                <TimeCellWidget
+                    :model-value="ts.getHours(row.tpId, 6)"
+                    :extra-val-cls="'font-bold text-xs opacity-60'"
+                    @update="val => ts.setHours(row.tpId, 6, val)"
+                />
+                <div class="flex gap-1 mt-0.5">
+                    <span v-if="row.git?.[6]" class="commit-dot source-git"></span>
+                    <span v-if="row.svn?.[6]" class="commit-dot source-svn"></span>
+                </div>
+            </div>
+        </td>
         <!-- Tot -->
         <td class="text-center text-xs">
             <span class="text-success font-bold">{{ weekTotal }}</span>
@@ -63,6 +78,7 @@
 import { computed }          from 'vue';
 import { useTimesheetStore } from '../../stores/useTimesheetStore';
 import { usePickerStore }    from '../../stores/usePickerStore';
+import { useUiStore }        from '../../stores/useUiStore';
 import { stateColor, tpLink as makeTpLink } from '../../utils';
 import type { TsRow, Day }   from '../../types';
 import TimeCellWidget        from '../TimeCellWidget.vue';
@@ -72,6 +88,7 @@ const props = defineProps<{ row: TsRow; isPinned: boolean }>();
 
 const ts     = useTimesheetStore();
 const picker = usePickerStore();
+const ui     = useUiStore();
 const days   = computed(() => ts.days);
 
 function selectDay(dayIdx: number) {
@@ -103,7 +120,6 @@ const weekTotal = computed(() =>
 );
 
 function cellCls(d: Day, i: number): string[] {
-    if (i === 5) return ['weekend-col', 'we-col'];
     const cls: string[] = [];
     if (d.holiday) {
         cls.push('holiday-col');
@@ -113,7 +129,6 @@ function cellCls(d: Day, i: number): string[] {
         if (r === 'warn') cls.push('day-warn');
         if (r === 'err')  cls.push('day-err');
     }
-    // outline-based indicators — do not override background/box-shadow
     if (i === picker.todayDayIdx)    cls.push('today-col');
     if (i === picker.selectedDayIdx) cls.push('selected-col');
     return cls;

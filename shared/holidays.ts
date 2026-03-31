@@ -53,3 +53,28 @@ export function getItalianHolidays(year: number): Holiday[] {
     { date: formatDate(12, 26), name: "Santo Stefano" },
   ];
 }
+
+// Creiamo una cache per evitare ricalcoli inutili
+const holidaysCache = new Map<number, Holiday[]>();
+
+export function dateToString(d: Date): string {
+  // Use local date components — toISOString() uses UTC and shifts in CET/CEST
+  const yr = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${yr}-${mo}-${day}`;
+}
+
+export function findHoliday(date: Date): Holiday | undefined {
+  const year = date.getFullYear();
+
+  // Se non abbiamo ancora calcolato l'anno, lo facciamo una volta sola
+  if (!holidaysCache.has(year)) {
+    holidaysCache.set(year, getItalianHolidays(year));
+  }
+
+  const yearHolidays = holidaysCache.get(year)!;
+  const dateStr = dateToString(date);
+
+  return yearHolidays.find((h) => h.date === dateStr);
+}

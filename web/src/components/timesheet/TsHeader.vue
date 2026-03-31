@@ -3,19 +3,10 @@
         <tr class="text-xs">
             <th>User Story</th>
             <th>Stato</th>
-            <th v-for="(d, i) in ts.days.slice(0, 6)" :key="i"
+            <th v-for="(d, i) in ts.days.slice(0, 5)" :key="i"
                 class="text-center text-xs"
                 :class="dayHeadCls(d, i)">
-                <template v-if="i === 5">
-                    <span class="flex flex-col items-center opacity-55 cursor-pointer select-none"
-                          @click="ui.toggleWE()"
-                          :title="ui.weVisible ? 'Nascondi weekend' : 'Mostra weekend'">
-                        <span class="font-bold">WE</span>
-                        <span class="font-normal text-xxs">Sab · Dom</span>
-                        <span class="text-xxs mt-0.5">{{ ui.weVisible ? '▾' : '▸' }}</span>
-                    </span>
-                </template>
-                <template v-else-if="d.holiday">
+                <template v-if="d.holiday">
                     <span class="flex flex-col items-center gap-0.5 opacity-80" :title="d.holidayName">
                         <span>{{ d.label }}</span>
                         <span class="font-normal text-xs">{{ d.date }}</span>
@@ -30,6 +21,33 @@
                         <span class="text-xs font-bold" :class="rendIconCls(rend(i))">{{ rendIcon(rend(i)) }}</span>
                     </span>
                 </template>
+            </th>
+            <!-- WE toggle / Sabato header -->
+            <th class="text-center text-xs weekend-col we-col">
+                <template v-if="!ui.weVisible">
+                    <span class="flex flex-col items-center opacity-55 cursor-pointer select-none"
+                          @click="ui.toggleWE()" title="Espandi Sabato e Domenica">
+                        <span class="font-bold">WE</span>
+                        <span class="font-normal text-xxs">Sab · Dom</span>
+                        <span class="text-xxs mt-0.5">▸</span>
+                    </span>
+                </template>
+                <template v-else>
+                    <span class="flex flex-col items-center gap-0.5">
+                        <span>Sab</span>
+                        <span class="font-normal opacity-60 text-xs">{{ ts.days[5]?.date ?? '' }}</span>
+                    </span>
+                </template>
+            </th>
+            <!-- Domenica — solo quando WE espanso -->
+            <th v-if="ui.weVisible" class="text-center text-xs weekend-col">
+                <span class="flex flex-col items-center gap-0.5">
+                    <span class="flex items-center gap-0.5">
+                        <span>Dom</span>
+                        <span class="opacity-55 cursor-pointer text-xxs ml-0.5" @click="ui.toggleWE()" title="Comprimi weekend">▾</span>
+                    </span>
+                    <span class="font-normal opacity-60 text-xs">{{ ts.days[6]?.date ?? '' }}</span>
+                </span>
             </th>
             <th class="text-center text-xs">Tot</th>
             <th class="text-center text-xs opacity-60">Rem</th>
@@ -72,7 +90,6 @@ const rend = (i: number) => ts.rendPerDay[i] ?? null;
 
 function dayHeadCls(d: Day, i: number): string[] {
     const cls: string[] = [];
-    if (i === 5) { cls.push('weekend-col', 'we-col'); return cls; }
     if (d?.holiday) {
         cls.push('holiday-col');
     } else {

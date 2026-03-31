@@ -62,8 +62,11 @@ async function callOpenAiCompatible(
     const baseUrl   = process.env["OPENAI_BASE_URL"]!;
     const apiKey    = process.env["OPENAI_API_KEY"] ?? "ollama";
     const timeoutMs = Number(process.env["OPENAI_REQUEST_TIMEOUT_MS"] ?? 900_000);
-    // num_ctx: override Ollama's default 4096-token context with the actual model window
-    const numCtx    = Number(process.env["OPENAI_MODEL_MAX_TPM"] ?? 5000);
+    // num_ctx: Ollama context window in tokens. Defaults to OPENAI_MODEL_MAX_TPM for backwards
+    // compatibility, but should be set independently via OPENAI_NUM_CTX so that the input budget
+    // (OPENAI_MODEL_MAX_TPM) can be a safe fraction of the context (e.g. 25%) without shrinking
+    // the actual model window.
+    const numCtx    = Number(process.env["OPENAI_NUM_CTX"] ?? process.env["OPENAI_MODEL_MAX_TPM"] ?? 5000);
 
     const response = await fetch(`${baseUrl}/chat/completions`, {
         method:  "POST",

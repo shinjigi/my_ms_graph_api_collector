@@ -10,14 +10,12 @@
 import path from "node:path";
 import * as nodeFs from "node:fs/promises";
 import { chromium } from "playwright";
+import { readMeta, writeMeta, shouldSkipMonth } from "../utils";
+import type { NibolBooking } from "@shared/aggregator";
+
+export type { NibolBooking };
 
 const NIBOL_URL = process.env["NIBOL_URL"] ?? "https://app.nibol.com";
-
-export interface NibolBooking {
-  date: string;
-  type: string;
-  details?: string;
-}
 
 function getProfileDir(): string {
   const dir = process.env["NIBOL_PROFILE_DIR"];
@@ -516,22 +514,36 @@ export async function nibolFetchCalendarData(range?: {
 }
 
 export async function collectNibol(
-  _force = false,
+  force = false,
   range?: { start: string; end: string },
 ): Promise<string[]> {
   const NIBOL_DIR = path.join(process.cwd(), "data", "raw", "nibol");
 
-  console.log("[Nibol] starting collection...");
   await nodeFs.mkdir(NIBOL_DIR, { recursive: true });
 
-  const now = new Date();
+  const today = new Date().toISOString().slice(0, 10);
+  const currentMonth = today.slice(0, 7);
+
   const effectiveRange = range ?? {
     start:
       process.env["COLLECT_SINCE"] ??
-      `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`,
-    end: now.toISOString().slice(0, 10),
+      `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-01`,
+    end: today,
   };
 
+  // Skip the entire Playwright scrape if current month was already collected today
+  if (!force) {
+    const meta = await readMeta(NIBOL_DIR);
+    if (shouldSkipMonth(meta[currentMonth], currentMonth, ["nibol"])) {
+      console.log("[Nibol] dati già raccolti — skip");
+      const entries = await nodeFs.readdir(NIBOL_DIR).catch(() => [] as string[]);
+      return entries
+        .filter((f) => /^\d{4}-\d{2}\.json$/.test(f))
+        .map((f) => path.join(NIBOL_DIR, f));
+    }
+  }
+
+  console.log("[Nibol] starting collection...");
   const bookings = await nibolFetchCalendarData(effectiveRange);
 
   // Group by month
@@ -542,14 +554,18 @@ export async function collectNibol(
     grouped[monthStr].push(b);
   }
 
+  const meta = await readMeta(NIBOL_DIR);
   const outPaths: string[] = [];
   for (const [monthStr, monthBookings] of Object.entries(grouped)) {
+    const isCurrentMonth = monthStr === currentMonth;
+    // Skip past months that are already fully collected (unless forced)
+    if (!force && !isCurrentMonth && shouldSkipMonth(meta[monthStr], monthStr, ["nibol"])) {
+      outPaths.push(path.join(NIBOL_DIR, `${monthStr}.json`));
+      continue;
+    }
     const outPath = path.join(NIBOL_DIR, `${monthStr}.json`);
-    await nodeFs.writeFile(
-      outPath,
-      JSON.stringify(monthBookings, null, 2),
-      "utf-8",
-    );
+    await nodeFs.writeFile(outPath, JSON.stringify(monthBookings, null, 2), "utf-8");
+    await writeMeta(NIBOL_DIR, monthStr, { lastExtractedDate: today, sources: ["nibol"] });
     outPaths.push(outPath);
     console.log(`  Nibol: ${monthStr} -> ${outPath}`);
   }

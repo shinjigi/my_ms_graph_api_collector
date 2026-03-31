@@ -13,7 +13,8 @@ export interface Day {
   date: string;
   rend: "ok" | "warn" | "err" | null;
   zucHours: number;
-  nibol: string | null;
+  location?: "office" | "smart" | "mixed" | "unknown";
+  nibol: NibolBooking | null;
   holiday: boolean;
   holidayName?: string;
 }
@@ -138,25 +139,30 @@ export interface EmailRaw {
 export type { ProposalEntry, DayProposal }                   from '@shared/analysis';
 export type { SubmitEdit, ZucchettiRequestResult }           from '@shared/submit';
 export type { WeekDayData }                                  from '@shared/week';
+export type { ZucchettiDay }                                 from '@shared/zucchetti';
+export type { NibolBooking, TeamsMessageRaw, BrowserVisit }  from '@shared/aggregator';
 
 // --- API Response Types (from backend) ---
+
+import type { ZucchettiDay }                       from '@shared/zucchetti';
+import type { NibolBooking, TeamsMessageRaw, BrowserVisit } from '@shared/aggregator';
 
 /** FE-specific version of WeekDayData with typed signal arrays. */
 export interface WeekDayResponse {
     date:           string;
     isWorkday:      boolean;
     oreTarget:      number;
-    location:       string;
-    nibol:          string | null;
+    location:       "office" | "smart" | "mixed" | "unknown";
+    nibol:          NibolBooking | null;
     holiday:        boolean;
     holidayName?:   string;
-    zucchetti:      unknown;
+    zucchetti:      ZucchettiDay | null;
     calendar:       CalendarEventRaw[];
     emails:         EmailRaw[];
-    teams:          unknown[];
+    teams:          TeamsMessageRaw[];
     svnCommits:     SvnCommitRaw[];
     gitCommits:     GitCommitRaw[];
-    browserVisits:  unknown[];
+    browserVisits:  BrowserVisit[];
 }
 
 export interface ApiWeekResponse {

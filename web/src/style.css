@@ -54,7 +54,7 @@
 .pinned-row:hover td { opacity: 1; }
 .ts-pin-sep-row td { background: color-mix(in oklch, var(--color-base-200) 80%, transparent) !important; border-top: 2px solid var(--color-base-300); }
 .day-err .err-x { color: #fff; font-weight: 900; text-shadow: 0 0 4px #0006; }
-.we-hidden .weekend-col { display: none; }
+/* WE columns are shown/hidden via v-if, not CSS display:none */
 
 /* ── Timesheet note inline edit ── */
 .tc-note {
@@ -77,7 +77,7 @@ td:hover .tc-note.empty::after { opacity: 0.3; }
 
 /* ── Pinned scroll ── */
 .ts-pin-scroll {
-    overflow-y: auto; max-height: 120px; scrollbar-width: thin;
+    overflow-y: auto; max-height: 340px; min-height: 80px; scrollbar-width: thin;
     border-left: 1px solid color-mix(in oklch, var(--color-base-300) 50%, transparent);
     border-right: 1px solid color-mix(in oklch, var(--color-base-300) 50%, transparent);
     border-bottom: 1px solid color-mix(in oklch, var(--color-base-300) 50%, transparent);

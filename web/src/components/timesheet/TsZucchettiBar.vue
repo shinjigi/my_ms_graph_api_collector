@@ -43,8 +43,8 @@ import { ref, computed }          from 'vue';
 import { useTimesheetStore }       from '../../stores/useTimesheetStore';
 import { usePickerStore }          from '../../stores/usePickerStore';
 import { submitZucchettiRequest }  from '../../api';
-import { DAYABB_IT, WORKDAY_HOURS, HALF_WORKDAY_HOURS } from '../../mock/data';
 import type { WeekDayResponse }    from '../../types';
+import { DAYABB_IT, HALF_WORKDAY_HOURS, WORKDAY_HOURS } from '../../standards';
 
 const ts     = useTimesheetStore();
 const picker = usePickerStore();

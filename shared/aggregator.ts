@@ -1,5 +1,11 @@
 import { ZucchettiDay } from "./zucchetti";
 
+export interface NibolBooking {
+  date:     string;  // YYYY-MM-DD
+  type:     string;  // e.g. "office", "home", "external"
+  details?: string;
+}
+
 export interface BrowserVisit {
   visitId: string; // "<source>-<id>" to avoid collisions across profiles
   source: string; // e.g. "chrome-profile1", "firefox"
@@ -79,6 +85,7 @@ export interface AggregatedDay {
   isWorkday: boolean;
   oreTarget: number; // decimal hours from Zucchetti hOrd
   location: "office" | "smart" | "mixed" | "unknown";
+  nibol: NibolBooking | null;
   zucchetti: ZucchettiDay | null;
   calendar: CalendarEventRaw[];
   emails: EmailRaw[];
