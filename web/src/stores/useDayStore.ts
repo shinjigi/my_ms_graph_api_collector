@@ -9,6 +9,10 @@ import type {
   TlEvent,
   Email,
   TlEventType,
+  TeamsMessageRaw,
+  BrowserVisit,
+  GitCommitRaw,
+  SvnCommitRaw,
 } from "../types";
 import { WORKDAY_HOURS } from "@shared/standards";
 import { dateToString, getTimeString } from "@shared/dates";
@@ -20,6 +24,10 @@ export const useDayStore = defineStore(
     const usToday = ref<UsCard[]>([]);
     const tlEvents = ref<TlEvent[]>([]);
     const emails = ref<Email[]>([]);
+    const teams = ref<TeamsMessageRaw[]>([]);
+    const browser = ref<BrowserVisit[]>([]);
+    const gitCommits = ref<GitCommitRaw[]>([]);
+    const svnCommits = ref<SvnCommitRaw[]>([]);
     const usNotes = ref<Record<number, string>>({});
 
     function loadDay(date: string) {
@@ -99,6 +107,12 @@ export const useDayStore = defineStore(
 
       tlEvents.value = allEvents.length > 0 ? allEvents : [];
       emails.value = emailList.length > 0 ? emailList : [];
+
+      // Popola i segnali dettagliati direttamente da dayData (già caricato in weekData)
+      teams.value = dayData.teams || [];
+      browser.value = dayData.browserVisits || [];
+      gitCommits.value = dayData.gitCommits || [];
+      svnCommits.value = dayData.svnCommits || [];
 
       // Rebuild usToday from active TP tasks that have hours on this day
       const dayIdx = picker.selectedDayIdx;
@@ -218,6 +232,10 @@ export const useDayStore = defineStore(
       usToday,
       tlEvents,
       emails,
+      teams,
+      browser,
+      gitCommits,
+      svnCommits,
       usNotes,
       quickLog,
       dayTotals,

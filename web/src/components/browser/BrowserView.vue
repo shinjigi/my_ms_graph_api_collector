@@ -2,18 +2,11 @@
     <div>
         <div class="flex items-center gap-3 mb-4">
             <h2 class="text-base font-bold">Browser — {{ dateLabel }}</h2>
-            <span class="badge badge-outline badge-sm">{{ data?.totalVisits ?? 0 }} visite</span>
-            <span class="badge badge-outline badge-sm">{{ data?.totalDomains ?? 0 }} domini</span>
+            <span class="badge badge-outline badge-sm">{{ day.browser.length }} visite</span>
+            <span class="badge badge-outline badge-sm">{{ stats.totalDomains }} domini</span>
         </div>
 
-        <div v-if="loading" class="flex items-center gap-2 py-8 justify-center text-base-content/40">
-            <span class="loading loading-spinner loading-sm"></span>
-            <span class="text-xs">Caricamento cronologia browser…</span>
-        </div>
-
-        <div v-else-if="error" class="alert alert-error text-sm">{{ error }}</div>
-
-        <div v-else-if="!data || data.totalVisits === 0"
+        <div v-if="day.browser.length === 0"
              class="text-center py-12 text-base-content/30 text-sm">
             Nessuna visita browser registrata per questo giorno.
         </div>
@@ -24,7 +17,7 @@
                 <div class="card-body p-3">
                     <div class="text-xs font-bold text-base-content/50 uppercase tracking-wide mb-3">Top domini</div>
                     <div class="space-y-2">
-                        <div v-for="d in data.byDomain" :key="d.domain">
+                        <div v-for="d in stats.byDomain" :key="d.domain">
                             <div class="flex justify-between text-xs mb-0.5">
                                 <span class="font-mono truncate text-base-content/70 max-w-[180px]" :title="d.domain">{{ d.domain }}</span>
                                 <span class="shrink-0 ml-2 font-semibold text-base-content/60">{{ d.visits }}</span>
@@ -71,24 +64,45 @@
 <script setup lang="ts">
 import { ref, computed, watch }   from 'vue';
 import { usePickerStore }         from '../../stores/usePickerStore';
-import { fetchDayBrowser }        from '../../api';
-import type { BrowserResponse }   from '../../api';
-import { dateToString, getTimeString } from '@shared/dates';
+import { useDayStore }            from '../../stores/useDayStore';
+import { getTimeString }          from '@shared/dates';
+import type { BrowserDomain }     from '../../types';
 
 const picker = usePickerStore();
-
-const loading = ref(false);
-const error   = ref('');
-const data    = ref<BrowserResponse | null>(null);
+const day    = useDayStore();
 const search  = ref('');
 
 const dateLabel = ref('');
 
+const stats = computed(() => {
+    const visits = day.browser;
+    const domains = new Map<string, number>();
+    for (const v of visits) {
+        try {
+            const d = new URL(v.url).hostname.replace('www.', '');
+            domains.set(d, (domains.get(d) ?? 0) + 1);
+        } catch { /* ignore */ }
+    }
+    const byDomain: BrowserDomain[] = [...domains.entries()]
+        .map(([domain, visits]) => ({
+            domain,
+            visits,
+            pct: visits > 0 ? (visits / day.browser.length) * 100 : 0
+        }))
+        .sort((a, b) => b.visits - a.visits)
+        .slice(0, 15);
+
+    return {
+        totalVisits: visits.length,
+        totalDomains: domains.size,
+        byDomain
+    };
+});
+
 const filteredVisits = computed(() => {
-    if (!data.value) return [];
     const needle = search.value.trim().toLowerCase();
-    if (!needle) return data.value.visits;
-    return data.value.visits.filter(v =>
+    if (!needle) return day.browser;
+    return day.browser.filter(v =>
         v.url.toLowerCase().includes(needle) ||
         (v.title ?? '').toLowerCase().includes(needle)
     );
@@ -98,22 +112,8 @@ function formatTime(iso: string): string {
     return getTimeString(iso).slice(0, 5);
 }
 
-async function load(date: string) {
-    loading.value = true;
-    error.value   = '';
-    search.value  = '';
-    try {
-        data.value = await fetchDayBrowser(date);
-    } catch (e) {
-        error.value = (e as Error).message;
-        data.value  = null;
-    } finally {
-        loading.value = false;
-    }
-}
-
 watch(() => picker.pickerSelected, (d) => {
     dateLabel.value = d.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'short' });
-    load(dateToString(d));
+    search.value = '';
 }, { immediate: true });
 </script>

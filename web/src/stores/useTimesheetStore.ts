@@ -37,7 +37,9 @@ export const useTimesheetStore = defineStore(
      * Fetch week data from backend and populate days/active/pinned.
      * Falls back to mock data if backend is unavailable.
      */
-    async function fetchWeekData(date: string): Promise<void> {
+    async function fetchWeekData(date: string, force = false): Promise<void> {
+      if (!force && currentMonday.value === date && weekData.value) return;
+
       loading.value = true;
       error.value = null;
 
