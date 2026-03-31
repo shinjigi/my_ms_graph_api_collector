@@ -11,16 +11,14 @@ import { parseTpDate, hhmmToHours } from "../../targetprocess/format";
 import type { WeekDayData } from "@shared/week";
 import type { SubmitEdit } from "@shared/submit";
 import { ZucchettiDay } from "@shared/zucchetti";
-import { getItalianHolidays, Holiday } from "@shared/holidays";
+import { dateToString, findHoliday } from "@shared/holidays";
 import { AggregatedDay } from "@shared/aggregator";
+import { parseZucchettiLocation } from "../../analysis/aggregator";
 
 export const weekRouter = Router();
 
 const RAW_DIR = path.join(process.cwd(), "data", "raw");
 const AGG_DIR = path.join(process.cwd(), "data", "aggregated");
-
-// Creiamo una cache per evitare ricalcoli inutili
-const holidaysCache = new Map<number, Holiday[]>();
 
 interface WeekResponse {
   monday: string;
@@ -53,14 +51,6 @@ function getMonday(dateStr: string): Date {
   return d;
 }
 
-function dateToString(d: Date): string {
-  // Use local date components — toISOString() uses UTC and shifts in CET/CEST
-  const yr = d.getFullYear();
-  const mo = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${yr}-${mo}-${day}`;
-}
-
 async function readAggregatedDay(date: string): Promise<AggregatedDay | null> {
   const filePath = path.join(AGG_DIR, `${date}.json`);
   try {
@@ -83,39 +73,12 @@ async function loadZucchettiMonth(month: string): Promise<ZucchettiDay[]> {
   }
 }
 
-function parseZucchettiLocation(day: ZucchettiDay): string {
-  if (!day.giustificativi || day.giustificativi.length === 0) return "office";
-  const hasSmartWorking = day.giustificativi.some((g) =>
-    (g.text ?? "").toUpperCase().includes("SMART"),
-  );
-  const hasLeave = day.giustificativi.some((g) => {
-    const text = (g.text ?? "").toUpperCase();
-    return text.includes("FERIE") || text.includes("PERM");
-  });
-  if (hasSmartWorking && hasLeave) return "mixed";
-  if (hasSmartWorking) return "smart";
-  return "office";
-}
 
 function isWorkday(day: ZucchettiDay): boolean {
   // Zucchetti marks non-workdays explicitly via the "orario" field.
   // Future or unfilled days have an empty hOrd — do NOT treat that as non-workday.
   const orario = (day.orario ?? "").toUpperCase();
   return orario !== "DOM" && orario !== "SAB" && orario !== "FES";
-}
-
-function findHoliday(date: Date): Holiday | undefined {
-  const year = date.getFullYear();
-
-  // Se non abbiamo ancora calcolato l'anno, lo facciamo una volta sola
-  if (!holidaysCache.has(year)) {
-    holidaysCache.set(year, getItalianHolidays(year));
-  }
-
-  const yearHolidays = holidaysCache.get(year)!;
-  const dateStr = dateToString(date);
-
-  return yearHolidays.find((h) => h.date === dateStr);
 }
 
 // GET /api/week/:date
@@ -170,7 +133,7 @@ weekRouter.get("/:date", async (req: Request, res: Response) => {
       isWorkday: isWd,
       oreTarget,
       location,
-      nibol: null,
+      nibol: agg?.nibol ?? null,
       holiday: !isWd,
       holidayName: holiday?.name,
       zucchetti: zuccDay,

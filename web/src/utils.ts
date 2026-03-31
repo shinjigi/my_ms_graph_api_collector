@@ -11,6 +11,7 @@ export function stateColor(state: string): string {
 }
 
 export function tpLink(id: number): string {
-    return `https://your-org.tpondemand.com/entity/${id}`;
+    const base = import.meta.env.VITE_TP_BASE_URL ?? 'https://your-org.tpondemand.com';
+    return `${base}/entity/${id}`;
 }
 

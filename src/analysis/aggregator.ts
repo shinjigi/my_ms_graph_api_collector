@@ -20,6 +20,7 @@ import {
   SvnCommit,
   GitCommit,
   BrowserVisit,
+  NibolBooking,
 } from "@shared/aggregator";
 
 const log = createLogger("aggregator");
@@ -31,10 +32,11 @@ const ZUCC_DIR = path.join(RAW_DIR, "zucchetti");
 const CAL_DIR = path.join(RAW_DIR, "graph-calendar");
 const EMAIL_DIR = path.join(RAW_DIR, "graph-email");
 const TEAMS_DIR = path.join(RAW_DIR, "graph-teams");
-const GIT_DIR = path.join(RAW_DIR, "git");
-const SVN_DIR = path.join(RAW_DIR, "svn");
+const GIT_DIR    = path.join(RAW_DIR, "git");
+const SVN_DIR    = path.join(RAW_DIR, "svn");
 const CHROME_DIR = path.join(RAW_DIR, "browser-chrome");
 const FIREFOX_DIR = path.join(RAW_DIR, "browser-firefox");
+const NIBOL_DIR  = path.join(RAW_DIR, "nibol");
 
 export function parseZucchettiLocation(
   day: ZucchettiDay,
@@ -107,7 +109,7 @@ export async function aggregateSingleDay(
 ): Promise<AggregatedDay> {
   const monthStr = date.slice(0, 7);
 
-  const [calendar, emails, teams, svn, git, chrome, firefox] =
+  const [calendar, emails, teams, svn, git, chrome, firefox, nibolMonth] =
     await Promise.all([
       loadMonthFile<CalendarEventRaw>(CAL_DIR, monthStr),
       loadMonthFile<EmailRaw>(EMAIL_DIR, monthStr),
@@ -116,17 +118,20 @@ export async function aggregateSingleDay(
       loadMonthFile<GitCommit>(GIT_DIR, monthStr),
       loadMonthFile<BrowserVisit>(CHROME_DIR, monthStr),
       loadMonthFile<BrowserVisit>(FIREFOX_DIR, monthStr),
+      loadMonthFile<NibolBooking>(NIBOL_DIR, monthStr),
     ]);
 
   const workday = isWorkday(zDay);
   const rawOre = zDay.hOrd ? hhmmToHours(zDay.hOrd) : null;
   const oreTarget = workday ? (rawOre ?? 8) : 0;
+  const nibol = nibolMonth.find((b) => b.date === date) ?? null;
 
   const bundle: AggregatedDay = {
     date,
     isWorkday: workday,
     oreTarget,
     location: workday ? parseZucchettiLocation(zDay) : "unknown",
+    nibol,
     zucchetti: zDay,
     calendar: calendar.filter((e) => e.start?.dateTime?.slice(0, 10) === date),
     emails: emails.filter((e) => e.receivedDateTime?.slice(0, 10) === date),
@@ -162,6 +167,7 @@ async function run(): Promise<void> {
   const git = await loadDirMonthly<GitCommit>(GIT_DIR);
   const chromeBrows = await loadDirMonthly<BrowserVisit>(CHROME_DIR);
   const firefoxBrows = await loadDirMonthly<BrowserVisit>(FIREFOX_DIR);
+  const nibolAll = await loadDirMonthly<NibolBooking>(NIBOL_DIR);
   const browser = [...chromeBrows, ...firefoxBrows];
 
   log.debug(`Zucchetti: ${zuccDays.length} giorni`);
@@ -171,14 +177,16 @@ async function run(): Promise<void> {
   log.debug(`SVN: ${svn.length} commit`);
   log.debug(`Git: ${git.length} commit`);
   log.debug(`Browser: ${browser.length} visite`);
+  log.debug(`Nibol: ${nibolAll.length} prenotazioni`);
 
   // Build date-indexed maps for fast lookup
-  const calByDate = new Map<string, CalendarEventRaw[]>();
-  const emailByDate = new Map<string, EmailRaw[]>();
-  const teamsByDate = new Map<string, TeamsMessageRaw[]>();
-  const svnByDate = new Map<string, SvnCommit[]>();
-  const gitByDate = new Map<string, GitCommit[]>();
+  const calByDate     = new Map<string, CalendarEventRaw[]>();
+  const emailByDate   = new Map<string, EmailRaw[]>();
+  const teamsByDate   = new Map<string, TeamsMessageRaw[]>();
+  const svnByDate     = new Map<string, SvnCommit[]>();
+  const gitByDate     = new Map<string, GitCommit[]>();
   const browserByDate = new Map<string, BrowserVisit[]>();
+  const nibolByDate   = new Map<string, NibolBooking>();
 
   for (const ev of calendar) {
     const d = ev.start?.dateTime?.slice(0, 10);
@@ -228,6 +236,10 @@ async function run(): Promise<void> {
     }
   }
 
+  for (const b of nibolAll) {
+    if (b.date) nibolByDate.set(b.date, b);
+  }
+
   let written = 0;
 
   for (const zDay of zuccDays) {
@@ -242,6 +254,7 @@ async function run(): Promise<void> {
       isWorkday: workday,
       oreTarget,
       location: workday ? parseZucchettiLocation(zDay) : "unknown",
+      nibol: nibolByDate.get(date) ?? null,
       zucchetti: zDay,
       calendar: calByDate.get(date) ?? [],
       emails: emailByDate.get(date) ?? [],
