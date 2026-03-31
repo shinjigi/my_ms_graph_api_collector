@@ -26,11 +26,9 @@
                     <span class="mx-1 text-base-content/20">·</span>
                     <span class="text-primary font-medium">{{ card.tpH }}h</span> TP
                 </div>
-                <div class="text-xs text-base-content/30 mt-0.5 flex items-center gap-1">
-                    <span v-if="card.location === 'smart'"  class="text-info text-sm leading-none"         title="Smart working">⌂</span>
-                    <span v-else-if="card.location === 'office'" class="text-base-content/30 text-sm leading-none" title="In ufficio">⊡</span>
-                    <span v-else-if="card.location === 'mixed'" class="text-warning text-sm leading-none"  title="Misto">◐</span>
-                    <span>{{ card.nibol?.type || '—' }}</span>
+                <div v-if="card.badges.length > 0" class="flex flex-wrap gap-0.5 mt-1">
+                    <span v-for="b in card.badges" :key="b.emoji"
+                          class="ws-badge" :title="b.title">{{ b.emoji }}</span>
                 </div>
             </div>
         </div>
@@ -46,6 +44,8 @@
 import { computed }           from 'vue';
 import { usePickerStore }     from '../../stores/usePickerStore';
 import { useTimesheetStore }  from '../../stores/useTimesheetStore';
+import { locationEmoji, locationTitle, giustActivityEmojis } from '../../utils';
+import type { ZucchettiJustification } from '@shared/zucchetti';
 
 const picker = usePickerStore();
 const ts     = useTimesheetStore();
@@ -70,7 +70,25 @@ const weekCards = computed(() => {
         const rendIcon = r === 'ok' ? '✓' : r === 'warn' ? '⚠' : r === 'err' ? '✗' : '·';
         const rendIconCls = r === 'ok' ? 'text-success' : r === 'warn' ? 'text-warning' : r === 'err' ? 'text-error' : 'text-base-content/20';
 
-        return { date, dateLabel, isSelected, isToday, rendCls, rendIcon, rendIconCls, zucH: d.zucHours, tpH, nibol: d.nibol, location: d.location };
+        const giust: ZucchettiJustification[] = ts.weekData?.days[i]?.zucchetti?.giustificativi ?? [];
+        const badges: { emoji: string; title: string }[] = [];
+        if (d.location) badges.push({ emoji: locationEmoji(d.location), title: locationTitle(d.location) });
+        for (const emoji of giustActivityEmojis(giust)) badges.push({ emoji, title: emoji });
+
+        return { date, dateLabel, isSelected, isToday, rendCls, rendIcon, rendIconCls, zucH: d.zucHours, tpH, nibol: d.nibol, badges };
     });
 });
 </script>
+
+<style scoped>
+.ws-badge {
+    font-size: 0.7rem;
+    line-height: 1;
+    padding: 1px 3px;
+    border-radius: 3px;
+    background: oklch(var(--b3));
+    display: inline-flex;
+    align-items: center;
+    cursor: default;
+}
+</style>

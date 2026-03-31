@@ -27,8 +27,19 @@
             <span v-if="pendingEditsCount > 0" class="badge badge-xs badge-primary">{{ pendingEditsCount }}</span>
         </button>
 
+        <!-- Reset button: visible only when there are pending edits -->
+        <button v-if="pendingEditsCount > 0 && !submitting"
+                class="btn btn-xs btn-ghost text-error/60 hover:text-error"
+                @click="ts.clearEdits()"
+                title="Annulla tutte le modifiche non inviate">
+            ✕ reset
+        </button>
+
         <!-- Feedback messages -->
-        <span v-if="analysis.error" class="text-xs text-error truncate max-w-40" :title="analysis.error">
+        <span v-if="validationError" class="text-xs text-warning truncate max-w-60" :title="validationError">
+            ⚠ {{ validationError }}
+        </span>
+        <span v-else-if="analysis.error" class="text-xs text-error truncate max-w-40" :title="analysis.error">
             ✗ {{ analysis.error }}
         </span>
         <span v-else-if="analysis.isRunning" class="text-xs text-secondary">
@@ -86,9 +97,10 @@ watch(() => analysis.status?.status, (newStatus) => {
 
 // ---- Submit to TP ----
 
-const submitting = ref(false);
-const submitMsg  = ref('');
-const submitMsgCls = ref('text-success');
+const submitting    = ref(false);
+const submitMsg     = ref('');
+const submitMsgCls  = ref('text-success');
+const validationError = ref('');
 
 const pendingEditsCount = computed(() =>
     Object.values(ts.hoursEdits).filter(h => h > 0).length
@@ -96,8 +108,25 @@ const pendingEditsCount = computed(() =>
 
 const submitDisabled = computed(() => pendingEditsCount.value === 0 || submitting.value);
 
+/** Returns the number of hour entries that are missing a description. */
+function countMissingNotes(): number {
+    let missing = 0;
+    for (const [key, hours] of Object.entries(ts.hoursEdits)) {
+        if (!hours || hours <= 0) continue;
+        if (!(ts.noteEdits[key] ?? '').trim()) missing++;
+    }
+    return missing;
+}
+
 async function runSubmit() {
     if (submitDisabled.value) return;
+    validationError.value = '';
+    const missing = countMissingNotes();
+    if (missing > 0) {
+        validationError.value = `${missing} entr${missing > 1 ? 'ate' : 'ata'} senza descrizione`;
+        setTimeout(() => { validationError.value = ''; }, 6000);
+        return;
+    }
     submitting.value = true;
     submitMsg.value  = '';
     try {

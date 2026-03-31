@@ -7,7 +7,7 @@ export interface WeekDayData {
     date:           string;
     isWorkday:      boolean;
     oreTarget:      number;
-    location:       "office" | "smart" | "mixed" | "unknown";
+    location:       "office" | "smart" | "travel" | "external" | "mixed" | "unknown";
     nibol:          NibolBooking | null;
     holiday:        boolean;
     holidayName?:   string;

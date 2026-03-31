@@ -29,6 +29,10 @@ export const useTimesheetStore = defineStore(
     const hoursEdits = ref<Record<string, number>>({});
     const noteEdits = ref<Record<string, string>>({});
 
+    // tpIds of pinned rows with a pending promotion timer
+    const pendingPromotion = ref<number[]>([]);
+    const promotionTimers = new Map<number, ReturnType<typeof setTimeout>>();
+
     /**
      * Fetch week data from backend and populate days/active/pinned.
      * Falls back to mock data if backend is unavailable.
@@ -216,6 +220,29 @@ export const useTimesheetStore = defineStore(
       }),
     );
 
+    /**
+     * Schedules promotion of a pinned row to the active table after a 2s debounce.
+     * Multiple quick clicks reset the timer, allowing the user to accumulate hours
+     * (e.g. three clicks → 1.5h) before the row moves up.
+     */
+    function schedulePromotion(tpId: number) {
+        if (promotionTimers.has(tpId)) clearTimeout(promotionTimers.get(tpId)!);
+        if (!pendingPromotion.value.includes(tpId)) {
+            pendingPromotion.value = [...pendingPromotion.value, tpId];
+        }
+        const timer = setTimeout(() => {
+            promotionTimers.delete(tpId);
+            pendingPromotion.value = pendingPromotion.value.filter(id => id !== tpId);
+            const idx = pinned.value.findIndex(r => r.tpId === tpId);
+            if (idx === -1) return;
+            const hasHours = days.value.some((_, i) => getHours(tpId, i) > 0);
+            if (!hasHours) return;
+            const [row] = pinned.value.splice(idx, 1);
+            active.value.push(row);
+        }, 2000);
+        promotionTimers.set(tpId, timer);
+    }
+
     function clearEdits() {
       hoursEdits.value = {};
       noteEdits.value = {};
@@ -302,12 +329,15 @@ export const useTimesheetStore = defineStore(
       currentMonday,
       hoursEdits,
       noteEdits,
+      pendingPromotion,
       getHours,
       getNote,
       setHours,
       setNote,
       fillDay,
       patchDay,
+      clearEdits,
+      schedulePromotion,
       fetchWeekData,
       submitWeekHours,
       submitDayHours,

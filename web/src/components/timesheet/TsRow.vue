@@ -13,10 +13,19 @@
         <td v-for="(d, i) in days.slice(0, 5)" :key="i"
             class="text-center"
             :class="cellCls(d, i)"
-            @click.stop="!d.holiday ? selectDay(i) : undefined">
+            @click.stop="!d.holiday && !isPinned ? selectDay(i) : undefined">
             <template v-if="d.holiday">
                 <span class="text-xs ts-holiday-icon">🇮🇹</span>
             </template>
+            <!-- Pinned row: quick-add + button -->
+            <template v-else-if="isPinned">
+                <button class="pin-add-btn" @click.stop="quickAdd(i)" title="+0.5h">
+                    <span v-if="ts.getHours(row.tpId, i) > 0" class="pin-add-hours">{{ ts.getHours(row.tpId, i) }}h</span>
+                    <span class="pin-add-plus">+</span>
+                    <span v-if="isPending && ts.getHours(row.tpId, i) > 0" class="loading loading-ring loading-xs text-warning ml-0.5"></span>
+                </button>
+            </template>
+            <!-- Active row: full widget -->
             <template v-else>
                 <div class="flex flex-col items-center gap-0">
                     <TimeCellWidget
@@ -86,6 +95,13 @@ import TsNoteCell            from './TsNoteCell.vue';
 
 const props = defineProps<{ row: TsRow; isPinned: boolean }>();
 
+const isPending = computed(() => ts.pendingPromotion.includes(props.row.tpId));
+
+function quickAdd(dayIdx: number) {
+    ts.setHours(props.row.tpId, dayIdx, ts.getHours(props.row.tpId, dayIdx) + 0.5);
+    ts.schedulePromotion(props.row.tpId);
+}
+
 const ts     = useTimesheetStore();
 const picker = usePickerStore();
 const ui     = useUiStore();
@@ -134,3 +150,34 @@ function cellCls(d: Day, i: number): string[] {
     return cls;
 }
 </script>
+
+<style scoped>
+.pin-add-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    width: 100%;
+    padding: 2px 0;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    color: oklch(var(--bc) / 0.4);
+    transition: color 0.15s, background 0.15s;
+    cursor: pointer;
+    background: transparent;
+    border: none;
+}
+.pin-add-btn:hover {
+    color: oklch(var(--bc) / 0.9);
+    background: oklch(var(--b3));
+}
+.pin-add-hours {
+    font-weight: 700;
+    color: oklch(var(--wa));
+}
+.pin-add-plus {
+    font-size: 0.85rem;
+    font-weight: 700;
+    line-height: 1;
+}
+</style>
