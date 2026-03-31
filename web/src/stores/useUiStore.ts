@@ -4,7 +4,7 @@ import type { ActiveView, QuickSortState } from '../types';
 
 export const useUiStore = defineStore('ui', () => {
     const activeView      = ref<ActiveView>('dashboard');
-    const weVisible       = ref(true);
+    const weVisible       = ref(false);
     const browserExpanded = ref(false);
     const quickFilterSignals  = ref(false);
     const quickSearch         = ref('');
