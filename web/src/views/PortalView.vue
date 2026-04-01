@@ -47,6 +47,7 @@ import { useUiStore }        from '../stores/useUiStore';
 import { usePickerStore }    from '../stores/usePickerStore';
 import { useTimesheetStore } from '../stores/useTimesheetStore';
 import { useDayStore }       from '../stores/useDayStore';
+import { useAnalysisStore }  from '../stores/useAnalysisStore';
 import type { ActiveView }   from '../types';
 import StatStrip             from '../components/dashboard/StatStrip.vue';
 import WeekStrip             from '../components/dashboard/WeekStrip.vue';
@@ -64,8 +65,9 @@ const props = defineProps<{ view: string; date: string }>();
 const router = useRouter();
 const ui     = useUiStore();
 const picker = usePickerStore();
-const ts     = useTimesheetStore();
-const day    = useDayStore();
+const ts       = useTimesheetStore();
+const day      = useDayStore();
+const analysis = useAnalysisStore();
 
 const highlightUs = ref('');
 
@@ -86,9 +88,10 @@ watch(() => [props.view, props.date] as const, ([newView, newDate]) => {
             picker.setFromDate(new Date(yr, mo, d));
         }
 
-        // Fetch week data from backend
+        // Fetch week data and AI hints from backend
         const monday = dateToString(getMonday(new Date(yr, mo, d)));
         ts.fetchWeekData(monday);
+        analysis.loadWeekHints(monday);
     }
 }, { immediate: true });
 

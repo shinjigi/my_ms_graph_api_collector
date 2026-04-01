@@ -11,6 +11,8 @@ import {
   validActivities,
 } from "../../collectors/zucchetti/updateData";
 import { ZucchettiRequestParams } from "@shared/zucchetti";
+import { createLogger } from "../../logger";
+const logger = createLogger("zucchetti-route");
 
 export const zucchettiRouter = Router();
 
@@ -40,14 +42,14 @@ zucchettiRouter.post("/request", async (req: Request, res: Response) => {
       scrapeAfterSubmit: true, // Always scrape when called from API
     };
 
-    log.info(
+    logger.info(
       `[zucchetti-route] Request: ${params.type} on ${params.date} (fullDay=${params.fullDay})`,
     );
     const result = await submitZucchettiRequest(params);
 
     res.json(result);
   } catch (err) {
-    log.error("[zucchetti-route] Unexpected error:", err);
+    logger.error("[zucchetti-route] Unexpected error:", err);
     res.status(500).json({ success: false, message: (err as Error).message });
   }
 });

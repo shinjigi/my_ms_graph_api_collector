@@ -80,7 +80,6 @@ export function stripJsonComments(json: string): string {
         .trim();
 }
 
-/** Converts a TPM (tokens-per-minute / max-context-tokens) env value to a character budget. */
 export function tpmToChars(envKey: string, defaultTokens: number): number {
-    return Number(process.env[envKey] ?? defaultTokens) * 4;
+    return Math.floor(Number(process.env[envKey] ?? defaultTokens) * 3.5);
 }

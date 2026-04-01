@@ -1,3 +1,7 @@
+import { TpTimeEntry } from "../../shared/targetprocess";
+import { createLogger } from "../logger";
+const logger = createLogger("formatter");
+
 /** Normalizes a display name: trims, collapses whitespace, canonical apostrophes, NFC. */
 export function normalizeName(s: string): string {
   return s.trim().replace(/\s+/g, " ").replace(/['']/g, "'").normalize("NFC");
@@ -23,7 +27,7 @@ export function hasJsonFlag(): boolean {
 }
 
 export function printJson(data: unknown): void {
-  log.info(JSON.stringify(data, null, 2));
+  logger.info(JSON.stringify(data, null, 2));
 }
 
 export interface ColumnDef<T> {
@@ -36,13 +40,23 @@ export function printTable<T>(rows: T[], columns: ColumnDef<T>[]): void {
   const header = columns.map((c) => c.header.padEnd(c.width)).join(" | ");
   const separator = "-".repeat(header.length);
 
-  log.info(header);
-  log.info(separator);
+  logger.info(header);
+  logger.info(separator);
 
   rows.forEach((row) => {
     const line = columns.map((c) => c.value(row).padEnd(c.width)).join(" | ");
-    log.info(line);
+    logger.info(line);
   });
+}
+
+export function groupTpEntriesByTask(entries: TpTimeEntry[]): Record<number, number> {
+  const map: Record<number, number> = {};
+  for (const e of entries) {
+    const taskId = e.Assignable?.Id;
+    if (!taskId) continue;
+    map[taskId] = +((map[taskId] ?? 0) + e.Spent).toFixed(1);
+  }
+  return map;
 }
 
 export { parseTpDate, hoursToHhmm, hhmmToHours } from "../../shared/dates";

@@ -236,7 +236,9 @@ export function buildUserPromptBatched(
       (s, a) => s + a.hours,
       0,
     );
-    const remainingHours = Math.max(0, day.oreTarget - recurringHours);
+    const reportedHoursMap = day.reportedHours ?? {};
+    const totalReported = Object.values(reportedHoursMap).reduce((s, v) => s + v, 0);
+    const remainingToReport = Math.max(0, +(day.oreTarget - totalReported - recurringHours).toFixed(1));
 
     const signals = buildSignals(day, signalDetail);
 
@@ -254,8 +256,11 @@ export function buildUserPromptBatched(
 
     return {
       date: day.date,
-      oreTarget: day.oreTarget,
-      remainingHours,
+      totalDailyTarget: day.oreTarget,
+      totalAlreadyOnTargetProcess: totalReported,
+      reportedByTaskId: reportedHoursMap,
+      recurringAllocated: recurringHours,
+      actualHoursToAllocate: remainingToReport,
       location: day.location,
       signals,
       preSeededEntries: preSeeded,
@@ -444,12 +449,16 @@ export async function analyzeBatch(
       );
       return validResults.map((r) => {
         const day = batch.find((d) => d.date === r.date)!;
-        const totalHours = r.entries.reduce((s, e) => s + e.inferredHours, 0);
+        const roundedEntries = r.entries.map(e => ({
+          ...e,
+          inferredHours: Math.round(e.inferredHours * 10) / 10
+        }));
+        const totalHours = roundedEntries.reduce((s, e) => s + e.inferredHours, 0);
         return {
           date: r.date,
           oreTarget: day?.oreTarget ?? 0,
-          totalHours: Math.round(totalHours * 100) / 100,
-          entries: r.entries,
+          totalHours: Math.round(totalHours * 10) / 10,
+          entries: roundedEntries,
           generatedAt: getISOTimestamp(),
           provider: provider.name,
         };
@@ -570,6 +579,17 @@ async function run(): Promise<void> {
       );
       for (const proposal of proposals) {
         const propPath = path.join(PROPOSALS_DIR, `${proposal.date}.json`);
+        
+        // Preserve user-set statuses from previous and existing file if any
+        try {
+          const raw = await fs.readFile(propPath, "utf-8");
+          const old = JSON.parse(raw);
+          for (const e of proposal.entries) {
+            const oe = old.entries.find((x: ProposalEntry) => x.taskId === e.taskId);
+            if (oe?.status) e.status = oe.status;
+          }
+        } catch { /* file not found or invalid — ok */ }
+
         await fs.writeFile(
           propPath,
           JSON.stringify(proposal, null, 2),
@@ -636,9 +656,11 @@ async function run(): Promise<void> {
       `  Accodo ${date} — target ${day.oreTarget.toFixed(2)}h, ${day.calendar.length} eventi, ${day.gitCommits.length} commit — prompt proiettato ~${projectedChars} chars`,
     );
 
-    if (projectedChars > maxInputChars && currentBatch.length > 0) {
+    const MAX_DAYS_PER_BATCH = 14;
+
+    if ((projectedChars > maxInputChars && currentBatch.length > 0) || currentBatch.length >= MAX_DAYS_PER_BATCH) {
       log.debug(
-        `Batch pieno (${projectedChars} > ${maxInputChars}) — flush prima di aggiungere ${date}`,
+        `Batch pieno (chars: ${projectedChars}/${maxInputChars}, giorni: ${currentBatch.length}/${MAX_DAYS_PER_BATCH}) — flush prima di aggiungere ${date}`,
       );
       await processBatch();
     }

@@ -30,10 +30,7 @@ const editing = ref(false);
 const inputRef = ref<HTMLInputElement | null>(null);
 
 const currentNote = computed(() => ts.getNote(props.tpId, props.dayIdx));
-const displayNote = computed(() => {
-    const n = currentNote.value;
-    return n.length > 9 ? n.substring(0, 8) + '…' : n;
-});
+const displayNote = computed(() => currentNote.value);
 
 async function startEdit() {
     if (editing.value) return;

@@ -8,12 +8,11 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { TargetprocessClient } from "../../targetprocess/client";
 import { parseTpDate, hhmmToHours } from "../../targetprocess/format";
-import type { WeekDayData } from "@shared/week";
+import { WeekDayData, ApiWeekResponse } from "@shared/week";
 import type { SubmitEdit } from "@shared/submit";
-import { ZucchettiDay } from "@shared/zucchetti";
+import { ZucchettiDay, isWorkday, parseZucchettiLocation } from "@shared/zucchetti";
 import { findHoliday } from "@shared/holidays";
 import { AggregatedDay, NibolBooking } from "@shared/aggregator";
-import { parseZucchettiLocation } from "../../aggregators/aggregator";
 import { readMeta } from "../../utils";
 import { WORKDAY_HOURS } from "@shared/standards";
 
@@ -22,27 +21,7 @@ export const weekRouter = Router();
 const RAW_DIR = path.join(process.cwd(), "data", "raw");
 const AGG_DIR = path.join(process.cwd(), "data", "aggregated");
 
-interface WeekResponse {
-  monday: string;
-  days: WeekDayData[];
-}
-
-interface TpWeekEntry {
-  tpId: number;
-  usName: string;
-  stateName: string;
-  timeSpent: number;
-  projectName: string;
-  hours: number[];
-  notes: Array<string | null>;
-}
-
-interface TpWeekResponse {
-  userId: number;
-  userName: string;
-  entries: TpWeekEntry[];
-  openItems: unknown[];
-}
+import { TpWeekEntry, TpWeekResponse } from "@shared/targetprocess";
 
 import {
   dateToString,
@@ -85,12 +64,7 @@ async function loadNibolMonth(month: string): Promise<NibolBooking[] | null> {
   }
 }
 
-function isWorkday(day: ZucchettiDay): boolean {
-  // Zucchetti marks non-workdays explicitly via the "orario" field.
-  // Future or unfilled days have an empty hOrd — do NOT treat that as non-workday.
-  const orario = (day.orario ?? "").toUpperCase();
-  return orario !== "DOM" && orario !== "SAB" && orario !== "FES";
-}
+
 
 // GET /api/week/:date
 weekRouter.get("/:date", async (req: Request, res: Response) => {
@@ -187,7 +161,7 @@ weekRouter.get("/:date", async (req: Request, res: Response) => {
     weekDays.push(dayData);
   }
 
-  const response: WeekResponse = {
+  const response: ApiWeekResponse = {
     monday: dateToString(monday),
     days: weekDays,
   };

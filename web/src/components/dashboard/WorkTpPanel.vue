@@ -55,7 +55,28 @@
                 </div>
                 <div class="flex items-center gap-2 flex-wrap">
                     <span class="text-xs text-base-content/40 font-medium shrink-0">TP:</span>
-                    <TimeCellWidget :model-value="us.tpHours" @update="val => day.setTpHours(us.tpId, val)" />
+                    <template v-if="cardCellMode(us.tpId) === 'hint-only'">
+                        <button class="ai-hint-btn"
+                                :class="`confidence-${cardHint(us.tpId)!.confidence}`"
+                                @click="acceptCardHint(us.tpId)"
+                                :title="`AI (${cardHint(us.tpId)!.confidence}): ${cardHint(us.tpId)!.inferredHours}h`">
+                            <span class="ai-hint-val">{{ cardHint(us.tpId)!.inferredHours }}h</span>
+                            <span class="ai-hint-dot"></span>
+                        </button>
+                    </template>
+                    <template v-else>
+                        <TimeCellWidget
+                            :model-value="us.tpHours"
+                            :hint-val="cardHint(us.tpId)?.inferredHours"
+                            :cell-mode="cardCellMode(us.tpId)"
+                            @update="val => {
+                                day.setTpHours(us.tpId, val);
+                                if (val === 0) day.setUsNote(us.tpId, '');
+                                else if (cardHint(us.tpId)?.comment)
+                                    day.setUsNote(us.tpId, cardHint(us.tpId)!.comment!);
+                            }"
+                        />
+                    </template>
                     <span v-if="us.emails"   class="us-signal"><span class="commit-dot source-mail" style="width:5px;height:5px"></span>{{ us.emails }} email</span>
                     <span v-if="us.commits"  class="us-signal"><span class="commit-dot source-git"  style="width:5px;height:5px"></span>{{ us.commits }} commit</span>
                     <span v-if="us.meetings" class="us-signal">📅 {{ us.meetings }} meeting</span>
@@ -135,17 +156,60 @@ import { useDayStore }         from '../../stores/useDayStore';
 import { useUiStore }          from '../../stores/useUiStore';
 import { useTimesheetStore }   from '../../stores/useTimesheetStore';
 import { usePickerStore }      from '../../stores/usePickerStore';
+import { useAnalysisStore }    from '../../stores/useAnalysisStore';
 import { stateColor, tpLink } from '../../utils';
+import { shiftDate }        from '@shared/dates';
 import TimeCellWidget          from '../TimeCellWidget.vue';
 import NoteEdit                from './NoteEdit.vue';
-import type { UsCard, QuickSortState } from '../../types';
+import type { UsCard, QuickSortState, CellMode } from '../../types';
 
 defineProps<{ highlightedUs?: string }>();
 
-const day     = useDayStore();
-const ui      = useUiStore();
-const ts      = useTimesheetStore();
-const picker  = usePickerStore();
+const day      = useDayStore();
+const ui       = useUiStore();
+const ts       = useTimesheetStore();
+const picker   = usePickerStore();
+const analysis = useAnalysisStore();
+
+function cardHint(tpId: number) {
+    const monday = ts.currentMonday;
+    const i      = picker.selectedDayIdx;
+    if (!monday || i < 0) return null;
+    return analysis.getHint(tpId, i, monday);
+}
+
+function cardCellMode(tpId: number): CellMode {
+    const monday = ts.currentMonday;
+    const i      = picker.selectedDayIdx;
+    if (!monday || i < 0) return 'clean';
+    const hint    = analysis.getHint(tpId, i, monday);
+    const key     = `${tpId}_${i}`;
+    const hasEdit = key in ts.hoursEdits;
+    const hours   = ts.getHours(tpId, i);
+
+    // If day is balanced, hide pulsating hints (hint-only) for tasks without hours
+    if (Math.abs(day.dayTotals.delta) < 0.05 && (!hasEdit || hours === 0))
+        return 'clean';
+
+    if (!hint || hint.inferredHours <= 0)
+        return hasEdit && hours > 0 ? 'user-edit' : 'clean';
+    if (!hasEdit || hours === 0) return 'hint-only';
+    if (+hours.toFixed(1) === +hint.inferredHours.toFixed(1)) return 'hint-match';
+    return 'hint-differ';
+}
+
+function acceptCardHint(tpId: number) {
+    const i    = picker.selectedDayIdx;
+    const hint = cardHint(tpId);
+    if (!hint || i < 0 || !ts.currentMonday) return;
+    ts.setHours(tpId, i, hint.inferredHours);
+    if (hint.comment)
+        ts.setNote(tpId, i, hint.comment);
+
+    // Persist to server
+    const dateStr = shiftDate(ts.currentMonday, i);
+    analysis.setEntryStatus(dateStr, tpId, 'applied');
+}
 
 const submitting   = ref(false);
 const submitMsg    = ref('');
@@ -216,3 +280,64 @@ const filteredQuickLog = computed(() => {
     });
 });
 </script>
+
+<style scoped>
+.hours-bar-bg { background-color: oklch(var(--b2)); height:4px; border-radius:2px; overflow:hidden; }
+.hours-bar-tp { background-color: oklch(var(--p)); height:100%; border-radius:2px; }
+.hours-bar-zuc { background-color: oklch(var(--su) / 0.5); height:100%; border-radius:2px; }
+
+.us-card { border-bottom: 1px solid oklch(var(--b3)); transition: background 0.2s; }
+.us-card:last-child { border-bottom: none; }
+.us-card.highlight { background: oklch(var(--p) / 0.05); }
+
+.state-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+.us-signal {
+    background: oklch(var(--b2)); padding: 1px 6px; border-radius: 99px;
+    font-size: 0.65rem; color: oklch(var(--bc) / 0.5); display: flex; align-items: center; gap: 4px; border: 1px solid oklch(var(--b3));
+}
+
+@keyframes ai-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 var(--ai-color); }
+    50%       { box-shadow: 0 0 0 3px var(--ai-color); }
+}
+@keyframes ai-dot-blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.2; }
+}
+
+.ai-hint-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    cursor: pointer;
+    background: transparent;
+    border: 1px solid;
+    transition: background 0.15s;
+    --ai-color: oklch(var(--wa) / 0.45);
+    color: oklch(var(--wa));
+    border-color: oklch(var(--wa) / 0.5);
+    animation: ai-pulse 2s ease-in-out infinite;
+}
+.ai-hint-btn.confidence-high {
+    --ai-color: oklch(var(--su) / 0.45);
+    color: oklch(var(--su));
+    border-color: oklch(var(--su) / 0.5);
+}
+.ai-hint-btn.confidence-low {
+    --ai-color: oklch(var(--er) / 0.3);
+    color: oklch(var(--er) / 0.7);
+    border-color: oklch(var(--er) / 0.35);
+}
+.ai-hint-btn:hover { background: oklch(var(--b3)); }
+.ai-hint-dot {
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: ai-dot-blink 1.4s ease-in-out infinite;
+}
+.ai-hint-val { line-height: 1; }
+</style>

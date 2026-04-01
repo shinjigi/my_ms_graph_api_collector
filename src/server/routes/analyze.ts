@@ -18,22 +18,17 @@ import {
   loadDefaults,
   KB_FILE,
 } from "../../analysers/analyzer";
-import { DayProposal } from "@shared/analysis";
+import { AnalysisJobStatus } from "@shared/analysis";
 import { AggregatedDay } from "@shared/aggregator";
+import { createLogger } from "../../logger";
+import { TargetprocessClient } from "../../targetprocess/client";
+import { parseTpDate, groupTpEntriesByTask } from "../../targetprocess/format";
+const logger = createLogger("api-analyze");
 
 export const analyzeRouter = Router();
 
 // ─── In-memory job store ────────────────────────────────────────────
-interface AnalysisJob {
-  id: string;
-  status: "pending" | "running" | "done" | "error";
-  dates: string[];
-  results: Record<string, DayProposal>;
-  errors: Record<string, string>;
-  startedAt: string;
-}
-
-const jobs = new Map<string, AnalysisJob>();
+const jobs = new Map<string, AnalysisJobStatus>();
 
 /** Check if KB file exists. */
 async function kbExists(): Promise<boolean> {
@@ -78,7 +73,7 @@ function weekDates(dateStr: string): string[] {
 }
 
 /** Run analysis for a list of dates in background. */
-async function runAnalysis(job: AnalysisJob, force: boolean): Promise<void> {
+async function runAnalysis(job: AnalysisJobStatus & { id: string }, force: boolean): Promise<void> {
   job.status = "running";
 
   try {
@@ -101,12 +96,30 @@ async function runAnalysis(job: AnalysisJob, force: boolean): Promise<void> {
       daysToProcess.push(day);
     }
 
+    // Context enrichment: fetch actual hours already on TP to avoid redundant hints
+    if (daysToProcess.length > 0) {
+      try {
+        const minDate = daysToProcess[0].date;
+        const maxDate = daysToProcess[daysToProcess.length - 1].date;
+        const tp = new TargetprocessClient();
+        const me = await tp.getMe();
+        const entries = await tp.getTimesByUserAndDateRange(me.Id, minDate, maxDate);
+
+        for (const day of daysToProcess) {
+          const daily = entries.filter(e => parseTpDate(e.Date) === day.date);
+          day.reportedHours = groupTpEntriesByTask(daily);
+        }
+      } catch (err) {
+        logger.warn(`[analyze-job ${job.id}] Fallito recupero ore reali TP: ${(err as Error).message}`);
+      }
+    }
+
     if (daysToProcess.length === 0) {
-      log.info(
+      logger.info(
         `[analyze-job ${job.id}] Tutti i giorni già analizzati — nessun nuovo proposal da generare (usa force=true per forzare).`,
       );
     } else {
-      log.info(
+      logger.info(
         `[analyze-job ${job.id}] Analisi batch per ${daysToProcess.length} giorni...`,
       );
       try {
@@ -122,13 +135,13 @@ async function runAnalysis(job: AnalysisJob, force: boolean): Promise<void> {
             JSON.stringify(proposal, null, 2),
             "utf-8",
           );
-          job.results[proposal.date] = proposal;
+          job.completed[proposal.date] = proposal;
         }
       } catch (err) {
         // Se l'intero batch fallisce, segna errore per tutte le date
         for (const date of daysToProcess.map((d) => d.date)) {
           job.errors[date] = (err as Error).message;
-          log.error(
+          logger.error(
             `[analyze-job ${job.id}] Errore per ${date}: ${(err as Error).message}`,
           );
         }
@@ -137,7 +150,7 @@ async function runAnalysis(job: AnalysisJob, force: boolean): Promise<void> {
 
     job.status =
       Object.keys(job.errors).length > 0 &&
-      Object.keys(job.results).length === 0
+      Object.keys(job.completed).length === 0
         ? "error"
         : "done";
   } catch (err) {
@@ -164,11 +177,11 @@ analyzeRouter.post("/:date", async (req: Request, res: Response) => {
 
   const force = req.query["force"] === "true";
   const jobId = crypto.randomUUID();
-  const job: AnalysisJob = {
+  const job: AnalysisJobStatus & { id: string } = {
     id: jobId,
     status: "pending",
     dates: [date],
-    results: {},
+    completed: {},
     errors: {},
     startedAt: getISOTimestamp(),
   };
@@ -199,11 +212,11 @@ analyzeRouter.post("/week/:date", async (req: Request, res: Response) => {
   const force = req.query["force"] === "true";
   const dates = weekDates(date);
   const jobId = crypto.randomUUID();
-  const job: AnalysisJob = {
+  const job: AnalysisJobStatus & { id: string } = {
     id: jobId,
     status: "pending",
     dates,
-    results: {},
+    completed: {},
     errors: {},
     startedAt: getISOTimestamp(),
   };
@@ -227,7 +240,7 @@ analyzeRouter.get("/status/:jobId", (req: Request, res: Response) => {
   res.json({
     status: job.status,
     dates: job.dates,
-    completed: job.results,
+    completed: job.completed,
     errors: job.errors,
     startedAt: job.startedAt,
   });

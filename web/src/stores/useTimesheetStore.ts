@@ -11,7 +11,9 @@ import type {
   ApiWeekResponse,
   SubmitEdit,
   WeekDayResponse,
+  DayProposal,
 } from "../types";
+import { useAnalysisStore } from "./useAnalysisStore";
 import {
   dateToString,
   DAYABB_IT,
@@ -24,9 +26,32 @@ export const useTimesheetStore = defineStore(
   "timesheet",
   () => {
     const days = ref<Day[]>([]);
-    const active = ref<TsRow[]>([]);
-    const pinned = ref<TsRow[]>([]);
-    const usExtra = ref<TsRow[]>([]); // User-added items not in TP list
+    const allTasks = ref<TsRow[]>([]);
+    const usExtra = ref<TsRow[]>([]); 
+
+    const analysis = useAnalysisStore();
+
+    /** Partition rows: Active (has hours, local edits or AI hints) vs Pinned (empty) */
+    const isRowActive = (r: TsRow) => {
+      // 1. Check local edits
+      for (let i = 0; i < 5; i++) {
+        if (hoursEdits.value[`${r.tpId}_${i}`] > 0) return true;
+      }
+      // 2. Check server hours
+      if ((r.hours as number[]).slice(0, 5).some((h) => h > 0)) return true;
+      
+      // 3. Check AI hints (promote them to main table automatically)
+      if (currentMonday.value) {
+        for (let i = 0; i < 5; i++) {
+          const hint = analysis.getHint(r.tpId, i, currentMonday.value);
+          if (hint && hint.inferredHours > 0) return true;
+        }
+      }
+      return false;
+    };
+
+    const active = computed(() => allTasks.value.filter(isRowActive));
+    const pinned = computed(() => allTasks.value.filter((r) => !isRowActive(r)));
 
     const loading = ref(false);
     const error = ref<string | null>(null);
@@ -126,18 +151,7 @@ export const useTimesheetStore = defineStore(
           ),
         }));
 
-        // Partition rows: Active (has hours or local edits) vs Pinned (empty)
-        const isRowActive = (r: TsRow) => {
-          // Check local edits first
-          for (let i = 0; i < 5; i++) {
-            if (hoursEdits.value[`${r.tpId}_${i}`] > 0) return true;
-          }
-          // Then check server hours in the record we just built
-          return (r.hours as number[]).slice(0, 5).some((h) => h > 0);
-        };
-
-        active.value = allRows.filter(isRowActive);
-        pinned.value = allRows.filter((r) => !isRowActive(r));
+        allTasks.value = allRows;
 
         // Set weekData last — triggers useDayStore watcher after active/pinned are populated
         weekData.value = weekRes;
@@ -233,7 +247,7 @@ export const useTimesheetStore = defineStore(
     const totalsRow = computed(() => {
       const allRows = [...active.value, ...pinned.value];
       const tp = days.value.map((_, i) =>
-        allRows.reduce((acc, r) => acc + getHours(r.tpId, i), 0),
+        +allRows.reduce((acc, r) => acc + getHours(r.tpId, i), 0).toFixed(1),
       );
       const zuc = days.value.map((d) => d.zucHours);
       const delta = tp.map((t, i) => +((zuc[i] ?? 0) - t).toFixed(1));
@@ -247,7 +261,7 @@ export const useTimesheetStore = defineStore(
         if (d.zucHours === 0) return null;
         const delta = totalsRow.value.delta[i];
         const tp = totalsRow.value.tp[i];
-        if (delta === 0) return "ok";
+        if (Math.abs(delta) < 0.05) return "ok";
         if (tp === 0) return "err";
         return "warn";
       }),
@@ -367,6 +381,7 @@ export const useTimesheetStore = defineStore(
         });
 
         clearEdits();
+        useAnalysisStore().clearWeekHints();
         // Give TP a moment to index the new entries before we re-fetch
         await new Promise((r) => setTimeout(r, 500));
         await fetchWeekData(monday, true);
@@ -407,6 +422,7 @@ export const useTimesheetStore = defineStore(
             delete noteEdits.value[key];
           }
         }
+        useAnalysisStore().clearDayHints(dayIdx, currentMonday.value);
         // Give TP a moment to index the new entries before we re-fetch
         await new Promise((r) => setTimeout(r, 500));
         await fetchWeekData(monday, true);
@@ -436,6 +452,7 @@ export const useTimesheetStore = defineStore(
       addExtraTask,
       removeExtraTask,
       schedulePromotion,
+      allTasks,
       fetchWeekData,
       buildEdits,
       submitWeekHours,

@@ -21,21 +21,22 @@ interface ChatMessage {
   lastUpdatedDateTime?: string; // Aggiungi questa!
 }
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const { createGraphClient } = require("../src/graphClient") as {
-  createGraphClient: () => Promise<
-    import("@microsoft/microsoft-graph-client").Client
-  >;
-};
+// Graph client will be imported dynamically in run()
 
 const targetDate = process.argv[2] ?? "2026-03-05";
 
 async function run(): Promise<void> {
   console.log(`\nTest fetch Teams messages — ${targetDate}\n`);
 
+  const { createGraphClient } = (await import(
+    "../src/graphClient"
+  )) as unknown as {
+    createGraphClient: () => Promise<
+      import("@microsoft/microsoft-graph-client").Client
+    >;
+  };
   const client = await createGraphClient();
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const c = client as any;
+  const c = client;
 
   // Step 1: list all chats (paginate to get more than top=50)
   let allChats: Array<{ id: string; topic: string | null; chatType: string }> =
@@ -43,7 +44,7 @@ async function run(): Promise<void> {
   let nextLink: string | null = null;
 
   do {
-    const res: GraphResponse<any> = nextLink
+    const res: GraphResponse<{ id: string; topic: string | null; chatType: string }> = nextLink
       ? await client.api(nextLink).get()
       : await client
           .api("/me/chats")

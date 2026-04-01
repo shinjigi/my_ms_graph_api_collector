@@ -17,12 +17,17 @@
                     </div>
                     <div v-for="e in group.entries" :key="e.key" class="flex items-center gap-2 mb-1.5">
                         <div class="flex-1 min-w-0">
-                            <div class="text-xs text-base-content/55 truncate mb-0.5">{{ e.us }}</div>
+                            <div class="text-xs text-base-content/55 truncate mb-0.5 flex items-center gap-1">
+                                {{ e.us }}
+                                <span v-if="e.isHint"
+                                      class="badge badge-xs badge-secondary shrink-0"
+                                      :title="`AI (${e.confidence})`">AI</span>
+                            </div>
                             <input
                                 type="text"
                                 class="input input-xs input-bordered w-full"
                                 :class="{ 'input-error': showErrors && !noteFor(e).trim() }"
-                                :placeholder="`Descrizione...`"
+                                :placeholder="e.isHint && e.hintComment ? e.hintComment : 'Descrizione...'"
                                 :value="noteFor(e)"
                                 @input="ts.setNote(e.tpId, e.dayIdx, ($event.target as HTMLInputElement).value)"
                             />
@@ -64,18 +69,23 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { useTimesheetStore } from '../../stores/useTimesheetStore';
+import { useAnalysisStore }  from '../../stores/useAnalysisStore';
 import { formatDateLabel }   from '@shared/dates';
 
-const ts = useTimesheetStore();
+const ts       = useTimesheetStore();
+const analysis = useAnalysisStore();
 
 const dialog = ref<HTMLDialogElement | null>(null);
 
 interface EntryRow {
-    key:    string;
-    tpId:   number;
-    dayIdx: number;
-    us:     string;
-    hours:  number;
+    key:          string;
+    tpId:         number;
+    dayIdx:       number;
+    us:           string;
+    hours:        number;
+    isHint:       boolean;        // true = origine AI (non ancora materializzato)
+    hintComment?: string;
+    confidence?:  'high' | 'medium' | 'low';
 }
 
 interface DayGroup {
@@ -84,33 +94,57 @@ interface DayGroup {
     entries: EntryRow[];
 }
 
-/** Builds the display rows from hoursEdits, keyed by "tpId_dayIdx". */
+/** Builds the display rows from hoursEdits AND pending AI hints. */
 const grouped = computed((): DayGroup[] => {
     const allRows = [...ts.active, ...ts.pinned];
-    const byDay = new Map<number, EntryRow[]>();
+    const monday  = ts.currentMonday;
+    const byDay   = new Map<number, EntryRow[]>();
 
+    const add = (e: EntryRow) => {
+        if (!byDay.has(e.dayIdx)) byDay.set(e.dayIdx, []);
+        byDay.get(e.dayIdx)!.push(e);
+    };
+
+    // 1. Explicit user edits
     for (const [key, hours] of Object.entries(ts.hoursEdits)) {
         if (!hours || hours <= 0) continue;
         const [tpIdStr, dayIdxStr] = key.split('_');
         const tpId   = Number(tpIdStr);
         const dayIdx = Number(dayIdxStr);
         if (dayIdx < 0 || dayIdx > 4) continue;
-
-        const row = allRows.find(r => r.tpId === tpId);
-        const us  = row ? `#${tpId} — ${row.us}` : `#${tpId}`;
-
-        if (!byDay.has(dayIdx)) byDay.set(dayIdx, []);
-        byDay.get(dayIdx)!.push({ key, tpId, dayIdx, us, hours });
+        const row  = allRows.find(r => r.tpId === tpId);
+        const hint = monday ? analysis.getHint(tpId, dayIdx, monday) : null;
+        add({ key, tpId, dayIdx,
+              us: row ? `#${tpId} — ${row.us}` : `#${tpId}`,
+              hours, isHint: false, confidence: hint?.confidence });
     }
 
-    // Sort by dayIdx, produce groups with labels
-    const result: DayGroup[] = [];
-    for (const dayIdx of [...byDay.keys()].sort((a, b) => a - b)) {
+    // 2. Pending AI hints not yet touched by the user
+    if (monday) {
+        for (let i = 0; i < 5; i++) {
+            for (const row of allRows) {
+                const key = `${row.tpId}_${i}`;
+                if (key in ts.hoursEdits) continue;
+                const hint = analysis.getHint(row.tpId, i, monday);
+                if (!hint || hint.inferredHours <= 0) continue;
+                add({ key, tpId: row.tpId, dayIdx: i,
+                      us: `#${row.tpId} — ${row.us}`,
+                      hours: hint.inferredHours,
+                      isHint: true,
+                      hintComment: hint.comment,
+                      confidence: hint.confidence });
+            }
+        }
+    }
+
+    return [...byDay.keys()].sort((a, b) => a - b).map(dayIdx => {
         const dayData = ts.weekData?.days[dayIdx];
-        const label   = dayData ? formatDateLabel(dayData.date) : `Giorno ${dayIdx + 1}`;
-        result.push({ dayIdx, label, entries: byDay.get(dayIdx)! });
-    }
-    return result;
+        return {
+            dayIdx,
+            label:   dayData ? formatDateLabel(dayData.date) : `Giorno ${dayIdx + 1}`,
+            entries: byDay.get(dayIdx)!,
+        };
+    });
 });
 
 const totalEntries = computed(() =>
@@ -118,7 +152,10 @@ const totalEntries = computed(() =>
 );
 
 function noteFor(e: EntryRow): string {
-    return ts.getNote(e.tpId, e.dayIdx);
+    const stored = ts.getNote(e.tpId, e.dayIdx);
+    if (stored) return stored;
+    if (e.isHint && e.hintComment) return e.hintComment;
+    return '';
 }
 
 const missingNotes = computed(() => {
@@ -143,6 +180,17 @@ async function doSubmit() {
     showErrors.value = true;
     if (missingNotes.value > 0) return;
 
+    // Materialize hint-only entries in hoursEdits/noteEdits so buildEdits() includes them
+    for (const g of grouped.value) {
+        for (const e of g.entries) {
+            if (!e.isHint) continue;
+            ts.setHours(e.tpId, e.dayIdx, e.hours);
+            const n = noteFor(e);
+            if (n) ts.setNote(e.tpId, e.dayIdx, n);
+            // After materializing, they are no longer "hints" in the next re-render
+        }
+    }
+
     submitting.value = true;
     submitMsg.value  = '';
     try {
@@ -165,6 +213,7 @@ async function doSubmit() {
 
 function doReset() {
     ts.clearEdits();
+    analysis.clearWeekHints();
     showErrors.value = false;
     submitMsg.value  = '';
     close();

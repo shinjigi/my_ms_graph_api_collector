@@ -232,11 +232,11 @@ export async function startZucchettiSession(
 
   // ── 9. Estrazione token ──────────────────────────────────────────────────
   log.info("Estrazione variabili globali JS dalla pagina...");
-  const rawCtx = await timesheetPage.evaluate(() => {
-    return (globalThis as any).m_Ctx || {};
-  });
+  const rawCtx = (await timesheetPage.evaluate(() => {
+    return (globalThis as Record<string, unknown>).m_Ctx || {};
+  })) as Record<string, unknown>;
 
-  const str = (v: any) => (v != null ? String(v) : "");
+  const str = (v: unknown) => (v != null ? String(v) : "");
   const idCompany = str(rawCtx.idAzienda || rawCtx.IDCOMPANY || rawCtx.company);
   const idEmploy = str(rawCtx.idDipendente || rawCtx.IDEMPLOY || rawCtx.employ);
   const m_cCheck = str(rawCtx.check || rawCtx.m_cCheck);
