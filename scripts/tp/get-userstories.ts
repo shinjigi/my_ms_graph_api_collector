@@ -1,6 +1,6 @@
 import { TargetprocessClient } from "./client";
 import { printTable, parseTpDate, printJson, hasJsonFlag } from "./format";
-import type { TpUserStory } from "./types";
+import type { TpUserStory } from "@shared/targetprocess";
 
 const PROJECT_ID = Number.parseInt(process.argv[2] ?? "", 10);
 const FROM_DATE = process.argv[3] ?? undefined; // optional: YYYY-MM-DD

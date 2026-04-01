@@ -5,14 +5,15 @@ import { parseString } from "xml2js";
 import { createLogger } from "../../logger";
 
 const log = createLogger("vcs-svn");
+import { mergeByKey, readMeta, writeMeta, shouldSkipMonth } from "../utils";
+import { SvnCommitRaw } from "@shared/aggregator";
 import {
-  mergeByKey,
-  readMeta,
-  writeMeta,
-  shouldSkipMonth,
-} from "../utils";
-import { SvnCommit } from "@shared/aggregator";
-import { dateToString, currentMonthString, lastDayOfMonth, startOfMonth, addMonths } from "@shared/dates";
+  dateToString,
+  currentMonthString,
+  lastDayOfMonth,
+  startOfMonth,
+  addMonths,
+} from "@shared/dates";
 
 function parseXml(xml: string): Promise<unknown> {
   return new Promise((resolve, reject) =>
@@ -48,7 +49,7 @@ async function fetchMonthCommits(
   user?: string,
   pass?: string,
   authorFilter?: string,
-): Promise<SvnCommit[]> {
+): Promise<SvnCommitRaw[]> {
   const lastDay = lastDayOfMonth(month);
   // --with-all-revprops ensures the server sends full revprop values (incl. full commit messages)
   const args = [
@@ -81,7 +82,7 @@ async function fetchMonthCommits(
   const parsed = (await parseXml(xmlOutput)) as SvnXmlParsed;
   const entries: SvnLogEntry[] = parsed?.log?.logentry ?? [];
 
-  const commits: SvnCommit[] = entries.flatMap((e) => {
+  const commits: SvnCommitRaw[] = entries.flatMap((e) => {
     const rawDate = (e.date ?? [])[0] ?? "";
     const d = new Date(rawDate);
     if (Number.isNaN(d.getTime())) return []; // property-change or merge-tracking entries have no date
@@ -148,7 +149,7 @@ export async function collectSvnCommits(force = false): Promise<string[]> {
           pass,
           user,
         );
-        const merged = await mergeByKey<SvnCommit>(
+        const merged = await mergeByKey<SvnCommitRaw>(
           outPath,
           commits,
           "revision",

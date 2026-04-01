@@ -98,76 +98,52 @@ export interface QuickLogItem extends UsCard {
   rem?: number;
 }
 
-// --- Raw signal types (mirroring backend collector interfaces) ---
-
-export interface CalendarEventRaw {
-  id: string;
-  subject: string;
-  start: { dateTime: string; timeZone: string };
-  end: { dateTime: string; timeZone: string };
-  organizer?: { emailAddress: { name: string; address: string } } | null;
-  isOnlineMeeting?: boolean;
-}
-
-export interface GitCommitRaw {
-  hash: string;
-  author: string;
-  date: string; // YYYY-MM-DD (no time)
-  message: string;
-  repo?: string;
-}
-
-export interface SvnCommitRaw {
-  revision: string;
-  author: string;
-  date: string; // YYYY-MM-DD
-  message: string;
-  paths?: string[];
-}
-
-export interface EmailRaw {
-  id: string;
-  subject: string;
-  from: { emailAddress: { name: string; address: string } } | null;
-  receivedDateTime: string;
-  bodyPreview: string;
-  webLink: string;
-}
-
 // --- Shared types (re-exported from @shared/* for single-import convenience) ---
 
-export type { ProposalEntry, DayProposal }                   from '@shared/analysis';
-export type { SubmitEdit, ZucchettiRequestResult }           from '@shared/submit';
-export type { WeekDayData }                                  from '@shared/week';
-export type { ZucchettiDay }                                 from '@shared/zucchetti';
-export type { NibolBooking, TeamsMessageRaw, BrowserVisit }  from '@shared/aggregator';
+export type { ProposalEntry, DayProposal } from "@shared/analysis";
+export type { SubmitEdit, ZucchettiRequestResult } from "@shared/submit";
+export type { WeekDayData } from "@shared/week";
+export type { ZucchettiDay } from "@shared/zucchetti";
+export type {
+  NibolBooking,
+  TeamsMessageRaw,
+  BrowserVisit,
+} from "@shared/aggregator";
 
 // --- API Response Types (from backend) ---
 
-import type { ZucchettiDay }                       from '@shared/zucchetti';
-import type { NibolBooking, TeamsMessageRaw, BrowserVisit } from '@shared/aggregator';
+import type { ZucchettiDay } from "@shared/zucchetti";
+import type {
+  NibolBooking,
+  TeamsMessageRaw,
+  BrowserVisit,
+  EmailRaw,
+  CalendarEventRaw,
+  GitCommitRaw,
+  SvnCommitRaw,
+} from "@shared/aggregator";
 
 /** FE-specific version of WeekDayData with typed signal arrays. */
 export interface WeekDayResponse {
-    date:           string;
-    isWorkday:      boolean;
-    oreTarget:      number;
-    location:       "office" | "smart" | "travel" | "external" | "mixed" | "unknown";
-    nibol:          NibolBooking | null;
-    holiday:        boolean;
-    holidayName?:   string;
-    zucchetti:      ZucchettiDay | null;
-    calendar:       CalendarEventRaw[];
-    emails:         EmailRaw[];
-    teams:          TeamsMessageRaw[];
-    svnCommits:     SvnCommitRaw[];
-    gitCommits:     GitCommitRaw[];
-    browserVisits:  BrowserVisit[];
+  date: string;
+  isWorkday: boolean;
+  oreTarget: number;
+  location: "office" | "smart" | "travel" | "external" | "mixed" | "unknown";
+  nibol: NibolBooking | null;
+  holiday: boolean;
+  holidayName?: string;
+  zucchetti: ZucchettiDay | null;
+  calendar: CalendarEventRaw[];
+  emails: EmailRaw[];
+  teams: TeamsMessageRaw[];
+  svnCommits: SvnCommitRaw[];
+  gitCommits: GitCommitRaw[];
+  browserVisits: BrowserVisit[];
 }
 
 export interface ApiWeekResponse {
-    monday: string;
-    days:   WeekDayResponse[];
+  monday: string;
+  days: WeekDayResponse[];
 }
 
 export interface ApiTpWeekEntry {

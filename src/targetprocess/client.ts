@@ -15,7 +15,7 @@ import type {
   TpList,
   TpListV2,
   TpUserStat,
-} from "./types";
+} from "@shared/targetprocess";
 import { parseTpDate, normalizeName } from "./format";
 import { dateToString } from "../../shared/dates";
 import { createLogger } from "../logger";
@@ -27,7 +27,7 @@ dotenv.config();
 function toAssignmentEntries(raw: TpAssignment[]): TpAssignmentEntry[] {
   return raw.map((a) => ({
     fullName: normalizeName(a.GeneralUser.FullName),
-    role:     a.Role?.Name ?? "",
+    role: a.Role?.Name ?? "",
   }));
 }
 
@@ -53,15 +53,15 @@ export class TargetprocessClient {
       .map(
         ([k, v]) =>
           `${encodeURIComponent(k)}=${encodeURIComponent(v)
-            .replaceAll(/%2C/g, ",")
-            .replaceAll(/%5B/g, "[")
-            .replaceAll(/%5D/g, "]")
-            .replaceAll(/%28/g, "(")
-            .replaceAll(/%29/g, ")")
-            .replaceAll(/%3D/g, "=")
-            .replaceAll(/%7B/g, "{")
-            .replaceAll(/%7D/g, "}")
-            .replaceAll(/%2E/g, ".")}`,
+            .replaceAll("%2C", ",")
+            .replaceAll("%5B", "[")
+            .replaceAll("%5D", "]")
+            .replaceAll("%28", "(")
+            .replaceAll("%29", ")")
+            .replaceAll("%3D", "=")
+            .replaceAll("%7B", "{")
+            .replaceAll("%7D", "}")
+            .replaceAll("%2E", ".")}`,
       )
       .join("&");
   }
@@ -111,7 +111,7 @@ export class TargetprocessClient {
 
     // 1. Check for existing time entries for this user, date and usId
     const existing = await this.getTimesByUserAndDate(me.Id, date);
-    const matches = existing.filter(e => e.Assignable?.Id === input.usId);
+    const matches = existing.filter((e) => e.Assignable?.Id === input.usId);
 
     const payload = {
       Assignable: { Id: input.usId },
@@ -123,12 +123,14 @@ export class TargetprocessClient {
     };
 
     const qs = `format=json&access_token=${this.token}`;
-    
+
     if (matches.length > 0) {
       // 2. We have at least one entry: UPDATE the first one
       const targetId = matches[0].Id;
-      log.info(`Updating existing time entry ${targetId} for US#${input.usId} on ${date}`);
-      
+      log.info(
+        `Updating existing time entry ${targetId} for US#${input.usId} on ${date}`,
+      );
+
       const url = `${this.baseUrl}/api/v1/Times/${targetId}?${qs}`;
       const response = await fetch(url, {
         method: "POST", // TP v1 POST to existing ID = Update
@@ -142,16 +144,20 @@ export class TargetprocessClient {
       if (!response.ok) {
         const errorText = await response.text();
         log.error(`Update Error: ${response.status} - ${errorText}`);
-        throw new Error(`TP API Update Error: ${response.status} - ${errorText}`);
+        throw new Error(
+          `TP API Update Error: ${response.status} - ${errorText}`,
+        );
       }
 
       // 3. Cleanup: if there were multiple entries (e.g. manual duplicates), DELETE the others
       if (matches.length > 1) {
-          const others = matches.slice(1);
-          log.info(`Cleaning up ${others.length} extra duplicates for US#${input.usId} on ${date}`);
-          for (const extra of others) {
-              await this.deleteTime(extra.Id);
-          }
+        const others = matches.slice(1);
+        log.info(
+          `Cleaning up ${others.length} extra duplicates for US#${input.usId} on ${date}`,
+        );
+        for (const extra of others) {
+          await this.deleteTime(extra.Id);
+        }
       }
 
       const raw = await response.json();
@@ -163,7 +169,6 @@ export class TargetprocessClient {
         user: raw.User.FullName,
         assignable: raw.Assignable.Name,
       };
-
     } else {
       // 4. No entry exists: CREATE new (original logic)
       log.info(`Creating new time entry for US#${input.usId} on ${date}`);
@@ -180,7 +185,9 @@ export class TargetprocessClient {
       if (!response.ok) {
         const errorText = await response.text();
         log.error(`Create Error: ${response.status} - ${errorText}`);
-        throw new Error(`TP API Create Error: ${response.status} - ${errorText}`);
+        throw new Error(
+          `TP API Create Error: ${response.status} - ${errorText}`,
+        );
       }
 
       const raw = await response.json();
@@ -312,28 +319,31 @@ export class TargetprocessClient {
       "v1",
       "UserStories",
       {
-        where:   `(Assignments.GeneralUser.Id eq ${me.Id})`,
-        include: "[Id,Name,Description,EntityState[Name,IsFinal],TimeSpent,Project[Id,Name],Owner[FullName],Assignments[GeneralUser[FullName],Role[Name]],CreateDate,LastStateChangeDate]",
-        take:    "200",
+        where: `(Assignments.GeneralUser.Id eq ${me.Id})`,
+        include:
+          "[Id,Name,Description,EntityState[Name,IsFinal],TimeSpent,Project[Id,Name],Owner[FullName],Assignments[GeneralUser[FullName],Role[Name]],CreateDate,LastStateChangeDate]",
+        take: "200",
       },
     );
 
     for (const us of usResult.Items) {
       if (us.EntityState?.IsFinal) continue;
       items.push({
-        id:                   us.Id,
-        name:                 us.Name,
-        description:          us.Description,
-        entityType:           "UserStory",
-        stateName:            us.EntityState?.Name ?? "",
-        isFinalState:         us.EntityState?.IsFinal ?? false,
-        timeSpent:            us.TimeSpent ?? 0,
-        projectName:          us.Project?.Name ?? "",
-        parentName:           null,
-        owner:                normalizeName(us.Owner?.FullName ?? "N/A"),
-        assignments:          toAssignmentEntries(us.Assignments?.Items ?? []),
-        createDate:           us.CreateDate ? parseTpDate(us.CreateDate) : undefined,
-        lastStateChangeDate:  us.LastStateChangeDate ? parseTpDate(us.LastStateChangeDate) : undefined,
+        id: us.Id,
+        name: us.Name,
+        description: us.Description,
+        entityType: "UserStory",
+        stateName: us.EntityState?.Name ?? "",
+        isFinalState: us.EntityState?.IsFinal ?? false,
+        timeSpent: us.TimeSpent ?? 0,
+        projectName: us.Project?.Name ?? "",
+        parentName: null,
+        owner: normalizeName(us.Owner?.FullName ?? "N/A"),
+        assignments: toAssignmentEntries(us.Assignments?.Items ?? []),
+        createDate: us.CreateDate ? parseTpDate(us.CreateDate) : undefined,
+        lastStateChangeDate: us.LastStateChangeDate
+          ? parseTpDate(us.LastStateChangeDate)
+          : undefined,
       });
     }
 
@@ -342,28 +352,31 @@ export class TargetprocessClient {
       "v1",
       "Tasks",
       {
-        where:   `(Assignments.GeneralUser.Id eq ${me.Id})`,
-        include: "[Id,Name,Description,EntityState[Name,IsFinal],TimeSpent,Project[Id,Name],UserStory[Id,Name,Owner[FullName]],Owner[FullName],Assignments[GeneralUser[FullName],Role[Name]],CreateDate,LastStateChangeDate]",
-        take:    "200",
+        where: `(Assignments.GeneralUser.Id eq ${me.Id})`,
+        include:
+          "[Id,Name,Description,EntityState[Name,IsFinal],TimeSpent,Project[Id,Name],UserStory[Id,Name,Owner[FullName]],Owner[FullName],Assignments[GeneralUser[FullName],Role[Name]],CreateDate,LastStateChangeDate]",
+        take: "200",
       },
     );
 
     for (const task of taskResult.Items) {
       if (task.EntityState?.IsFinal) continue;
       items.push({
-        id:                   task.Id,
-        name:                 task.Name,
-        description:          task.Description,
-        entityType:           "Task",
-        stateName:            task.EntityState?.Name ?? "",
-        isFinalState:         task.EntityState?.IsFinal ?? false,
-        timeSpent:            task.TimeSpent ?? 0,
-        projectName:          task.Project?.Name ?? "",
-        parentName:           task.UserStory?.Name ?? null,
-        owner:                normalizeName(task.Owner?.FullName ?? "N/A"),
-        assignments:          toAssignmentEntries(task.Assignments?.Items ?? []),
-        createDate:           task.CreateDate ? parseTpDate(task.CreateDate) : undefined,
-        lastStateChangeDate:  task.LastStateChangeDate ? parseTpDate(task.LastStateChangeDate) : undefined,
+        id: task.Id,
+        name: task.Name,
+        description: task.Description,
+        entityType: "Task",
+        stateName: task.EntityState?.Name ?? "",
+        isFinalState: task.EntityState?.IsFinal ?? false,
+        timeSpent: task.TimeSpent ?? 0,
+        projectName: task.Project?.Name ?? "",
+        parentName: task.UserStory?.Name ?? null,
+        owner: normalizeName(task.Owner?.FullName ?? "N/A"),
+        assignments: toAssignmentEntries(task.Assignments?.Items ?? []),
+        createDate: task.CreateDate ? parseTpDate(task.CreateDate) : undefined,
+        lastStateChangeDate: task.LastStateChangeDate
+          ? parseTpDate(task.LastStateChangeDate)
+          : undefined,
       });
     }
 
@@ -444,17 +457,21 @@ export class TargetprocessClient {
 
     for (const us of usResult.Items) {
       items.push({
-        id:           us.Id,
-        name:         us.Name,
-        description:  us.Description,
-        entityType:   "UserStory",
-        stateName:    (us.EntityState as (TpEntityRef & { IsFinal?: boolean }) | null)?.Name ?? "",
-        isFinalState: (us.EntityState as (TpEntityRef & { IsFinal?: boolean }) | null)?.IsFinal ?? false,
-        timeSpent:    us.TimeSpent ?? 0,
-        projectName:  us.Project?.Name ?? "",
-        parentName:   null,
-        owner:        normalizeName(us.Owner?.FullName ?? "N/A"),
-        assignments:  toAssignmentEntries(us.Assignments?.Items ?? []),
+        id: us.Id,
+        name: us.Name,
+        description: us.Description,
+        entityType: "UserStory",
+        stateName:
+          (us.EntityState as (TpEntityRef & { IsFinal?: boolean }) | null)
+            ?.Name ?? "",
+        isFinalState:
+          (us.EntityState as (TpEntityRef & { IsFinal?: boolean }) | null)
+            ?.IsFinal ?? false,
+        timeSpent: us.TimeSpent ?? 0,
+        projectName: us.Project?.Name ?? "",
+        parentName: null,
+        owner: normalizeName(us.Owner?.FullName ?? "N/A"),
+        assignments: toAssignmentEntries(us.Assignments?.Items ?? []),
       });
     }
 

@@ -1,6 +1,6 @@
 import { TargetprocessClient } from "./client";
 import { printTable, parseTpDate, printJson, hasJsonFlag } from "./format";
-import type { TpTimeEntry } from "./types";
+import type { TpTimeEntry } from "@shared/targetprocess";
 
 const US_ID = Number.parseInt(process.argv[2] ?? "", 10);
 const ASSIGNEE = process.argv[3] ?? null; // optional: partial name match (case-insensitive)

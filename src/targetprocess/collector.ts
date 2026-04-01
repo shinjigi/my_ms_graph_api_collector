@@ -21,9 +21,14 @@ import { saveRawResponse } from "../aiRaw";
 import { TargetprocessClient } from "./client";
 import { dateToString, getISOTimestamp } from "@shared/dates";
 import { AnalysisPrompts } from "./prompts";
-import type { TpOpenItem, TpUserStat, TpTimeEntry } from "./types";
 import type { KbEntry, KbStore } from "@shared/kb";
 import { parseTpDate, nameSet, nameSetHas } from "./format";
+import {
+  TpOpenItem,
+  TpUserStat,
+  TpTimeEntry,
+  TpAssignmentEntry,
+} from "@shared/targetprocess";
 
 const logger = createLogger("collector");
 
@@ -282,26 +287,28 @@ function applyResults(
       timeEntryDates.length > 0
         ? timeEntryDates.reduce((a, b) => (a > b ? a : b))
         : undefined;
-    const stateDate        = original.item.lastStateChangeDate;
+    const stateDate = original.item.lastStateChangeDate;
     const lastActivityDate =
       maxTimeEntry && stateDate
-        ? maxTimeEntry > stateDate ? maxTimeEntry : stateDate
+        ? maxTimeEntry > stateDate
+          ? maxTimeEntry
+          : stateDate
         : (maxTimeEntry ?? stateDate);
 
     kbMap.set(result.id, {
-      id:                   original.item.id,
-      entityType:           original.item.entityType,
-      projectName:          original.item.projectName,
-      name:                 original.item.name,
-      summary:              result.summary ?? "",
-      tags:                 result.tags ?? [],
-      userActivities:       result.userActivities ?? {},
-      stakeholders:         (result.stakeholders || result.stakeholder) ?? [],
-      cachedAt:             getISOTimestamp(),
-      createDate:           original.item.createDate,
-      currentState:         original.item.stateName,
-      isFinalState:         original.item.isFinalState,
-      lastStateChangeDate:  stateDate,
+      id: original.item.id,
+      entityType: original.item.entityType,
+      projectName: original.item.projectName,
+      name: original.item.name,
+      summary: result.summary ?? "",
+      tags: result.tags ?? [],
+      userActivities: result.userActivities ?? {},
+      stakeholders: (result.stakeholders || result.stakeholder) ?? [],
+      cachedAt: getISOTimestamp(),
+      createDate: original.item.createDate,
+      currentState: original.item.stateName,
+      isFinalState: original.item.isFinalState,
+      lastStateChangeDate: stateDate,
       lastActivityDate,
     });
     batchIds.delete(result.id);
@@ -555,23 +562,27 @@ function buildProviders(forceProvider?: string): KbCollectorProvider[] {
 
 // ─── CLI helpers ──────────────────────────────────────────────────────────────
 interface RunArgs {
-  updateKb:      boolean;
-  force:         boolean;
-  providerArg?:  string;
+  updateKb: boolean;
+  force: boolean;
+  providerArg?: string;
   fromEnriched?: string;
   fromAiResponse?: string;
 }
 
 function parseRunArgs(): RunArgs {
-  const argv          = process.argv;
-  const findArg       = (prefix: string) =>
-    argv.find((a) => a.startsWith(prefix))?.split("=").slice(1).join("=");
+  const argv = process.argv;
+  const findArg = (prefix: string) =>
+    argv
+      .find((a) => a.startsWith(prefix))
+      ?.split("=")
+      .slice(1)
+      .join("=");
 
   return {
-    updateKb:       argv.includes("--update-kb"),
-    force:          argv.includes("--force"),
-    providerArg:    findArg("--provider="),
-    fromEnriched:   findArg("--from-enriched="),
+    updateKb: argv.includes("--update-kb"),
+    force: argv.includes("--force"),
+    providerArg: findArg("--provider="),
+    fromEnriched: findArg("--from-enriched="),
     fromAiResponse: findArg("--from-ai-response="),
   };
 }
@@ -582,12 +593,13 @@ async function runEnrichmentFromApi(
   force: boolean,
 ): Promise<EnrichedItem[]> {
   logger.info("Recupero item assegnati da TargetProcess...");
-  const me    = await client.getMe();
+  const me = await client.getMe();
   const items = await client.getMyAssignedOpenItems();
   logger.info(`Trovati ${items.length} open item.`);
 
   const toProcess = items.filter(
-    (item) => force || !kbMap.has(item.id) || kbMap.get(item.id)!.name !== item.name,
+    (item) =>
+      force || !kbMap.has(item.id) || kbMap.get(item.id)!.name !== item.name,
   );
 
   if (toProcess.length === 0) {
@@ -596,12 +608,14 @@ async function runEnrichmentFromApi(
   }
 
   // Phase A — cheap pre-filter before HTTP calls
-  const myNameNorm       = nameSet([me.FullName]);
+  const myNameNorm = nameSet([me.FullName]);
   const isRelevantByMeta = (item: TpOpenItem): boolean =>
     nameSetHas(myNameNorm, item.owner) ||
     nameSetHas(COLLEAGUES_PRIORITY, item.owner) ||
     item.assignments.some(
-      (a) => nameSetHas(myNameNorm, a.fullName) || nameSetHas(COLLEAGUES_PRIORITY, a.fullName),
+      (a) =>
+        nameSetHas(myNameNorm, a.fullName) ||
+        nameSetHas(COLLEAGUES_PRIORITY, a.fullName),
     );
 
   const preFiltered = toProcess.filter(isRelevantByMeta);
@@ -616,16 +630,31 @@ async function runEnrichmentFromApi(
 
   for (const item of preFiltered) {
     const stats = await client.getAssignableStatistics(item.id);
-    const logs  = await client.getTimesByAssignable(item.id);
+    const logs = await client.getTimesByAssignable(item.id);
 
-    const hasMyHours           = stats.some((s) => nameSetHas(myNameNorm, s.userName) && s.totalHours > 0);
-    const hasColleagueHours    = stats.some((s) => nameSetHas(COLLEAGUES_PRIORITY, s.userName) && s.totalHours > 0);
-    const hasColleagueAssigned = item.assignments.some((a) => nameSetHas(COLLEAGUES_PRIORITY, a.fullName));
-    const ownerIsRelevant      = nameSetHas(myNameNorm, item.owner) || nameSetHas(COLLEAGUES_PRIORITY, item.owner);
+    const hasMyHours = stats.some(
+      (s) => nameSetHas(myNameNorm, s.userName) && s.totalHours > 0,
+    );
+    const hasColleagueHours = stats.some(
+      (s) => nameSetHas(COLLEAGUES_PRIORITY, s.userName) && s.totalHours > 0,
+    );
+    const hasColleagueAssigned = item.assignments.some((a: TpAssignmentEntry) =>
+      nameSetHas(COLLEAGUES_PRIORITY, a.fullName),
+    );
+    const ownerIsRelevant =
+      nameSetHas(myNameNorm, item.owner) ||
+      nameSetHas(COLLEAGUES_PRIORITY, item.owner);
 
     // Phase B — post-filter: discard if no actual team involvement
-    if (!hasMyHours && !hasColleagueHours && !hasColleagueAssigned && !ownerIsRelevant) {
-      logger.debug(`Post-filtro: scartato item #${item.id} "${item.name}" — nessun coinvolgimento del team`);
+    if (
+      !hasMyHours &&
+      !hasColleagueHours &&
+      !hasColleagueAssigned &&
+      !ownerIsRelevant
+    ) {
+      logger.debug(
+        `Post-filtro: scartato item #${item.id} "${item.name}" — nessun coinvolgimento del team`,
+      );
       continue;
     }
 
@@ -633,7 +662,13 @@ async function runEnrichmentFromApi(
       item,
       stats,
       logs,
-      priority: hasMyHours ? 4 : hasColleagueHours ? 3 : hasColleagueAssigned ? 2 : 1,
+      priority: hasMyHours
+        ? 4
+        : hasColleagueHours
+          ? 3
+          : hasColleagueAssigned
+            ? 2
+            : 1,
     });
   }
 
@@ -687,7 +722,7 @@ async function run(): Promise<void> {
     process.exit(0);
   }
 
-  const kb    = await loadKb();
+  const kb = await loadKb();
   const kbMap = new Map<number, KbEntry>(kb.items.map((e) => [e.id, e]));
 
   // ── Enrichment phase ─────────────────────────────────────────────────────
@@ -698,19 +733,29 @@ async function run(): Promise<void> {
     ENRICHED_DIR,
     `enriched-${dateToString()}.json`,
   );
-  const enrichedSource = args.fromEnriched ?? (
-    !args.force && await fs.access(todayEnrichedPath).then(() => true).catch(() => false)
+  const enrichedSource =
+    args.fromEnriched ??
+    (!args.force &&
+    (await fs
+      .access(todayEnrichedPath)
+      .then(() => true)
+      .catch(() => false))
       ? todayEnrichedPath
-      : undefined
-  );
+      : undefined);
 
   if (enrichedSource) {
     logger.info(`Carico enriched da file: ${enrichedSource}`);
     const loaded = await loadEnriched(enrichedSource);
-    enriched     = loaded.items;
-    logger.info(`Caricati ${enriched.length} item (userId=${loaded.userId}, user=${loaded.userName}).`);
+    enriched = loaded.items;
+    logger.info(
+      `Caricati ${enriched.length} item (userId=${loaded.userId}, user=${loaded.userName}).`,
+    );
   } else {
-    enriched = await runEnrichmentFromApi(new TargetprocessClient(), kbMap, args.force);
+    enriched = await runEnrichmentFromApi(
+      new TargetprocessClient(),
+      kbMap,
+      args.force,
+    );
     if (enriched.length === 0) return;
   }
 

@@ -1,0 +1,13 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "checkJs": true,
+    "outDir": "../dist/scripts",
+    "paths": {
+      "@shared/*": ["shared/*"]
+    },
+    "sourceMap": true,
+    "baseUrl": ".." // Punta alla root del progetto
+  },
+  "include": ["./**/*.ts", "../shared/**/*.ts"]
+}

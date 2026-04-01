@@ -6,6 +6,21 @@
 import * as dotenv from "dotenv";
 dotenv.config();
 
+// 1. Definisci l'interfaccia (se non l'hai già fatto nel file)
+interface GraphResponse<T> {
+  value: T[];
+  "@odata.nextLink"?: string;
+  "@odata.context"?: string;
+}
+
+interface ChatMessage {
+  // O il nome che usi nel tuo codice
+  id: string;
+  topic: string | null;
+  chatType: string;
+  lastUpdatedDateTime?: string; // Aggiungi questa!
+}
+
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { createGraphClient } = require("../src/graphClient") as {
   createGraphClient: () => Promise<
@@ -19,6 +34,8 @@ async function run(): Promise<void> {
   console.log(`\nTest fetch Teams messages — ${targetDate}\n`);
 
   const client = await createGraphClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const c = client as any;
 
   // Step 1: list all chats (paginate to get more than top=50)
   let allChats: Array<{ id: string; topic: string | null; chatType: string }> =
@@ -26,7 +43,7 @@ async function run(): Promise<void> {
   let nextLink: string | null = null;
 
   do {
-    const res = nextLink
+    const res: GraphResponse<any> = nextLink
       ? await client.api(nextLink).get()
       : await client
           .api("/me/chats")
@@ -43,20 +60,16 @@ async function run(): Promise<void> {
     `Chat di tipo 'meeting': ${allChats.filter((ch) => ch.chatType === "meeting").length}`,
   );
 
-  // Step 2: find chats active on targetDate (lastUpdatedDateTime starts with target date)
-  const activeOnDay = allChats.filter((ch: { lastUpdatedDateTime?: string }) =>
+  // Quando filtri, non serve ridichiarare il tipo di 'ch', TS lo saprà già
+  const activeOnDay = allChats.filter((ch: ChatMessage) =>
     ch.lastUpdatedDateTime?.startsWith(targetDate),
   );
+
   console.log(`Chat attive il ${targetDate}: ${activeOnDay.length}`);
-  activeOnDay.forEach(
-    (ch: {
-      chatType: string;
-      topic: string | null;
-      lastUpdatedDateTime?: string;
-    }) =>
-      console.log(
-        `  [${ch.chatType}] ${ch.topic ?? "(no topic)"} — ${ch.lastUpdatedDateTime}`,
-      ),
+  activeOnDay.forEach((ch: ChatMessage) =>
+    console.log(
+      `  [${ch.chatType}] ${ch.topic ?? "(no topic)"} — ${ch.lastUpdatedDateTime}`,
+    ),
   );
 
   // Step 2b: find chats that contain "stand" in topic

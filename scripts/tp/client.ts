@@ -9,7 +9,7 @@ import type {
   TpLogTimeResult,
   TpList,
   TpListV2,
-} from "./types";
+} from "@shared/targetprocess";
 
 dotenv.config();
 import { dateToString, parseTpDate } from "../../shared/dates";
@@ -36,15 +36,15 @@ export class TargetprocessClient {
       .map(
         ([k, v]) =>
           `${encodeURIComponent(k)}=${encodeURIComponent(v)
-            .replaceAll(/%2C/g, ",")
-            .replaceAll(/%5B/g, "[")
-            .replaceAll(/%5D/g, "]")
-            .replaceAll(/%28/g, "(")
-            .replaceAll(/%29/g, ")")
-            .replaceAll(/%3D/g, "=")
-            .replaceAll(/%7B/g, "{")
-            .replaceAll(/%7D/g, "}")
-            .replaceAll(/%2E/g, ".")}`,
+            .replaceAll("%2C", ",")
+            .replaceAll("%5B", "[")
+            .replaceAll("%5D", "]")
+            .replaceAll("%28", "(")
+            .replaceAll("%29", ")")
+            .replaceAll("%3D", "=")
+            .replaceAll("%7B", "{")
+            .replaceAll("%7D", "}")
+            .replaceAll("%2E", ".")}`,
       )
       .join("&");
   }
