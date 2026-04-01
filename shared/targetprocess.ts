@@ -123,3 +123,20 @@ export interface TpListV2<T> {
   items: T[];
   next?: string;
 }
+
+export interface TpWeekEntry {
+  tpId: number;
+  usName: string;
+  stateName: string;
+  timeSpent: number;
+  projectName: string;
+  hours: number[];
+  notes: Array<string | null>;
+}
+
+export interface TpWeekResponse {
+  userId: number;
+  userName: string;
+  entries: TpWeekEntry[];
+  openItems: unknown[];
+}

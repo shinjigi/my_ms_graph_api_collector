@@ -26,7 +26,7 @@ interface GraphPage<T> {
 async function fetchCalendarEvents(
   client: Client,
   apiPath: string,
-  query: Record<string, any> = {},
+  query: Record<string, string | number> = {},
 ): Promise<CalendarEventRaw[]> {
   const events: CalendarEventRaw[] = [];
   let nextLink: string | null = null;

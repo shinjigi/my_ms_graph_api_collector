@@ -13,6 +13,7 @@ import type {
   DayProposal,
   BrowserDomain,
 } from "./types";
+import { shiftDate } from "@shared/dates";
 
 export async function fetchWeek(date: string): Promise<ApiWeekResponse> {
   const res = await fetch(`/api/week/${date}`);
@@ -208,5 +209,29 @@ export async function fetchProposal(
   const res = await fetch(`/api/proposals/${date}`);
   if (res.status === 404) return null;
   if (!res.ok) throw new Error(`fetchProposal: ${res.status}`);
+  return res.json();
+}
+
+export async function fetchWeekProposals(
+  monday: string,
+): Promise<Record<string, DayProposal>> {
+  const dates = [0, 1, 2, 3, 4].map((i) => shiftDate(monday, i));
+  const results = await Promise.allSettled(dates.map((d) => fetchProposal(d)));
+  const map: Record<string, DayProposal> = {};
+  for (let i = 0; i < 5; i++) {
+    const r = results[i];
+    if (r.status === "fulfilled" && r.value?.proposal)
+      map[dates[i]] = r.value.proposal;
+  }
+  return map;
+}
+
+export async function saveProposal(date: string, patch: Partial<DayProposal>): Promise<DayProposal> {
+  const res = await fetch(`/api/proposals/${date}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!res.ok) throw new Error(`saveProposal: ${res.status}`);
   return res.json();
 }

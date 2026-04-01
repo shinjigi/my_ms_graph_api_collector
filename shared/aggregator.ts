@@ -95,4 +95,5 @@ export interface AggregatedDay {
   svnCommits: SvnCommitRaw[];
   gitCommits: GitCommitRaw[];
   browserVisits: BrowserVisit[];
+  reportedHours?: Record<number, number>; // taskId -> hours already in TargetProcess
 }

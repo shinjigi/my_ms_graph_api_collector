@@ -17,12 +17,24 @@
             <template v-if="d.holiday">
                 <span class="text-xs ts-holiday-icon">🇮🇹</span>
             </template>
-            <!-- Pinned row: quick-add + button -->
+            <!-- Pinned row: quick-add + button (con supporto AI hint) -->
             <template v-else-if="isPinned">
                 <div class="flex flex-col items-center gap-0.5">
-                    <button class="pin-add-btn" @click.stop="quickAdd(i)" title="+0.5h">
+                    <button class="pin-add-btn"
+                            :class="{
+                                'ai-hint-btn': !!(cellHint(i) && ts.getHours(row.tpId, i) === 0),
+                                [`confidence-${cellHint(i)?.confidence}`]: !!(cellHint(i) && ts.getHours(row.tpId, i) === 0)
+                            }"
+                            @click.stop="quickAdd(i)"
+                            :title="cellHint(i) && ts.getHours(row.tpId, i) === 0
+                                ? `AI (${cellHint(i)!.confidence}): ${cellHint(i)!.inferredHours}h`
+                                : '+0.5h'">
                         <span v-if="ts.getHours(row.tpId, i) > 0" class="pin-add-hours">{{ hoursToHhmm(ts.getHours(row.tpId, i)) }}</span>
-                        <span class="pin-add-plus">+</span>
+                        <template v-else-if="cellHint(i)">
+                            <span class="ai-hint-val">{{ cellHint(i)!.inferredHours }}h</span>
+                            <span class="ai-hint-dot"></span>
+                        </template>
+                        <span v-else class="pin-add-plus">+</span>
                         <span v-if="isPending && ts.getHours(row.tpId, i) > 0" class="loading loading-ring loading-xs text-warning ml-0.5"></span>
                     </button>
                     <TsNoteCell v-if="ts.getHours(row.tpId, i) > 0" :tpId="row.tpId" :day-idx="i" />
@@ -32,19 +44,44 @@
                     </div>
                 </div>
             </template>
-            <!-- Active row: full widget -->
+            <!-- Active row: AI hint button OR full widget -->
             <template v-else>
                 <div class="flex flex-col items-center gap-0">
-                    <TimeCellWidget
-                        :model-value="ts.getHours(row.tpId, i)"
-                        :extra-val-cls="`font-bold text-xs ${i === 4 ? 'text-primary' : ''}`"
-                        :day-delta="ts.totalsRow.delta[i]"
-                        @update="val => ts.setHours(row.tpId, i, val)"
-                    />
+                    <!-- HINT-ONLY: bottone pulsante AI -->
+                    <template v-if="computeCellMode(i) === 'hint-only'">
+                        <div class="relative group/hint">
+                            <button class="ai-hint-btn"
+                                    :class="`confidence-${cellHint(i)!.confidence}`"
+                                    @click.stop="acceptHint(i)"
+                                    :title="`AI (${cellHint(i)!.confidence}): ${(cellHint(i)!.reasoning ?? '').slice(0, 80)}`">
+                                <span class="ai-hint-val">{{ cellHint(i)!.inferredHours }}h</span>
+                                <span class="ai-hint-dot"></span>
+                            </button>
+                            <button class="ts-hint-dismiss"
+                                    @click.stop="analysis.dismissHint(row.tpId, i, ts.currentMonday)"
+                                    title="Ignora suggerimento">✕</button>
+                        </div>
+                    </template>
+                    <!-- ALTRI STATI: widget normale con indicatori passivi -->
+                    <template v-else>
+                        <TimeCellWidget
+                            :model-value="ts.getHours(row.tpId, i)"
+                            :extra-val-cls="`font-bold text-xs ${i === 4 ? 'text-primary' : ''}`"
+                            :day-delta="ts.totalsRow.delta[i]"
+                            :hint-val="cellHint(i)?.inferredHours"
+                            :cell-mode="computeCellMode(i)"
+                            @update="val => {
+                                ts.setHours(row.tpId, i, val);
+                                if (val === 0) ts.setNote(row.tpId, i, '');
+                                else if (cellHint(i)?.comment)
+                                    ts.setNote(row.tpId, i, cellHint(i)!.comment!);
+                            }"
+                        />
+                    </template>
                     <TsNoteCell :tpId="row.tpId" :day-idx="i" />
                     <div class="flex gap-1 mt-0.5">
-                        <span v-if="row.git?.[i]" class="commit-dot source-git" ></span>
-                        <span v-if="row.svn?.[i]" class="commit-dot source-svn" ></span>
+                        <span v-if="row.git?.[i]" class="commit-dot source-git"></span>
+                        <span v-if="row.svn?.[i]" class="commit-dot source-svn"></span>
                     </div>
                 </div>
             </template>
@@ -91,28 +128,73 @@
 </template>
 
 <script setup lang="ts">
-import { computed }          from 'vue';
-import { useTimesheetStore } from '../../stores/useTimesheetStore';
-import { usePickerStore }    from '../../stores/usePickerStore';
-import { useUiStore }        from '../../stores/useUiStore';
+import { computed }            from 'vue';
+import { useTimesheetStore }   from '../../stores/useTimesheetStore';
+import { usePickerStore }      from '../../stores/usePickerStore';
+import { useUiStore }          from '../../stores/useUiStore';
+import { useAnalysisStore }    from '../../stores/useAnalysisStore';
 import { stateColor, tpLink as makeTpLink } from '../../utils';
-import { hoursToHhmm, getMonday } from '@shared/dates';
-import type { TsRow, Day }   from '../../types';
-import TimeCellWidget        from '../TimeCellWidget.vue';
-import TsNoteCell            from './TsNoteCell.vue';
+import { hoursToHhmm, getMonday, shiftDate } from '@shared/dates';
+import type { TsRow, Day, CellMode } from '../../types';
+import TimeCellWidget          from '../TimeCellWidget.vue';
+import TsNoteCell              from './TsNoteCell.vue';
 
 const props = defineProps<{ row: TsRow; isPinned: boolean }>();
 
+const ts       = useTimesheetStore();
+const picker   = usePickerStore();
+const ui       = useUiStore();
+const analysis = useAnalysisStore();
+
 const isPending = computed(() => ts.pendingPromotion.includes(props.row.tpId));
 
-function quickAdd(dayIdx: number) {
-    ts.setHours(props.row.tpId, dayIdx, ts.getHours(props.row.tpId, dayIdx) + 0.5);
-    ts.schedulePromotion(props.row.tpId);
+function cellHint(i: number) {
+    const monday = ts.currentMonday;
+    if (!monday) return null;
+    return analysis.getHint(props.row.tpId, i, monday);
 }
 
-const ts     = useTimesheetStore();
-const picker = usePickerStore();
-const ui     = useUiStore();
+function computeCellMode(i: number): CellMode {
+    const hint    = cellHint(i);
+    const key     = `${props.row.tpId}_${i}`;
+    const hasEdit = key in ts.hoursEdits;
+    const hours   = ts.getHours(props.row.tpId, i);
+
+    // If day is balanced, hide pulsating hints (hint-only) for tasks without hours
+    if (Math.abs(ts.totalsRow.delta[i]) < 0.05 && (!hasEdit || hours === 0))
+        return 'clean';
+
+    if (!hint || hint.inferredHours <= 0)
+        return hasEdit && hours > 0 ? 'user-edit' : 'clean';
+    if (!hasEdit || hours === 0) return 'hint-only';
+    if (+hours.toFixed(1) === +hint.inferredHours.toFixed(1)) return 'hint-match';
+    return 'hint-differ';
+}
+
+function acceptHint(dayIdx: number) {
+    const hint = cellHint(dayIdx);
+    if (!hint || !ts.currentMonday) return;
+    ts.setHours(props.row.tpId, dayIdx, hint.inferredHours);
+    if (hint.comment)
+        ts.setNote(props.row.tpId, dayIdx, hint.comment);
+    
+    // Persist to server
+    const dateStr = shiftDate(ts.currentMonday!, dayIdx);
+    analysis.setEntryStatus(dateStr, props.row.tpId, 'applied');
+}
+
+function quickAdd(dayIdx: number) {
+    const hint    = cellHint(dayIdx);
+    const current = ts.getHours(props.row.tpId, dayIdx);
+    if (hint && current === 0) {
+        ts.setHours(props.row.tpId, dayIdx, hint.inferredHours);
+        if (hint.comment)
+            ts.setNote(props.row.tpId, dayIdx, hint.comment);
+    } else {
+        ts.setHours(props.row.tpId, dayIdx, current + 0.5);
+    }
+    ts.schedulePromotion(props.row.tpId);
+}
 const days   = computed(() => ts.days);
 
 function selectDay(dayIdx: number) {
@@ -185,4 +267,51 @@ function cellCls(d: Day, i: number): string[] {
     font-weight: 700;
     line-height: 1;
 }
+
+/* AI hint button — usato sia su active rows che su pinned */
+@keyframes ai-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 var(--ai-color); }
+    50%       { box-shadow: 0 0 0 3px var(--ai-color); }
+}
+@keyframes ai-dot-blink {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.2; }
+}
+.ai-hint-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 2px 5px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    cursor: pointer;
+    background: transparent;
+    border: 1px solid;
+    transition: background 0.15s;
+    /* default = medium/warning */
+    --ai-color: oklch(var(--wa) / 0.45);
+    color: oklch(var(--wa));
+    border-color: oklch(var(--wa) / 0.5);
+    animation: ai-pulse 2s ease-in-out infinite;
+}
+.ai-hint-btn.confidence-high {
+    --ai-color: oklch(var(--su) / 0.45);
+    color: oklch(var(--su));
+    border-color: oklch(var(--su) / 0.5);
+}
+.ai-hint-btn.confidence-low {
+    --ai-color: oklch(var(--er) / 0.3);
+    color: oklch(var(--er) / 0.7);
+    border-color: oklch(var(--er) / 0.35);
+}
+.ai-hint-btn:hover { background: oklch(var(--b3)); }
+.ai-hint-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: ai-dot-blink 1.4s ease-in-out infinite;
+}
+.ai-hint-val { line-height: 1; }
 </style>

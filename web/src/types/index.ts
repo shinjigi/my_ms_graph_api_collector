@@ -1,6 +1,29 @@
 // --- Activity Portal types ---
 
-import { DayProposal } from "@shared/analysis";
+// --- Shared types (re-exported from @shared/* for single-import convenience) ---
+
+import type { ProposalEntry, DayProposal, AnalysisJobStatus, AnalyzeStartResponse } from "@shared/analysis";
+import type { SubmitEdit, ZucchettiRequestResult } from "@shared/submit";
+import type { WeekDayData, ApiWeekResponse } from "@shared/week";
+import type { TpWeekEntry as ApiTpWeekEntry, TpWeekResponse as ApiTpWeekResponse } from "@shared/targetprocess";
+import type { ZucchettiDay, WorkLocation } from "@shared/zucchetti";
+import type { NibolBooking, TeamsMessageRaw, BrowserVisit } from "@shared/aggregator";
+
+export type {
+  ProposalEntry, DayProposal, AnalysisJobStatus, AnalyzeStartResponse,
+  SubmitEdit, ZucchettiRequestResult,
+  WeekDayData, ApiWeekResponse,
+  ApiTpWeekEntry, ApiTpWeekResponse,
+  ZucchettiDay, WorkLocation,
+  NibolBooking, TeamsMessageRaw, BrowserVisit
+};
+
+export type CellMode =
+    | 'clean'        // nessun hint, nessun edit
+    | 'hint-only'    // hint AI presente, non ancora toccato dall'utente
+    | 'hint-match'   // utente ha accettato o inserito lo stesso valore
+    | 'hint-differ'  // utente ha inserito un valore diverso
+    | 'user-edit';   // utente ha editato, nessun hint
 
 export interface Holiday {
   m: number;
@@ -13,7 +36,7 @@ export interface Day {
   date: string;
   rend: "ok" | "warn" | "err" | null;
   zucHours: number;
-  location?: "office" | "smart" | "travel" | "external" | "mixed" | "unknown";
+  location?: WorkLocation;
   nibol: NibolBooking | null;
   holiday: boolean;
   holidayName?: string;
@@ -98,86 +121,13 @@ export interface QuickLogItem extends UsCard {
   rem?: number;
 }
 
-// --- Shared types (re-exported from @shared/* for single-import convenience) ---
 
-export type { ProposalEntry, DayProposal } from "@shared/analysis";
-export type { SubmitEdit, ZucchettiRequestResult } from "@shared/submit";
-export type { WeekDayData } from "@shared/week";
-export type { ZucchettiDay } from "@shared/zucchetti";
-export type {
-  NibolBooking,
-  TeamsMessageRaw,
-  BrowserVisit,
-} from "@shared/aggregator";
+// Retro-compatibility for FE components
+export type WeekDayResponse = WeekDayData;
 
-// --- API Response Types (from backend) ---
-
-import type { ZucchettiDay } from "@shared/zucchetti";
-import type {
-  NibolBooking,
-  TeamsMessageRaw,
-  BrowserVisit,
-  EmailRaw,
-  CalendarEventRaw,
-  GitCommitRaw,
-  SvnCommitRaw,
-} from "@shared/aggregator";
-
-/** FE-specific version of WeekDayData with typed signal arrays. */
-export interface WeekDayResponse {
-  date: string;
-  isWorkday: boolean;
-  oreTarget: number;
-  location: "office" | "smart" | "travel" | "external" | "mixed" | "unknown";
-  nibol: NibolBooking | null;
-  holiday: boolean;
-  holidayName?: string;
-  zucchetti: ZucchettiDay | null;
-  calendar: CalendarEventRaw[];
-  emails: EmailRaw[];
-  teams: TeamsMessageRaw[];
-  svnCommits: SvnCommitRaw[];
-  gitCommits: GitCommitRaw[];
-  browserVisits: BrowserVisit[];
-}
-
-export interface ApiWeekResponse {
-  monday: string;
-  days: WeekDayResponse[];
-}
-
-export interface ApiTpWeekEntry {
-  tpId: number;
-  usName: string;
-  stateName: string;
-  timeSpent: number;
-  projectName: string;
-  hours: number[];
-}
-
-export interface ApiTpWeekResponse {
-  userId: number;
-  userName: string;
-  entries: ApiTpWeekEntry[];
-  openItems: unknown[];
-}
-
-// --- Submit result (FE-only, not in shared) ---
+// --- FE-only types ---
 
 export interface SubmitResult {
   submitted: number;
   errors: Array<{ tpId: number; date: string; error: string }>;
-}
-
-export interface AnalysisJobStatus {
-  status: "pending" | "running" | "done" | "error";
-  dates: string[];
-  completed: Record<string, DayProposal>;
-  errors: Record<string, string>;
-  startedAt: string;
-}
-
-export interface AnalyzeStartResponse {
-  jobId: string;
-  dates?: string[];
 }

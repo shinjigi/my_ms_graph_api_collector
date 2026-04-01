@@ -7,7 +7,9 @@ export interface ProposalEntry {
     inferredHours: number;
     confidence:    'high' | 'medium' | 'low';
     reasoning:     string;
+    comment?:      string;
     approved:      boolean;
+    status?:       'suggested' | 'applied' | 'dismissed' | 'modified';
 }
 
 export interface DayProposal {
@@ -17,4 +19,17 @@ export interface DayProposal {
     entries:     ProposalEntry[];
     generatedAt: string;
     provider?:   string;
+}
+
+export interface AnalysisJobStatus {
+  status: "pending" | "running" | "done" | "error";
+  dates: string[];
+  completed: Record<string, DayProposal>;
+  errors: Record<string, string>;
+  startedAt: string;
+}
+
+export interface AnalyzeStartResponse {
+  jobId: string;
+  dates?: string[];
 }

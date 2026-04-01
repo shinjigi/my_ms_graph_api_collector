@@ -9,12 +9,13 @@ import * as path from "node:path";
 import * as dotenv from "dotenv";
 dotenv.config();
 
-import { hhmmToHours } from "../targetprocess/format";
+import { hhmmToHours, groupTpEntriesByTask, parseTpDate } from "../targetprocess/format";
 import { createLogger } from "../logger";
 import { readMeta } from "../utils";
-import { ZucchettiDay } from "@shared/zucchetti";
+import { ZucchettiDay, isWorkday, parseZucchettiLocation } from "@shared/zucchetti";
 import { dateToString, extractMonthStr } from "@shared/dates";
 import { WORKDAY_HOURS } from "@shared/standards";
+import { TpTimeEntry } from "@shared/targetprocess";
 import {
   AggregatedDay,
   CalendarEventRaw,
@@ -41,30 +42,7 @@ const CHROME_DIR = path.join(RAW_DIR, "browser-chrome");
 const FIREFOX_DIR = path.join(RAW_DIR, "browser-firefox");
 const NIBOL_DIR = path.join(RAW_DIR, "nibol");
 
-export function parseZucchettiLocation(
-  day: ZucchettiDay,
-): AggregatedDay["location"] {
-  const giust = day.giustificativi.map((g) => g.text.toUpperCase());
-  const reqs = (day.richieste ?? [])
-    .filter((r) => r.status.toUpperCase() !== "CANCELLATA")
-    .map((r) => r.text.toUpperCase());
-  const allSignals = [...giust, ...reqs];
 
-  if (allSignals.some((s) => s.includes("SMART"))) return "smart";
-  if (allSignals.some((s) => s.includes("TRASFERTA"))) return "travel";
-  if (allSignals.some((s) => s.includes("SERVIZIO ESTERNO"))) return "external";
-
-  // If we have no signals at all, it's typically office work (default).
-  // If we have signals but they don't match location keywords, it's unknown.
-  if (giust.length === 0 && reqs.length === 0) return "office";
-  return "unknown";
-}
-
-export function isWorkday(day: ZucchettiDay): boolean {
-  const orario = (day.orario ?? "").toUpperCase();
-  // DOM/SAB = weekend, FES = public holiday — future days have empty hOrd but are valid workdays
-  return orario !== "DOM" && orario !== "SAB" && orario !== "FES";
-}
 
 /** Reads all *.json files from a directory (excluding .meta.json) and concatenates their arrays. */
 async function loadDirMonthly<T>(dir: string): Promise<T[]> {
@@ -119,6 +97,7 @@ export function buildAggregatedDay(
   git: GitCommitRaw[],
   browser: BrowserVisit[],
   nibol: NibolBooking | null,
+  tpEntries: TpTimeEntry[],
 ): AggregatedDay {
   const workday = isWorkday(zDay);
   const isComplete = date < dateToString();
@@ -139,6 +118,7 @@ export function buildAggregatedDay(
     svnCommits: svn,
     gitCommits: git,
     browserVisits: browser,
+    reportedHours: groupTpEntriesByTask(tpEntries.filter(e => parseTpDate(e.Date) === date)),
   };
 }
 
@@ -212,6 +192,26 @@ async function loadDirTeams(dir: string): Promise<TeamsMessageRaw[]> {
   return all;
 }
 
+/** Load TP time entries from enriched day files. */
+async function loadDirTp(dir: string): Promise<TpTimeEntry[]> {
+  let entries: string[];
+  try {
+    entries = await fs.readdir(dir);
+  } catch {
+    return [];
+  }
+  const files = entries.filter((f) => /^enriched-.*\.json$/.test(f));
+  const all: TpTimeEntry[] = [];
+  for (const file of files) {
+    try {
+      const raw = await fs.readFile(path.join(dir, file), "utf-8");
+      const data = JSON.parse(raw);
+      if (Array.isArray(data)) all.push(...data);
+    } catch { /* skip */ }
+  }
+  return all;
+}
+
 /**
  * Aggregate a single day: reads raw source files for the target month,
  * filters by date, builds and writes AggregatedDay, and returns it.
@@ -222,7 +222,7 @@ export async function aggregateSingleDay(
 ): Promise<AggregatedDay> {
   const monthStr = extractMonthStr(date);
 
-  const [calendar, emails, teams, svn, git, chrome, firefox, nibolMonth] =
+  const [calendar, emails, teams, svn, git, chrome, firefox, nibolMonth, tpEnriched] =
     await Promise.all([
       loadMonthFile<CalendarEventRaw>(CAL_DIR, monthStr),
       loadMonthFile<EmailRaw>(EMAIL_DIR, monthStr),
@@ -232,6 +232,7 @@ export async function aggregateSingleDay(
       loadMonthFile<BrowserVisit>(CHROME_DIR, monthStr),
       loadMonthFile<BrowserVisit>(FIREFOX_DIR, monthStr),
       loadMonthFile<NibolBooking>(NIBOL_DIR, monthStr),
+      loadDirTp(ZUCC_DIR.replace("zucchetti", "targetprocess")), // Simple path hack to dir
     ]);
 
   const nibol = nibolMonth.find((b) => b.date === date) ?? null;
@@ -245,6 +246,7 @@ export async function aggregateSingleDay(
     git.filter((c) => c.date?.slice(0, 10) === date),
     [...chrome, ...firefox].filter((v) => v.date?.slice(0, 10) === date),
     nibol,
+    tpEnriched,
   );
 
   await fs.mkdir(AGG_DIR, { recursive: true });
@@ -273,6 +275,7 @@ async function run(): Promise<void> {
   const firefoxBrows = await loadDirMonthly<BrowserVisit>(FIREFOX_DIR);
   const nibolAll = await loadDirMonthly<NibolBooking>(NIBOL_DIR);
   const browser = [...chromeBrows, ...firefoxBrows];
+  const tpAll = await loadDirTp(ZUCC_DIR.replace("zucchetti", "targetprocess"));
 
   log.info(`Zucchetti: ${zuccDays.length} giorni`);
   log.info(`Calendar: ${calendar.length} eventi`);
@@ -281,6 +284,7 @@ async function run(): Promise<void> {
   log.info(`SVN: ${svn.length} commit`);
   log.info(`Git: ${git.length} commit`);
   log.info(`Browser: ${browser.length} visite`);
+  log.info(`TargetProcess: ${tpAll.length} ore`);
   log.info(`Nibol: ${nibolAll.length} prenotazioni`);
 
   // Build date-indexed maps for fast lookup
@@ -308,6 +312,7 @@ async function run(): Promise<void> {
       gitByDate.get(date) ?? [],
       browserByDate.get(date) ?? [],
       nibolByDate.get(date) ?? null,
+      tpAll,
     );
 
     const outPath = path.join(AGG_DIR, `${date}.json`);

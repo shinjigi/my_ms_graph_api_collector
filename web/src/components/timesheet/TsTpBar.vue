@@ -98,13 +98,32 @@ watch(() => analysis.status?.status, (newStatus) => {
             analysisDoneMsg.value = '✓ Già analizzato';
             alreadyDone.value     = true;
         }
+        // Reload hints from baseline files now that analysis is done
+        analysis.loadWeekHints(ts.currentMonday || selectedDateStr());
         setTimeout(() => { analysisDoneMsg.value = ''; alreadyDone.value = false; }, 10000);
     }
 });
 
 // ---- Pending count ----
 
-const pendingEditsCount = computed(() =>
-    Object.values(ts.hoursEdits).filter(h => h > 0).length
-);
+const pendingEditsCount = computed(() => {
+    const editCount = Object.values(ts.hoursEdits).filter(h => h > 0).length;
+    const monday    = ts.currentMonday;
+    if (!monday) return editCount;
+
+    let hintCount = 0;
+    for (let i = 0; i < 5; i++) {
+        // Skip days that are already balanced (total reported = target)
+        if (Math.abs(ts.totalsRow.delta[i]) < 0.05) continue;
+
+        for (const row of [...ts.active, ...ts.pinned]) {
+            if (`${row.tpId}_${i}` in ts.hoursEdits) continue;
+            const hint = analysis.getHint(row.tpId, i, monday);
+            if (hint && hint.inferredHours > 0) {
+                hintCount++;
+            }
+        }
+    }
+    return editCount + hintCount;
+});
 </script>
