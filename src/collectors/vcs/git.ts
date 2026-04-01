@@ -29,7 +29,7 @@ function findGitRepos(root: string): string[] {
 function getCommitsFromRepo(repoPath: string, since: string): GitCommit[] {
   const SEP = "\x1F";
   const REC = "\x1E";
-  const fmt = `--format=%H${SEP}%an${SEP}%ae${SEP}%ad${SEP}%s${REC}`;
+  const fmt = `--format=%H${SEP}%an${SEP}%ae${SEP}%ad${SEP}%B${REC}`;
 
   try {
     const out = execSync(

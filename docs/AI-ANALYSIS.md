@@ -37,7 +37,7 @@ flowchart TD
     end
 
     subgraph PROMPT["⑤ Prompt builder  —  analyzer.ts"]
-        AN["filterKbByPeriod\nsortKbByRelevance\nfitKbItems  ← provider.kbItemCap\nbuildUserPromptBatched"]
+        AN["extractTaskIds / extractCalendarKeywords\nfilterKbByPeriod\nsortKbByRelevance\nfitKbItems  ← provider.kbItemCap\nbuildSignals ← provider.signalDetail\nbuildUserPromptBatched"]
     end
 
     subgraph CHAIN["⑥ Provider chain  —  AnalyzerProvider&#91;&#93;"]
@@ -79,7 +79,7 @@ flowchart TD
 | `subject` | `calendar[].subject` | ✅ full text | Primary signal for meeting-task attribution |
 | `start.dateTime` | `calendar[].start.dateTime` | ✅ sliced to `HH:mm` | Used to infer duration |
 | `end.dateTime` | `calendar[].end.dateTime` | ✅ sliced to `HH:mm` | — |
-| `attendees` | `calendar[].attendees` | ✅ count only | Full list stripped to reduce tokens |
+| `attendees` | `calendar[].attendees` | ✅ count or name list | **full** mode: first 5 names; **compact/minimal**: count only |
 | `isOnlineMeeting` | not forwarded | ❌ | Not in current prompt |
 | `organizer` | not forwarded | ❌ | Not in current prompt |
 
@@ -87,20 +87,22 @@ flowchart TD
 
 | Raw field | Aggregated as | Sent to AI | Notes |
 |-----------|---------------|------------|-------|
-| *(all fields)* | `emails[]` | ✅ count only (`emailsReceived`) | Subject/body never sent to avoid privacy leakage and token waste |
+| `subject` | `emails[].subject` | ✅ subjects in compact/full | **full**: up to 20 subjects ×100 chars; **compact**: up to 5 ×80 chars; **minimal**: count only (`emailsReceived`) |
+| `body`, `from`, `to`, … | dropped | ❌ | Privacy; never forwarded |
 
 ### 2.3 Graph Teams → `TeamsMessageRaw`
 
 | Raw field | Aggregated as | Sent to AI | Notes |
 |-----------|---------------|------------|-------|
-| *(all fields)* | `teams[]` | ✅ count only (`teamsMessages`) | Message content never sent |
+| `chatTopic` | `teams[].chatTopic` | ✅ in compact/full | **full**: `{ topic: count }` map; **compact**: unique topic list; **minimal**: total count only |
+| message body | dropped | ❌ | Privacy; never forwarded |
 
 ### 2.4 Git commits → `GitCommit`
 
 | Raw field | Aggregated as | Sent to AI | Notes |
 |-----------|---------------|------------|-------|
 | `repo` | `gitCommits[].repo` | ✅ | Helps attribute to projects |
-| `message` | `gitCommits[].message` | ✅ | Key signal: contains `#TASKID` references |
+| `message` | `gitCommits[].message` | ✅ | Full message body (`%B`): subject + blank line + body. Key signal for `#TASKID` extraction |
 | `hash`, `author`, `email`, `date` | aggregated | ❌ | Stripped from AI payload |
 
 ### 2.5 SVN commits → `SvnCommit`
@@ -108,7 +110,8 @@ flowchart TD
 | Raw field | Aggregated as | Sent to AI | Notes |
 |-----------|---------------|------------|-------|
 | `message` | `svnCommits[].message` | ✅ | Same role as git commit messages |
-| `revision`, `author`, `date`, `paths` | aggregated | ❌ | Stripped from AI payload |
+| `paths` | `svnCommits[].paths` | ✅ in **full** mode | First 3 paths; stripped in compact/minimal |
+| `revision`, `author`, `date` | aggregated | ❌ | Stripped from AI payload |
 
 ### 2.6 Zucchetti → `ZucchettiDay`
 
@@ -123,7 +126,9 @@ flowchart TD
 
 | Raw field | Sent to AI | Notes |
 |-----------|------------|-------|
-| `url`, `title`, `visitTime` | ❌ | Never sent — privacy + token cost |
+| `url` | ✅ **task IDs only** (compact/full) | Regex `/\/entity\/\w+\/(\d{5,6})\b/g` extracts TP task IDs — URL itself never sent |
+| `title` | ✅ **task IDs only** (compact/full) | Regex `/#(\d{5,6})\b/g` extracts TP task IDs — title text never sent |
+| `visitTime`, host, path | ❌ | Privacy; not forwarded |
 
 ---
 
@@ -173,13 +178,21 @@ Before the AI prompt is built, the knowledge base (`KbEntry[]`) is reduced to th
 ```mermaid
 flowchart TD
     KB["us-summaries.json\nAll KbEntry items"]
+    EXT["extractTaskIds()\n─────────────────\nScan gitCommits + svnCommits messages\nfor #NNNNN references.\nScan browserVisits URL / title\nfor /entity/.../NNNNN patterns.\n→ Set of TP task ID strings"]
     FILTER["filterKbByPeriod()\n─────────────────\nKeep open items always\nKeep closed items only if\ncreateDate or lastActivityDate\nis within ±window days of batch"]
-    SORT["sortKbByRelevance()\n─────────────────\nScore each item:\n+10 if name/summary matches\n    a keyword from commit/calendar\n+5  if lastActivityDate == batch date\n+2  if lastActivityDate in window\n+1  if isFinalState === false\nSort descending"]
+    SORT["sortKbByRelevance()\n─────────────────\nScore each item:\n+15 if kb.id ∈ extractTaskIds (direct match)\n+10 if name/summary matches a calendar\n    keyword — only when no IDs found\n+5  if lastActivityDate == batch date\n+2  if lastActivityDate in window\n+1  if isFinalState === false\nSort descending"]
     FIT["fitKbItems()\n─────────────────\nSlice to fit char budget\n(60% of provider.maxInputChars)\nHard cap = 20 items for Ollama\nto prevent hallucinations"]
-    PROMPT["KB section of prompt\narray of { id, entityType,\nname, summary? }"]
+    PROMPT["KB section of prompt\n─────────────────\nminimal/compact: { id, entityType, name, summary? }\nfull + ID-matched: + tags + userActivities"]
 
+    KB --> EXT
     KB --> FILTER --> SORT --> FIT --> PROMPT
+    EXT --> SORT
 ```
+
+**Scoring rationale:**
+- **+15 for direct ID match**: a commit or browser visit referencing `#NNNNN` is an unambiguous signal — scored highest.
+- **+10 for calendar keyword match**: used only as a fallback when no commit/browser task IDs are found (avoids noisy 4-char word matching).
+- **Calendar keyword extraction** uses a stopword filter (generic meeting words like `"standup"`, `"weekly"`, `"review"`, Italian equivalents) so only meaningful project-specific words are matched.
 
 **Why the 20-item hard cap for Ollama?**
 Small local models (≤8B params) tend to hallucinate task IDs or invent tasks when given long KB lists. Restricting to the top-20 most relevant items drastically reduces fabricated attributions at the cost of slightly lower coverage.
@@ -188,31 +201,60 @@ Small local models (≤8B params) tend to hallucinate task IDs or invent tasks w
 
 ## 5. Prompt construction
 
+### 5.1 `SignalDetail` — per-provider verbosity
+
+The `AnalyzerProvider` interface exposes an optional `signalDetail?: "full" | "compact" | "minimal"` field. `buildUserPromptBatched()` accepts this as a parameter and delegates per-day signal serialisation to `buildSignals(day, detail)`.
+
+| Level | Who uses it | Signals included |
+|-------|-------------|------------------|
+| `"full"` | Claude API, Gemini, Claude CLI (default) | attendees as name list (×5), Teams as `{topic: count}` map, email subjects ×20, SVN paths, browser task IDs, KB tags + userActivities for ID-matched tasks |
+| `"compact"` | OpenAI-compat / Ollama (default) | attendees as count, Teams unique topic list, email subjects ×5 ×80 chars, browser task IDs (no SVN paths, no KB extras) |
+| `"minimal"` | explicit opt-in via env | current pre-enrichment behaviour: attendee count, Teams count, email count — no subjects/topics/browser |
+
+The `signalDetail` default is `"full"` — providers that do **not** declare the field are treated as full.
+
+### 5.2 Prompt structure
+
 ```mermaid
 flowchart LR
     subgraph SystemPrompt["SYSTEM_PROMPT (static)"]
-        SP["Rules:\n1. Output ONLY valid JSON array\n2. One object per day\n3. date + entries fields\n4. Sum of inferredHours == oreTarget\n5. Use signals to infer tasks\n6. Distribute remaining hours\n7. Keep pre-seeded entries"]
+        SP["Rules:\n1. Output ONLY valid JSON array\n2. One object per day\n3. date + entries fields\n4. Sum of inferredHours == oreTarget\n5. Use all signals to infer tasks\n6. Distribute remaining hours\n7. Keep pre-seeded entries\n8. Skip pre-seeded only if signals\n   explicitly contradict them"]
     end
 
-    subgraph UserPrompt["buildUserPromptBatched()"]
-        UP_KB["activeTasks: KbEntry&#91;&#93;\n(filtered + sorted + fitted)"]
-        UP_DAYS["days&#91;&#93;:\n  date\n  oreTarget\n  remainingHours  ← oreTarget - recurring\n  location\n  signals:\n    calendarEvents&#91;&#93;  ← subject + HH:mm + attendees count\n    teamsMessages    ← count only\n    gitCommits&#91;&#93;     ← repo + message\n    svnCommits&#91;&#93;     ← message only\n    emailsReceived   ← count only\n  preSeededEntries&#91;&#93;  ← from defaults.json"]
-        UP_INS["instruction: string"]
+    subgraph UserPrompt["buildUserPromptBatched(days, kb, defaults, signalDetail)"]
+        UP_KB["activeTasks: KbEntry&#91;&#93;\n(filtered + sorted + fitted)\nfull+idMatch: + tags + userActivities\nothers: { id, entityType, name, summary? }"]
+        UP_DAYS["days&#91;&#93;:\n  date\n  oreTarget\n  remainingHours  ← oreTarget − recurring\n  location\n  signals: buildSignals(day, signalDetail)\n  preSeededEntries&#91;&#93;  ← from defaults.json"]
+        UP_INS["instruction: userInstruction()"]
     end
 
     SystemPrompt --> Provider
     UP_KB & UP_DAYS & UP_INS --> Provider["AI Provider\n(JSON.stringify → string)"]
 ```
 
-**What is stripped from the prompt (to save tokens):**
+### 5.3 `buildSignals()` output by detail level
+
+| Signal key | `minimal` | `compact` | `full` |
+|------------|-----------|-----------|--------|
+| `calendarEvents[].subject` | ✅ | ✅ | ✅ |
+| `calendarEvents[].attendees` | count | count | name list ×5 |
+| `teamsMessages` | count | — | `{topic: count}` map |
+| `teamsTopics` | — | unique list | — |
+| `gitCommits[].repo + message` | ✅ | ✅ | ✅ |
+| `svnCommits[].message` | ✅ | ✅ | ✅ |
+| `svnCommits[].paths` | — | — | first 3 |
+| `emailsReceived` | count | — | — |
+| `emailSubjects` | — | ×5 ×80 chars | ×20 ×100 chars |
+| `browserTaskIds` | — | ✅ | ✅ |
+
+### 5.4 What is stripped from the prompt
 
 | Field present in `AggregatedDay` | Reason for exclusion |
 |----------------------------------|----------------------|
-| `browserVisits` | Privacy + irrelevant to task attribution |
-| `emails[].subject/body` | Privacy; only count forwarded |
-| `teams[].body.content` | Privacy; only count forwarded |
-| `gitCommits[].hash/author/email/date` | Redundant; message+repo is sufficient |
-| `svnCommits[].revision/author/date/paths` | Same as above |
+| `browserVisits[].url/title` (raw) | Only task IDs extracted; full URLs/titles never sent |
+| `emails[].body/from/to` | Privacy; only subjects forwarded in compact/full |
+| `teams[].body.content` | Privacy; only topic forwarded |
+| `gitCommits[].hash/author/email/date` | Redundant; `message` + `repo` is sufficient |
+| `svnCommits[].revision/author/date` | Same as above |
 | `zucchetti.*` (raw fields) | Already translated to `oreTarget` + `location` |
 | `nibol.*` | Not relevant for task attribution |
 
@@ -228,6 +270,8 @@ classDiagram
         <<interface>>
         +string name
         +number maxInputChars
+        +number? kbItemCap
+        +SignalDetail? signalDetail
         +isAvailable() Promise~boolean~
         +analyzeBatch(system, user) Promise~DayResult[]~
     }
@@ -235,6 +279,7 @@ classDiagram
     class ClaudeApiProvider {
         +name = "claude:anthropic-api"
         +maxInputChars ← CLAUDE_MODEL_MAX_TPM × 4
+        +signalDetail = "full" (default)
         +isAvailable() probe via models.list()
         +analyzeBatch() Anthropic SDK messages.create()
     }
@@ -242,6 +287,8 @@ classDiagram
     class OpenAiCompatibleProvider {
         +name = "openai-compat"
         +maxInputChars ← OPENAI_MODEL_MAX_TPM × 4
+        +kbItemCap ← OPENAI_KB_ITEM_CAP (default 20)
+        +signalDetail ← OPENAI_SIGNAL_DETAIL (default "compact")
         +isAvailable() probe via GET /models
         +analyzeBatch() SSE streaming /chat/completions
     }
@@ -249,6 +296,7 @@ classDiagram
     class GeminiProvider {
         +name = "gemini:&lt;model&gt;"
         +maxInputChars ← GEMINI_MODEL_MAX_TPM × 4
+        +signalDetail = "full" (default)
         +isAvailable() probe via models list REST
         +analyzeBatch() generateContent + responseSchema
     }
@@ -256,6 +304,7 @@ classDiagram
     class ClaudeCliProvider {
         +name = "claude:cli"
         +maxInputChars ← CLAUDE_CLI_MAX_TPM × 4
+        +signalDetail = "full" (default)
         +isAvailable() probe via claude --version
         +analyzeBatch() spawn claude -p
     }
@@ -279,8 +328,8 @@ sequenceDiagram
     EXT-->>P: ok / fail
     P-->>ORC: true / false
 
-    ORC->>ORC: fitKbItems(sortedKb, provider.maxInputChars × 0.6)
-    ORC->>ORC: buildUserPromptBatched(batch, kbItems, defaults)
+    ORC->>ORC: fitKbItems(sortedKb, provider.maxInputChars × 0.6, provider)
+    ORC->>ORC: buildUserPromptBatched(batch, kbItems, defaults, provider.signalDetail ?? "full")
 
     ORC->>P: analyzeBatch(systemPrompt, userPrompt)
     P->>EXT: API call / spawn
@@ -302,6 +351,7 @@ sequenceDiagram
 | Structured output | ❌ (text + JSON.parse) | ❌ (+ stripJsonComments) | ✅ `responseSchema` | ❌ (text + JSON.parse) |
 | Token usage logging | ✅ `input_tokens` / `output_tokens` | token count from stream | ❌ | ❌ |
 | `kbItemCap` | ∞ (not declared) | **20** via `OPENAI_KB_ITEM_CAP` | ∞ (not declared) | ∞ (not declared) |
+| `signalDetail` | `"full"` (default) | `"compact"` via `OPENAI_SIGNAL_DETAIL` | `"full"` (default) | `"full"` (default) |
 | Timeout env var | — | `OPENAI_REQUEST_TIMEOUT_MS` | — | — |
 
 ---
@@ -336,10 +386,16 @@ flowchart TD
 | `GeminiProvider` | 1 000 000 tokens → 4 000 000 chars | `GEMINI_MODEL_MAX_TPM` | Structured output via `responseSchema` |
 | `ClaudeCliProvider` | 200 000 tokens → 800 000 chars | `CLAUDE_CLI_MAX_TPM` | Claude Code subscription |
 
-**Batch sizing:** The orchestrator uses the most restrictive active provider's budget to fit as many days as possible per API call, flushing the batch when the projected prompt exceeds the budget.
+**Batch sizing:** The orchestrator uses the most restrictive active provider's budget to fit as many days as possible per API call, flushing the batch when the projected prompt exceeds the budget. The **sizing probe** now uses:
+1. `filterKbByPeriod` + `sortKbByRelevance` on the candidate batch
+2. `fitKbItems` with 60% of the restrictive provider's budget → realistic KB subset
+3. `buildUserPromptBatched` with the restrictive provider's `signalDetail` → accurate char count
+
+This prevents under-estimation: previously the probe used the full KB list with the old fixed signal shape.
 
 **Hallucination mitigations for local models (Ollama):**
 - KB hard cap of 20 items (`fitKbItems`)
+- `signalDetail = "compact"` caps emails to 5 subjects ×80 chars and teams to unique topic list
 - `stripJsonComments` removes `//` comments injected by models like qwen2.5-coder
 - Date validation: results with dates outside the batch window are silently discarded
 - SSE streaming (`stream: true`) prevents proxy/OS TCP timeouts on long inference

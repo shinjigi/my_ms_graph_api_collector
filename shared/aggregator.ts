@@ -83,6 +83,7 @@ export interface SvnCommit {
 export interface AggregatedDay {
   date: string; // YYYY-MM-DD
   isWorkday: boolean;
+  isComplete: boolean; // True if the day has ended and all data is final
   oreTarget: number; // decimal hours from Zucchetti hOrd
   location: "office" | "smart" | "travel" | "external" | "mixed" | "unknown";
   nibol: NibolBooking | null;

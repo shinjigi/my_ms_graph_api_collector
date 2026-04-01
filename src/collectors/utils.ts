@@ -4,6 +4,7 @@ import * as path from 'path';
 export interface MonthMeta {
     lastExtractedDate: string;   // YYYY-MM-DD
     sources:           string[]; // paths/URLs actually scanned for that month
+    activeDays?:       string[]; // YYYY-MM-DD Array of days found inside this file/month
 }
 
 /** Merge-dedup: reads existing file, overwrites items by key, returns merged array. */

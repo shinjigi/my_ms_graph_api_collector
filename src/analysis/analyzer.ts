@@ -25,7 +25,7 @@ import { ClaudeApiProvider }        from "./claudeApiProvider";
 import { OpenAiCompatibleProvider } from "./openAiCompatProvider";
 import { ClaudeCliProvider }        from "./claudeCliProvider";
 import { GeminiProvider }           from "./geminiProvider";
-export { AnalyzerProvider, stripCodeFence } from "./base";
+export { AnalyzerProvider, SignalDetail, stripCodeFence } from "./base";
 
 const log = createLogger("analyzer");
 
@@ -60,8 +60,112 @@ export interface DefaultsConfig {
 }
 
 // ─── Shared utilities ───────────────────────────────────────────────
-import { AnalyzerProvider } from "./base";
+import { AnalyzerProvider, SignalDetail } from "./base";
 import { AggregatedDay } from "@shared/aggregator";
+
+// ─── Module-level regex constants ───────────────────────────────────
+// Used with .matchAll() only — never .test()/.exec() — to avoid g-flag lastIndex issues.
+const TP_ID_RE  = /#(\d{5,6})\b/g;
+const TP_URL_RE = /\/entity\/\w+\/(\d{5,6})\b/g;
+
+// ─── Step 3b: task-ID + stopword-filtered keyword extraction ────────
+function extractTaskIds(days: AggregatedDay[]): Set<string> {
+    const ids = new Set<string>();
+    for (const day of days) {
+        for (const c of [...day.gitCommits, ...day.svnCommits])
+            for (const m of c.message.matchAll(TP_ID_RE))  ids.add(m[1]);
+        for (const v of day.browserVisits) {
+            for (const m of v.url.matchAll(TP_URL_RE))     ids.add(m[1]);
+            if (v.title)
+                for (const m of v.title.matchAll(TP_ID_RE)) ids.add(m[1]);
+        }
+    }
+    return ids;
+}
+
+const STOPWORDS = new Set([
+    "the","and","for","with","this","that","from","into","have","will",
+    "your","been","they","were","when","what","which","there","their",
+    "call","meet","sync","chat","oggi","ieri","domani","riunione",
+    "meeting","weekly","daily","standup","sprint","review","retrospective",
+]);
+
+function extractCalendarKeywords(days: AggregatedDay[]): Set<string> {
+    const words = new Set<string>();
+    for (const day of days) {
+        const text = day.calendar.map(e => e.subject).join(" ").toLowerCase();
+        for (const m of text.matchAll(/\b([a-z]\w{3,})\b/g))
+            if (!STOPWORDS.has(m[1])) words.add(m[1]);
+    }
+    return words;
+}
+
+// ─── Step 3c: per-detail-level signal builder ───────────────────────
+function buildSignals(day: AggregatedDay, detail: SignalDetail): Record<string, unknown> {
+    if (detail === "minimal") {
+        return {
+            calendarEvents: day.calendar.map(e => ({
+                subject:   e.subject,
+                start:     e.start?.dateTime?.slice(11, 16),
+                end:       e.end?.dateTime?.slice(11, 16),
+                attendees: e.attendees?.length ?? 0,
+            })),
+            teamsMessages:  day.teams.length,
+            gitCommits:     day.gitCommits.map(c => ({ repo: c.repo, message: c.message })),
+            svnCommits:     day.svnCommits.map(c => ({ message: c.message })),
+            emailsReceived: day.emails.length,
+        };
+    }
+
+    // browser task IDs — used in both compact and full
+    const browserTaskIds = [...new Set([
+        ...day.browserVisits.flatMap(v => [...v.url.matchAll(TP_URL_RE)].map(m => m[1])),
+        ...day.browserVisits.flatMap(v => v.title
+            ? [...v.title.matchAll(TP_ID_RE)].map(m => m[1]) : []),
+    ])];
+
+    if (detail === "compact") {
+        const teamsTopics = [...new Set(
+            day.teams.map(m => m.chatTopic).filter(Boolean)
+        )];
+        return {
+            calendarEvents: day.calendar.map(e => ({
+                subject:   e.subject,
+                start:     e.start?.dateTime?.slice(11, 16),
+                end:       e.end?.dateTime?.slice(11, 16),
+                attendees: e.attendees?.length ?? 0,
+            })),
+            teamsTopics,
+            gitCommits:    day.gitCommits.map(c => ({ repo: c.repo, message: c.message })),
+            svnCommits:    day.svnCommits.map(c => ({ message: c.message })),
+            emailSubjects: day.emails.slice(0, 5).map(e => e.subject.slice(0, 80)),
+            browserTaskIds: browserTaskIds.length > 0 ? browserTaskIds : undefined,
+        };
+    }
+
+    // "full"
+    const teamsByTopic = new Map<string, number>();
+    for (const m of day.teams) {
+        const t = m.chatTopic ?? "(no topic)";
+        teamsByTopic.set(t, (teamsByTopic.get(t) ?? 0) + 1);
+    }
+    return {
+        calendarEvents: day.calendar.map(e => ({
+            subject:   e.subject,
+            start:     e.start?.dateTime?.slice(11, 16),
+            end:       e.end?.dateTime?.slice(11, 16),
+            attendees: e.attendees?.slice(0, 5).map(a => a.emailAddress.name) ?? [],
+        })),
+        teamsMessages:  Object.fromEntries(teamsByTopic),
+        gitCommits:     day.gitCommits.map(c => ({ repo: c.repo, message: c.message })),
+        svnCommits:     day.svnCommits.map(c => ({
+            message: c.message,
+            paths:   c.paths.slice(0, 3),
+        })),
+        emailSubjects:  day.emails.slice(0, 20).map(e => e.subject.slice(0, 100)),
+        browserTaskIds: browserTaskIds.length > 0 ? browserTaskIds : undefined,
+    };
+}
 
 export async function loadKb(): Promise<KbEntry[]> {
   const raw = await fs.readFile(KB_FILE, "utf-8");
@@ -82,34 +186,34 @@ export function buildSystemPrompt(): string {
   return SYSTEM_PROMPT;
 }
 
+// ─── Step 3d: updated buildUserPromptBatched ────────────────────────
 export function buildUserPromptBatched(
   days: AggregatedDay[],
   kbItems: KbEntry[],
   defaults: DefaultsConfig,
+  signalDetail: SignalDetail = "full",
 ): string {
-  // Extra check for keywords to decide whether to include summaries
-  const keywords = new Set<string>();
-  for (const day of days) {
-      const text = [
-          ...day.gitCommits.map(c => c.message),
-          ...day.svnCommits.map(c => c.message),
-          ...day.calendar.map(e => e.subject)
-      ].join(' ').toLowerCase();
-      const matches = text.match(/\b\w{4,}\b/g) ?? [];
-      for (const m of matches) keywords.add(m);
-  }
+  const taskIds     = extractTaskIds(days);
+  const calKeywords = taskIds.size === 0 ? extractCalendarKeywords(days) : new Set<string>();
 
   const activeTasks = kbItems.map((kb) => {
-    const entryText = `${kb.name} ${kb.id}`.toLowerCase();
-    const hasMatch = Array.from(keywords).some(kw => entryText.includes(kw));
-    
-    return {
-      id: kb.id,
-      entityType: kb.entityType,
-      name: kb.name,
-      // Only include summary if it's highly relevant to today's keywords
-      summary: hasMatch ? kb.summary : undefined,
+    const idMatch  = taskIds.has(String(kb.id));
+    const kwMatch  = !idMatch && Array.from(calKeywords).some(kw =>
+        `${kb.name} ${kb.id}`.toLowerCase().includes(kw)
+    );
+    const base = {
+        id: kb.id, entityType: kb.entityType, name: kb.name,
+        summary: (idMatch || kwMatch) ? kb.summary : undefined,
     };
+    if (signalDetail === "full" && idMatch) {
+        return {
+            ...base,
+            tags:           kb.tags.length > 0 ? kb.tags : undefined,
+            userActivities: Object.keys(kb.userActivities).length > 0
+                ? kb.userActivities : undefined,
+        };
+    }
+    return base;
   });
 
   const daysContext = days.map((day) => {
@@ -119,21 +223,7 @@ export function buildUserPromptBatched(
     );
     const remainingHours = Math.max(0, day.oreTarget - recurringHours);
 
-    const signals = {
-      calendarEvents: day.calendar.map((e) => ({
-        subject: e.subject,
-        start: e.start?.dateTime?.slice(11, 16),
-        end: e.end?.dateTime?.slice(11, 16),
-        attendees: e.attendees?.length ?? 0,
-      })),
-      teamsMessages: day.teams.length,
-      gitCommits: day.gitCommits.map((c) => ({
-        repo: c.repo,
-        message: c.message,
-      })),
-      svnCommits: day.svnCommits.map((c) => ({ message: c.message })),
-      emailsReceived: day.emails.length,
-    };
+    const signals = buildSignals(day, signalDetail);
 
     const preSeeded: ProposalEntry[] = defaults.recurringActivities.map(
       (a) => ({
@@ -212,51 +302,38 @@ function filterKbByPeriod(items: KbEntry[], batchDates: string[]): KbEntry[] {
   });
 }
 
+// ─── Step 3e: updated sortKbByRelevance ────────────────────────────
 /** Sorts KB items by relevance to the batch period (most relevant first). */
 function sortKbByRelevance(items: KbEntry[], batch: AggregatedDay[]): KbEntry[] {
   const batchDates = batch.map(d => d.date);
   if (batchDates.length === 0) return items;
-  
-  const batchSet = new Set(batchDates);
-  const batchMin = batchDates.reduce((a, b) => (a < b ? a : b));
+
+  const batchSet   = new Set(batchDates);
+  const batchMin   = batchDates.reduce((a, b) => (a < b ? a : b));
   const windowDays = Number(process.env["KB_RELEVANCE_WINDOW_DAYS"] ?? 90);
   const windowStart = shiftDate(batchMin, -windowDays);
 
-  // Extract keywords from all signals in the batch to find related KB items
-  const keywords = new Set<string>();
-  for (const day of batch) {
-      const text = [
-          ...day.gitCommits.map(c => c.message),
-          ...day.svnCommits.map(c => c.message),
-          ...day.calendar.map(e => e.subject),
-          day.location
-      ].join(' ').toLowerCase();
-      // Match words with at least 4 characters
-      const matches = text.match(/\b\w{4,}\b/g) ?? [];
-      for (const m of matches) keywords.add(m);
-  }
+  // Use precise task-ID extraction; fall back to stopword-filtered calendar keywords
+  const taskIds     = extractTaskIds(batch);
+  const calKeywords = taskIds.size === 0 ? extractCalendarKeywords(batch) : new Set<string>();
 
   const score = (e: KbEntry): number => {
     let s = 0;
-    
-    // Keyword match (highest boost)
-    const entryText = `${e.name} ${e.summary ?? ""} ${e.id}`.toLowerCase();
-    for (const kw of keywords) {
-        if (entryText.includes(kw)) {
-            s += 10; // Strong relevance
-            break; // Found one is enough for a big boost
+    if (taskIds.has(String(e.id))) {
+        s += 15;  // direct ID match — strongest signal
+    } else {
+        const entryText = `${e.name} ${e.summary ?? ""} ${e.id}`.toLowerCase();
+        for (const kw of calKeywords) {
+            if (entryText.includes(kw)) { s += 10; break; }
         }
     }
-
     // Temporal relevance
     if (e.lastActivityDate) {
       if (batchSet.has(e.lastActivityDate)) s += 5;
       else if (e.lastActivityDate >= windowStart) s += 2;
     }
-    
     // State relevance
     if (e.isFinalState === false) s += 1;
-    
     return s;
   };
 
@@ -310,7 +387,9 @@ export async function analyzeBatch(
       );
     }
 
-    const user = buildUserPromptBatched(batch, kbItemsForProvider, defaults);
+    // Step 3f: pass signalDetail to control prompt verbosity per provider
+    const user = buildUserPromptBatched(batch, kbItemsForProvider, defaults,
+        provider.signalDetail ?? "full");
     const promptChars = system.length + user.length;
     log.info(
       `Batch di ${batch.length} giorni — prompt ~${promptChars} chars (KB: ${kbItemsForProvider.length} items)`,
@@ -520,13 +599,18 @@ async function run(): Promise<void> {
       continue;
     }
 
-    // Measure actual prompt size (not raw file — which includes browser history etc.)
-    const system = buildSystemPrompt();
-    const testUser = buildUserPromptBatched(
-      [...currentBatch, day],
-      kbItems,
-      defaults,
-    );
+    // Step 3g: measure prompt size using the most restrictive provider's detail level
+    const restrictiveProvider = providers.find(p => p.maxInputChars === maxInputChars)!;
+    const batchDatesForFit    = [...currentBatch, day].map(d => d.date);
+    const filteredKbForFit    = filterKbByPeriod(kbItems, batchDatesForFit);
+    const sortedKbForFit      = sortKbByRelevance(filteredKbForFit, [...currentBatch, day]);
+    const fittedKb            = fitKbItems(sortedKbForFit,
+        Math.floor(maxInputChars * 0.6), restrictiveProvider);
+
+    const system       = buildSystemPrompt();
+    const testUser     = buildUserPromptBatched(
+      [...currentBatch, day], fittedKb, defaults,
+      restrictiveProvider.signalDetail ?? "full");
     const projectedChars = system.length + testUser.length;
 
     log.info(
