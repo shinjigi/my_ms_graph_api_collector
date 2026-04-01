@@ -198,9 +198,9 @@ export async function startZucchettiSession(
 
   const debugData = await timesheetPage.evaluate(() => {
     const result: Record<string, unknown> = {};
-    const win = window as unknown as Record<string, unknown>;
+    const win = globalThis as unknown as Record<string, unknown>;
 
-    for (const key in window) {
+    for (const key in globalThis) {
       try {
         const lower = key.toLowerCase();
 
@@ -219,7 +219,8 @@ export async function startZucchettiSession(
             result[key] = val;
           }
         }
-      } catch (_e) {
+      } catch (e) {
+        log.warn(`Accesso a window["${key}"] ha lanciato un errore, skip.`, e);
         // property access on window[key] may throw — skip silently
       }
     }

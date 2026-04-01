@@ -1,7 +1,7 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { spawn } from "node:child_process";
-import { readMeta, writeMeta, shouldSkipMonth } from "../utils";
+import { readMeta, writeMeta, shouldSkipMonth } from "../../utils";
 import { createLogger } from "../../logger";
 
 const log = createLogger("zucchetti");
@@ -80,7 +80,13 @@ function extractJson(output: string): MonthData[] {
   return parsed as MonthData[];
 }
 
-import { currentMonthString, dateToString, getYearMonth, parseDateString, addMonths } from "@shared/dates";
+import {
+  currentMonthString,
+  dateToString,
+  getYearMonth,
+  parseDateString,
+  addMonths,
+} from "@shared/dates";
 
 export async function collectZucchetti(
   force = false,

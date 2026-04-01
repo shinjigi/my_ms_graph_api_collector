@@ -23,7 +23,7 @@ export function hasJsonFlag(): boolean {
 }
 
 export function printJson(data: unknown): void {
-  console.log(JSON.stringify(data, null, 2));
+  log.info(JSON.stringify(data, null, 2));
 }
 
 export interface ColumnDef<T> {
@@ -36,17 +36,13 @@ export function printTable<T>(rows: T[], columns: ColumnDef<T>[]): void {
   const header = columns.map((c) => c.header.padEnd(c.width)).join(" | ");
   const separator = "-".repeat(header.length);
 
-  console.log(header);
-  console.log(separator);
+  log.info(header);
+  log.info(separator);
 
   rows.forEach((row) => {
     const line = columns.map((c) => c.value(row).padEnd(c.width)).join(" | ");
-    console.log(line);
+    log.info(line);
   });
 }
 
-export {
-  parseTpDate,
-  hoursToHhmm,
-  hhmmToHours,
-} from "../../shared/dates";
+export { parseTpDate, hoursToHhmm, hhmmToHours } from "../../shared/dates";

@@ -12,7 +12,13 @@ import type {
   SubmitEdit,
   WeekDayResponse,
 } from "../types";
-import { dateToString, DAYABB_IT, parseDateString, shiftDate, formatShortDateLabel } from "@shared/dates";
+import {
+  dateToString,
+  DAYABB_IT,
+  parseDateString,
+  shiftDate,
+  formatShortDateLabel,
+} from "@shared/dates";
 
 export const useTimesheetStore = defineStore(
   "timesheet",
@@ -51,7 +57,7 @@ export const useTimesheetStore = defineStore(
         ]);
 
         currentMonday.value = weekRes.monday;
-        console.log(
+        log.info(
           "[TS] fetchWeekData:",
           date,
           "monday:",
@@ -77,7 +83,7 @@ export const useTimesheetStore = defineStore(
             holidayName: d.holidayName,
           };
         });
-        console.log(
+        log.info(
           "[TS] days mapped:",
           days.value.map((d) => d.date),
         );
@@ -110,27 +116,33 @@ export const useTimesheetStore = defineStore(
           totAllTime: e.timeSpent,
           hours: [...e.hours, 0, 0], // Pad to 7 (Mon-Sun)
           notes: [...(e.notes ?? [null, null, null, null, null]), null, null], // Pad to 7
-          git: Array.from({ length: 7 }, (_, i) => gitCounts.get(`${e.tpId}_${i}`) ?? 0),
-          svn: Array.from({ length: 7 }, (_, i) => svnCounts.get(`${e.tpId}_${i}`) ?? 0),
+          git: Array.from(
+            { length: 7 },
+            (_, i) => gitCounts.get(`${e.tpId}_${i}`) ?? 0,
+          ),
+          svn: Array.from(
+            { length: 7 },
+            (_, i) => svnCounts.get(`${e.tpId}_${i}`) ?? 0,
+          ),
         }));
 
         // Partition rows: Active (has hours or local edits) vs Pinned (empty)
         const isRowActive = (r: TsRow) => {
-            // Check local edits first
-            for (let i = 0; i < 5; i++) {
-                if (hoursEdits.value[`${r.tpId}_${i}`] > 0) return true;
-            }
-            // Then check server hours in the record we just built
-            return (r.hours as number[]).slice(0, 5).some(h => h > 0);
+          // Check local edits first
+          for (let i = 0; i < 5; i++) {
+            if (hoursEdits.value[`${r.tpId}_${i}`] > 0) return true;
+          }
+          // Then check server hours in the record we just built
+          return (r.hours as number[]).slice(0, 5).some((h) => h > 0);
         };
 
         active.value = allRows.filter(isRowActive);
-        pinned.value = allRows.filter(r => !isRowActive(r));
+        pinned.value = allRows.filter((r) => !isRowActive(r));
 
         // Set weekData last — triggers useDayStore watcher after active/pinned are populated
         weekData.value = weekRes;
       } catch (err) {
-        console.warn(
+        log.warn(
           "fetchWeekData failed, falling back to mock data:",
           (err as Error).message,
         );
@@ -247,24 +259,26 @@ export const useTimesheetStore = defineStore(
      * (e.g. three clicks → 1.5h) before the row moves up.
      */
     function schedulePromotion(tpId: number) {
-        if (promotionTimers.has(tpId)) clearTimeout(promotionTimers.get(tpId)!);
-        if (!pendingPromotion.value.includes(tpId)) {
-            pendingPromotion.value = [...pendingPromotion.value, tpId];
-        }
-        
-        const timer = setTimeout(() => {
-            promotionTimers.delete(tpId);
-            pendingPromotion.value = pendingPromotion.value.filter(id => id !== tpId);
-            
-            // Check if it's still in pinned
-            const idx = pinned.value.findIndex(r => r.tpId === tpId);
-            if (idx === -1) return;
+      if (promotionTimers.has(tpId)) clearTimeout(promotionTimers.get(tpId)!);
+      if (!pendingPromotion.value.includes(tpId)) {
+        pendingPromotion.value = [...pendingPromotion.value, tpId];
+      }
 
-            // Move to active
-            const [row] = pinned.value.splice(idx, 1);
-            active.value.push(row);
-        }, 2000);
-        promotionTimers.set(tpId, timer);
+      const timer = setTimeout(() => {
+        promotionTimers.delete(tpId);
+        pendingPromotion.value = pendingPromotion.value.filter(
+          (id) => id !== tpId,
+        );
+
+        // Check if it's still in pinned
+        const idx = pinned.value.findIndex((r) => r.tpId === tpId);
+        if (idx === -1) return;
+
+        // Move to active
+        const [row] = pinned.value.splice(idx, 1);
+        active.value.push(row);
+      }, 2000);
+      promotionTimers.set(tpId, timer);
     }
 
     function clearEdits() {
@@ -273,29 +287,29 @@ export const useTimesheetStore = defineStore(
     }
 
     function addExtraTask(name: string, dayIdx: number) {
-        const tpId = Math.floor(Math.random() * 1000000) + 9000000; // 9M range for extras
-        usExtra.value.push({
-            project: 'Extra',
-            us: name,
-            tpId,
-            state: 'Inception',
-            totAllTime: 0,
-            hours: [0, 0, 0, 0, 0, 0, 0],
-            notes: [null, null, null, null, null, null, null],
-            git: [0, 0, 0, 0, 0, 0, 0],
-            svn: [0, 0, 0, 0, 0, 0, 0],
-        });
-        setHours(tpId, dayIdx, 0.5);
-        return tpId;
+      const tpId = Math.floor(Math.random() * 1000000) + 9000000; // 9M range for extras
+      usExtra.value.push({
+        project: "Extra",
+        us: name,
+        tpId,
+        state: "Inception",
+        totAllTime: 0,
+        hours: [0, 0, 0, 0, 0, 0, 0],
+        notes: [null, null, null, null, null, null, null],
+        git: [0, 0, 0, 0, 0, 0, 0],
+        svn: [0, 0, 0, 0, 0, 0, 0],
+      });
+      setHours(tpId, dayIdx, 0.5);
+      return tpId;
     }
 
     function removeExtraTask(tpId: number) {
-        usExtra.value = usExtra.value.filter(t => t.tpId !== tpId);
-        // Clear its edits
-        [0,1,2,3,4,5,6].forEach(i => {
-            delete hoursEdits.value[`${tpId}_${i}`];
-            delete noteEdits.value[`${tpId}_${i}`];
-        });
+      usExtra.value = usExtra.value.filter((t) => t.tpId !== tpId);
+      // Clear its edits
+      [0, 1, 2, 3, 4, 5, 6].forEach((i) => {
+        delete hoursEdits.value[`${tpId}_${i}`];
+        delete noteEdits.value[`${tpId}_${i}`];
+      });
     }
 
     function buildEdits(filterDayIdx?: number): SubmitEdit[] {

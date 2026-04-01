@@ -4,7 +4,7 @@ import { Client } from "@microsoft/microsoft-graph-client";
 import { createLogger } from "../../logger";
 
 const log = createLogger("graph-teams");
-import { mergeByKey, readMeta, writeMeta } from "../utils";
+import { mergeByKey, readMeta, writeMeta } from "../../utils";
 import { ChatState, TeamsMessageRaw } from "@shared/aggregator";
 import { dateToString, extractMonthStr, getApiStartOfDay } from "@shared/dates";
 
@@ -140,11 +140,13 @@ export async function collectGraphTeams(
   // Apply hard cap after pagination
   if (chatLimit > 0 && allChats.length > chatLimit) allChats.splice(chatLimit);
 
-  log.info(`  [Teams] ${allChats.length} chat trovate${chatLimit > 0 ? ` (limite: ${chatLimit})` : ""}`);
+  log.info(
+    `  [Teams] ${allChats.length} chat trovate${chatLimit > 0 ? ` (limite: ${chatLimit})` : ""}`,
+  );
 
   let myName = "";
   try {
-    const me = await client.api('/me').select('displayName').get();
+    const me = await client.api("/me").select("displayName").get();
     myName = me.displayName;
   } catch {
     // Silently ignore if we can't fetch the current user's name
@@ -163,24 +165,40 @@ export async function collectGraphTeams(
   const meta = await readMeta(TEAMS_DIR);
 
   const flushProgress = async (isFinal = false) => {
-    const files = Array.from(byChatFile.keys()).sort((a, b) => a.localeCompare(b));
+    const files = Array.from(byChatFile.keys()).sort((a, b) =>
+      a.localeCompare(b),
+    );
     for (const fileName of files) {
       const outPath = path.join(TEAMS_DIR, `${fileName}.json`);
       const newMsgs = byChatFile.get(fileName) ?? [];
       if (newMsgs.length > 0) {
-        const merged = await mergeByKey<TeamsMessageRaw>(outPath, newMsgs, "id");
+        const merged = await mergeByKey<TeamsMessageRaw>(
+          outPath,
+          newMsgs,
+          "id",
+        );
         await fs.writeFile(outPath, JSON.stringify(merged, null, 2), "utf-8");
-        
+
         const activeDays = new Set<string>();
         for (const m of merged) {
-            const cd = m.createdDateTime?.substring(0, 10);
-            if (cd) activeDays.add(cd);
+          const cd = m.createdDateTime?.substring(0, 10);
+          if (cd) activeDays.add(cd);
         }
 
-        await writeMeta(TEAMS_DIR, fileName, { lastExtractedDate: today, sources: ["graph"], activeDays: Array.from(activeDays) });
+        await writeMeta(TEAMS_DIR, fileName, {
+          lastExtractedDate: today,
+          sources: ["graph"],
+          activeDays: Array.from(activeDays),
+        });
         outPathsSet.add(outPath);
-        if (!isFinal) log.info(`    [Progress] Salvati su disco ${newMsgs.length} messaggi per: ${fileName}`);
-        else log.info(`  [Teams] ${fileName}: salvataggio finale completato (tot. ${merged.length} messaggi)`);
+        if (!isFinal)
+          log.info(
+            `    [Progress] Salvati su disco ${newMsgs.length} messaggi per: ${fileName}`,
+          );
+        else
+          log.info(
+            `  [Teams] ${fileName}: salvataggio finale completato (tot. ${merged.length} messaggi)`,
+          );
       }
     }
     await saveChatStates(updatedStates);
@@ -191,7 +209,10 @@ export async function collectGraphTeams(
   for (const chat of allChats) {
     chatIdx++;
     // Determine the since threshold for this chat.
-    const collectSince = process.env["TEAMS_COLLECT_SINCE"] ?? process.env["COLLECT_SINCE"] ?? "2025-01-01";
+    const collectSince =
+      process.env["TEAMS_COLLECT_SINCE"] ??
+      process.env["COLLECT_SINCE"] ??
+      "2025-01-01";
     const stored = chatStates[chat.id];
     let since = force
       ? collectSince
@@ -209,14 +230,18 @@ export async function collectGraphTeams(
       );
 
       if (messages.length === 0) {
-        if (chatIdx % 50 === 0) log.info(`    [Progress] Analizzate ${chatIdx}/${allChats.length} chat...`);
+        if (chatIdx % 50 === 0)
+          log.info(
+            `    [Progress] Analizzate ${chatIdx}/${allChats.length} chat...`,
+          );
         continue;
       }
 
       let finalChatName = chat.topic;
       if (!finalChatName && messages.length > 0) {
         for (const m of messages) {
-          const u = (m.from as { user?: { displayName?: string } })?.user?.displayName;
+          const u = (m.from as { user?: { displayName?: string } })?.user
+            ?.displayName;
           if (u && u !== myName) {
             finalChatName = u;
             break;
@@ -224,14 +249,16 @@ export async function collectGraphTeams(
         }
       }
       if (!finalChatName) finalChatName = "Unknown";
-      
+
       const safeName = sanitizeFilename(finalChatName);
       const prefix = getChatPrefix(chat.chatType);
       const uniquePart = chat.id.split("@")[0] || chat.id;
       const hash = uniquePart.substring(uniquePart.length - 6);
       const fileName = `${prefix}__${safeName}__${hash}`;
 
-      log.info(`    [Chat ${chatIdx}/${allChats.length}] ${finalChatName}: +${messages.length} messaggi`);
+      log.info(
+        `    [Chat ${chatIdx}/${allChats.length}] ${finalChatName}: +${messages.length} messaggi`,
+      );
 
       for (const m of messages) {
         const msg: TeamsMessageRaw = {
@@ -247,7 +274,9 @@ export async function collectGraphTeams(
           messageType: m.messageType,
         };
 
-        const month = m.createdDateTime ? extractMonthStr(m.createdDateTime) : undefined;
+        const month = m.createdDateTime
+          ? extractMonthStr(m.createdDateTime)
+          : undefined;
         if (!month) continue;
 
         // In single-day mode only accumulate the relevant month
@@ -268,7 +297,9 @@ export async function collectGraphTeams(
       // Auto-flush memory aggressively to prevent heap bounds exits and lost progress
       if (accumulatedMessages >= 2000 || chatIdx % 50 === 0) {
         if (accumulatedMessages > 0) {
-          log.info(`    [Progress] Auto-salvataggio intermedio (${accumulatedMessages} messaggi elaborati in batch)...`);
+          log.info(
+            `    [Progress] Auto-salvataggio intermedio (${accumulatedMessages} messaggi elaborati in batch)...`,
+          );
           await flushProgress(false);
         } else {
           // If 50 chats passed but zero messages, just flush the states
@@ -279,7 +310,9 @@ export async function collectGraphTeams(
       // Inaccessible chats (403/404): skip silently
       const code = (err as { statusCode?: number }).statusCode;
       if (code !== 403 && code !== 404) {
-        log.warn(`    [Notice] Errore su chat ${chat.id}: ${(err as Error).message}`);
+        log.warn(
+          `    [Notice] Errore su chat ${chat.id}: ${(err as Error).message}`,
+        );
       }
     }
   }
@@ -296,7 +329,8 @@ export async function collectGraphTeams(
   const existingFiles = await fs.readdir(TEAMS_DIR).catch(() => [] as string[]);
   const outPathsArr = Array.from(outPathsSet);
   for (const f of existingFiles) {
-    if (!f.endsWith(".json") || f === ".meta.json" || f === "chat-states.json") continue;
+    if (!f.endsWith(".json") || f === ".meta.json" || f === "chat-states.json")
+      continue;
     const fnoext = f.replaceAll(".json", "");
     const finalP = path.join(TEAMS_DIR, f);
     if (!outPathsSet.has(finalP) && meta[fnoext]) {

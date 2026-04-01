@@ -44,6 +44,8 @@ src/analysis/
 └── geminiProvider.ts    ← Google Generative AI SDK (GeminiProvider)
 ```
 
+`config/master-rules.md` — Markdown file with business rules injected into the system prompt at runtime. Loaded fresh on every `analyzeBatch()` call via `loadMasterRules()`. Edit this file to tune AI attribution logic without touching code. Missing file is silently ignored (base `SYSTEM_PROMPT` used as-is).
+
 Server endpoints:
 - `POST /api/analyze/:date` — single day (202 + jobId)
 - `POST /api/analyze/week/:date` — all workdays in week (202 + jobId)
@@ -109,7 +111,7 @@ Server endpoints:
 | `scripts/` | PowerShell automation, morning task, bootstrap |
 | `docs/` | Documentation and planning |
 | `docs/archive/` | Legacy files (portal.html) |
-| `config/` | `defaults.json` (recurring activities), `hooks.json` |
+| `config/` | `defaults.json` (recurring activities), `hooks.json`, `master-rules.md` (AI business rules) |
 | `data/` | Runtime data: raw, aggregated, proposals, kb |
 
 ### Setup helper

@@ -4,14 +4,17 @@ import type { Client } from "@microsoft/microsoft-graph-client";
 import { createLogger } from "../../logger";
 
 const log = createLogger("graph-calendar");
-import {
-  mergeByKey,
-  readMeta,
-  writeMeta,
-  shouldSkipMonth,
-} from "../utils";
+import { mergeByKey, readMeta, writeMeta, shouldSkipMonth } from "../../utils";
 import { CalendarEventRaw } from "@shared/aggregator";
-import { dateToString, currentMonthString, startOfMonth, addMonths, getApiStartOfDay, getApiEndOfDay, extractMonthStr } from "@shared/dates";
+import {
+  dateToString,
+  currentMonthString,
+  startOfMonth,
+  addMonths,
+  getApiStartOfDay,
+  getApiEndOfDay,
+  extractMonthStr,
+} from "@shared/dates";
 
 const CAL_DIR = path.join(process.cwd(), "data", "raw", "graph-calendar");
 
@@ -23,25 +26,31 @@ interface GraphPage<T> {
 async function fetchCalendarEvents(
   client: Client,
   apiPath: string,
-  query: Record<string, any> = {}
+  query: Record<string, any> = {},
 ): Promise<CalendarEventRaw[]> {
   const events: CalendarEventRaw[] = [];
   let nextLink: string | null = null;
   let pageNum = 1;
 
   do {
-    const request = nextLink ? client.api(nextLink) : client.api(apiPath).query(query);
+    const request = nextLink
+      ? client.api(nextLink)
+      : client.api(apiPath).query(query);
     const response = (await request
-      .select("id,subject,start,end,organizer,attendees,isOnlineMeeting,webLink")
+      .select(
+        "id,subject,start,end,organizer,attendees,isOnlineMeeting,webLink",
+      )
       .orderby("start/dateTime")
       .top(100) // Page size
       .get()) as GraphPage<CalendarEventRaw>;
 
     const page = response.value ?? [];
     events.push(...page);
-    
+
     if (pageNum > 1 || response["@odata.nextLink"]) {
-        log.info(`    [Pagina ${pageNum++}] Scaricati ${page.length} eventi. Totale: ${events.length}`);
+      log.info(
+        `    [Pagina ${pageNum++}] Scaricati ${page.length} eventi. Totale: ${events.length}`,
+      );
     }
 
     nextLink = response["@odata.nextLink"] ?? null;
@@ -84,7 +93,7 @@ export async function collectGraphCalendar(
       !isCurrentMonth &&
       shouldSkipMonth(meta[month], month, ["graph"])
     ) {
-      console.log(`  [Calendar] ${month}: skip`);
+      log.info(`  [Calendar] ${month}: skip`);
       return [outPath];
     }
 
@@ -116,7 +125,7 @@ export async function collectGraphCalendar(
       !isCurrentMonth &&
       shouldSkipMonth(meta[month], month, ["graph"])
     ) {
-      console.log(`  [Calendar] ${month}: skip`);
+      log.info(`  [Calendar] ${month}: skip`);
       outPaths.push(outPath);
     } else {
       try {
@@ -132,9 +141,9 @@ export async function collectGraphCalendar(
           sources: ["graph"],
         });
         outPaths.push(outPath);
-        console.log(`  [Calendar] ${month}: ${events.length} eventi`);
+        log.info(`  [Calendar] ${month}: ${events.length} eventi`);
       } catch (err) {
-        console.warn(`  [Calendar] ${month}: ${(err as Error).message}`);
+        log.warn(`  [Calendar] ${month}: ${(err as Error).message}`);
       }
     }
 

@@ -2,10 +2,17 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { createRequire } from "node:module";
-import { mergeByKey, readMeta, writeMeta, shouldSkipMonth } from "../utils";
+import { mergeByKey, readMeta, writeMeta, shouldSkipMonth } from "../../utils";
 import { BrowserVisit } from "@shared/aggregator";
-import { dateToString, currentMonthString, getISOTimestamp } from "@shared/dates";
+import {
+  dateToString,
+  currentMonthString,
+  getISOTimestamp,
+} from "@shared/dates";
 
+import { createLogger } from "../../logger";
+
+const log = createLogger("browser-history");
 const _require = createRequire(__filename);
 
 const CHROME_DIR = path.join(process.cwd(), "data", "raw", "browser-chrome");
@@ -220,7 +227,7 @@ export async function collectBrowserHistory(force = false): Promise<string[]> {
   const sinceMs = BigInt(Date.parse(since)) * BigInt(1000); // Unix microseconds
 
   if (chromeProfileDirs.length === 0 && !firefoxProfileDir) {
-    console.warn(
+    log.warn(
       "CHROME_PROFILE_DIRS e FIREFOX_PROFILE_DIR non configurati — collector browser saltato.",
     );
     return [];
@@ -230,7 +237,7 @@ export async function collectBrowserHistory(force = false): Promise<string[]> {
   try {
     SQL = await loadSqlJs();
   } catch (err) {
-    console.warn(
+    log.warn(
       `Browser history: impossibile caricare sql.js — ${(err as Error).message}`,
     );
     return [];
@@ -256,13 +263,9 @@ export async function collectBrowserHistory(force = false): Promise<string[]> {
           sinceMs,
         );
         allChromeVisits.push(...visits);
-        console.log(
-          `  [Browser] Chrome ${sourceName}: ${visits.length} visite`,
-        );
+        log.info(`  [Browser] Chrome ${sourceName}: ${visits.length} visite`);
       } catch (err) {
-        console.warn(
-          `  [Browser] Chrome ${sourceName}: ${(err as Error).message}`,
-        );
+        log.warn(`  [Browser] Chrome ${sourceName}: ${(err as Error).message}`);
       }
     }
 
@@ -284,7 +287,7 @@ export async function collectBrowserHistory(force = false): Promise<string[]> {
         "firefox",
         sinceMs,
       );
-      console.log(`  [Browser] Firefox: ${visits.length} visite`);
+      log.info(`  [Browser] Firefox: ${visits.length} visite`);
       const firefoxPaths = await writeByMonth(
         FIREFOX_DIR,
         visits,
@@ -293,7 +296,7 @@ export async function collectBrowserHistory(force = false): Promise<string[]> {
       );
       outPaths.push(...firefoxPaths);
     } catch (err) {
-      console.warn(`  [Browser] Firefox: ${(err as Error).message}`);
+      log.warn(`  [Browser] Firefox: ${(err as Error).message}`);
     }
   }
 

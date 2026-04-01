@@ -48,30 +48,32 @@ ${userWorkDetail || "Nessun log presente."}
       })
       .join("\n\n================================\n\n");
 
-    return `Analizza questo batch di task di TargetProcess.
-Per ogni task, restituisci un oggetto JSON all'interno di un array.
+    return `Analyze this batch of TargetProcess tasks.
+For each task, return a JSON object in an array.
 
-STRUTTURA RICHIESTA:
+REQUIRED STRUCTURE:
 {
   "results": [
     {
       "id": number,
-      "summary": "Riassunto tecnico complessivo di 3-4 frasi",
+      "summary": "Overall technical summary in 3-4 sentences",
       "tags": ["tag1", "tag2", "tag3"],
       "stakeholders": ["Stakeholder1", "Stakeholder2"],
       "userActivities": {
-         "Nome Utente": "Riassunto specifico di cosa ha fatto questa persona basandoti sui suoi log"
+        "UserName": "Specific summary of the user's contribution based on their activity logs"
       }
     }
   ]
 }
 
-REGOLE:
-1. I tag devono essere almeno 10 ed includere termini ricorrenti, tecnologie, moduli, tipo di attività, processi.
-2. In 'userActivities', crea un riassunto di 1 frase per ogni utente che ha loggato ore, spiegando il suo contributo specifico.
-3. Se un utente ha loggato ore ma le descrizioni sono generiche, deduci il contributo dal contesto del task.
+RULES:
 
-DATI BATCH:
+1. Tags must be at least 10 and include recurring terms, technologies, modules, activity types, and processes.
+2. In 'userActivities', create a one-sentence summary for each user who logged hours, explaining their specific contribution.
+3. If a user logged hours but the descriptions are generic, infer the contribution from the context of the task.
+4. All the output must be in ENG in the specified JSON format without any additional text.
+
+BATCH DATA:
 ${formattedItems}`;
   },
 };

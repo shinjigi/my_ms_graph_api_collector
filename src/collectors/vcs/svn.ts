@@ -5,7 +5,7 @@ import { parseString } from "xml2js";
 import { createLogger } from "../../logger";
 
 const log = createLogger("vcs-svn");
-import { mergeByKey, readMeta, writeMeta, shouldSkipMonth } from "../utils";
+import { mergeByKey, readMeta, writeMeta, shouldSkipMonth } from "../../utils";
 import { SvnCommitRaw } from "@shared/aggregator";
 import {
   dateToString,

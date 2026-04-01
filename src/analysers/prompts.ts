@@ -15,7 +15,8 @@ RULES:
 5. Use all available signals — calendar attendees, Teams topics, email subjects, commit messages, SVN paths, and browser task IDs — to infer which tasks were worked on and for how long.
 6. When signals are scarce, distribute hours proportionally across active tasks weighted by recent activity.
 7. For recurring activities (standup etc.) that are pre-seeded, keep their hours as-is and distribute the remainder.
-8. Pre-seeded entries are recurring activity suggestions. Skip or reduce their hours only if day signals explicitly contradict them (e.g. no standup on a travel/sick day). Otherwise keep them unchanged.`;
+8. Pre-seeded entries are recurring activity suggestions. Skip or reduce their hours only if day signals explicitly contradict them (e.g. no standup on a travel/sick day). Otherwise keep them unchanged.
+9. ALL text fields in the output (taskName, reasoning, comment) MUST be written in English, regardless of the language of the input signals.`;
 
 /** Builds the user instruction string with interpolated variables. */
 export function userInstruction(): string {
