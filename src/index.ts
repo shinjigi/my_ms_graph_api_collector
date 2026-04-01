@@ -31,52 +31,77 @@ async function run(): Promise<void> {
   const endArg = process.argv
     .find((a) => a.startsWith("--end="))
     ?.split("=")[1];
+  const sourceArg = process.argv
+    .find((a) => a.startsWith("--source="))
+    ?.split("=")[1]?.toLowerCase();
 
   const range =
     startArg && endArg ? { start: startArg, end: endArg } : undefined;
 
+  const shouldRun = (name: string) => !sourceArg || sourceArg === name;
+
   log.info(
     "Avvio raccolta dati" +
       (dateArg ? ` (giorno: ${dateArg})` : "") +
+      (sourceArg ? ` [solo: ${sourceArg}]` : "") +
       (forceFlag ? " [--force]" : ""),
   );
 
-  // Microsoft Graph collectors (require device code auth on first run)
-  log.info("[Graph] Autenticazione...");
-  const client = await createGraphClient();
+  // Microsoft Graph collectors
+  const requiresGraph = shouldRun("calendar") || shouldRun("email") || shouldRun("teams");
+  if (requiresGraph) {
+    log.info("[Graph] Autenticazione...");
+    const client = await createGraphClient();
 
-  const calPaths = await collectGraphCalendar(client, dateArg, forceFlag);
-  calPaths.forEach((p) => log.info(`[Graph] Calendario → ${p}`));
+    if (shouldRun("calendar")) {
+      const calPaths = await collectGraphCalendar(client, dateArg, forceFlag);
+      calPaths.forEach((p) => log.info(`[Graph] Calendario → ${p}`));
+    }
 
-  const emailPaths = await collectGraphEmail(client, dateArg, forceFlag);
-  emailPaths.forEach((p) => log.info(`[Graph] Email → ${p}`));
+    if (shouldRun("email")) {
+      const emailPaths = await collectGraphEmail(client, dateArg, forceFlag);
+      emailPaths.forEach((p) => log.info(`[Graph] Email → ${p}`));
+    }
 
-  const teamsPaths = await collectGraphTeams(client, dateArg, forceFlag);
-  teamsPaths.forEach((p) => log.info(`[Graph] Teams → ${p}`));
+    if (shouldRun("teams")) {
+      const teamsPaths = await collectGraphTeams(client, dateArg, forceFlag);
+      teamsPaths.forEach((p) => log.info(`[Graph] Teams → ${p}`));
+    }
+  }
 
   // SVN commits
-  log.info("[SVN] Raccolta commit...");
-  const svnPaths = await collectSvnCommits(forceFlag);
-  svnPaths.forEach((p) => log.info(`[SVN] Commit → ${p}`));
+  if (shouldRun("svn")) {
+    log.info("[SVN] Raccolta commit...");
+    const svnPaths = await collectSvnCommits(forceFlag);
+    svnPaths.forEach((p) => log.info(`[SVN] Commit → ${p}`));
+  }
 
   // Git commits
-  log.info("[Git] Raccolta commit...");
-  const gitPaths = await collectGitCommits(forceFlag);
-  gitPaths.forEach((p) => log.info(`[Git] Commit → ${p}`));
+  if (shouldRun("git")) {
+    log.info("[Git] Raccolta commit...");
+    const gitPaths = await collectGitCommits(forceFlag);
+    gitPaths.forEach((p) => log.info(`[Git] Commit → ${p}`));
+  }
 
-  log.info("[Zucchetti] Raccolta cartellino...");
-  const zuccPaths = await collectZucchetti(forceFlag, range);
-  zuccPaths.forEach((p) => log.info(`[Zucchetti] → ${p}`));
+  if (shouldRun("zucchetti")) {
+    log.info("[Zucchetti] Raccolta cartellino...");
+    const zuccPaths = await collectZucchetti(forceFlag, range);
+    zuccPaths.forEach((p) => log.info(`[Zucchetti] → ${p}`));
+  }
 
   // Nibol calendar
-  log.info("[Nibol] Raccolta calendario...");
-  const nibolPaths = await collectNibol(forceFlag, range);
-  nibolPaths.forEach((p) => log.info(`[Nibol] → ${p}`));
+  if (shouldRun("nibol")) {
+    log.info("[Nibol] Raccolta calendario...");
+    const nibolPaths = await collectNibol(forceFlag, range);
+    nibolPaths.forEach((p) => log.info(`[Nibol] → ${p}`));
+  }
 
   // Browser history (Chrome + Firefox)
-  log.info("[Browser] Raccolta cronologia...");
-  const browserPaths = await collectBrowserHistory(forceFlag);
-  browserPaths.forEach((p) => log.info(`[Browser] → ${p}`));
+  if (shouldRun("browser")) {
+    log.info("[Browser] Raccolta cronologia...");
+    const browserPaths = await collectBrowserHistory(forceFlag);
+    browserPaths.forEach((p) => log.info(`[Browser] → ${p}`));
+  }
 
   log.info("Raccolta completata.");
 }

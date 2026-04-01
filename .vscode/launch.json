@@ -26,6 +26,16 @@
       "skipFiles": ["<node_internals>/**"]
     },
     {
+      "type": "node",
+      "request": "launch",
+      "name": "Execute current JS/MJS Script",
+      "program": "${file}",
+      "cwd": "${workspaceFolder}",
+      "envFile": "${workspaceFolder}/.env",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"]
+    },
+    {
       "type": "bashdb",
       "request": "launch",
       "name": "Bash-Debug (select script from list of sh files)",

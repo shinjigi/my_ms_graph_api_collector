@@ -1,6 +1,9 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { Client } from "@microsoft/microsoft-graph-client";
+import { createLogger } from "../../logger";
+
+const log = createLogger("graph-calendar");
 import {
   mergeByKey,
   readMeta,
@@ -12,22 +15,49 @@ import { dateToString, currentMonthString, startOfMonth, addMonths, getApiStartO
 
 const CAL_DIR = path.join(process.cwd(), "data", "raw", "graph-calendar");
 
+interface GraphPage<T> {
+  value: T[];
+  "@odata.nextLink"?: string;
+}
+
+async function fetchCalendarEvents(
+  client: Client,
+  apiPath: string,
+  query: Record<string, any> = {}
+): Promise<CalendarEventRaw[]> {
+  const events: CalendarEventRaw[] = [];
+  let nextLink: string | null = null;
+  let pageNum = 1;
+
+  do {
+    const request = nextLink ? client.api(nextLink) : client.api(apiPath).query(query);
+    const response = (await request
+      .select("id,subject,start,end,organizer,attendees,isOnlineMeeting,webLink")
+      .orderby("start/dateTime")
+      .top(100) // Page size
+      .get()) as GraphPage<CalendarEventRaw>;
+
+    const page = response.value ?? [];
+    events.push(...page);
+    
+    if (pageNum > 1 || response["@odata.nextLink"]) {
+        log.info(`    [Pagina ${pageNum++}] Scaricati ${page.length} eventi. Totale: ${events.length}`);
+    }
+
+    nextLink = response["@odata.nextLink"] ?? null;
+  } while (nextLink);
+
+  return events;
+}
+
 async function fetchMonthEvents(
   client: Client,
   month: string,
 ): Promise<CalendarEventRaw[]> {
-  const startDateTime = getApiStartOfDay(month);
-  const endDateTime = getApiEndOfDay(month);
-
-  const response = (await client
-    .api("/me/calendarView")
-    .query({ startDateTime, endDateTime })
-    .select("id,subject,start,end,organizer,attendees,isOnlineMeeting,webLink")
-    .orderby("start/dateTime")
-    .top(2000)
-    .get()) as { value: CalendarEventRaw[] };
-
-  return response.value ?? [];
+  return fetchCalendarEvents(client, "/me/calendarView", {
+    startDateTime: getApiStartOfDay(month),
+    endDateTime: getApiEndOfDay(month),
+  });
 }
 
 export async function collectGraphCalendar(
@@ -58,20 +88,11 @@ export async function collectGraphCalendar(
       return [outPath];
     }
 
-    const response = (await client
-      .api("/me/calendarView")
-      .query({
-        startDateTime: getApiStartOfDay(date),
-        endDateTime: getApiEndOfDay(date),
-      })
-      .select(
-        "id,subject,start,end,organizer,attendees,isOnlineMeeting,webLink",
-      )
-      .orderby("start/dateTime")
-      .top(2000)
-      .get()) as { value: CalendarEventRaw[] };
+    const events = await fetchCalendarEvents(client, "/me/calendarView", {
+      startDateTime: getApiStartOfDay(date),
+      endDateTime: getApiEndOfDay(date),
+    });
 
-    const events = response.value ?? [];
     const merged = await mergeByKey<CalendarEventRaw>(outPath, events, "id");
     await fs.writeFile(outPath, JSON.stringify(merged, null, 2), "utf-8");
     await writeMeta(CAL_DIR, month, {

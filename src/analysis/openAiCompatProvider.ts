@@ -12,7 +12,7 @@
  *   OPENAI_NUM_CTX           — Ollama context window in tokens; defaults to OPENAI_MODEL_MAX_TPM
  *   OPENAI_REQUEST_TIMEOUT_MS — streaming timeout in ms; default 900 000 (15 min)
  */
-import { AnalyzerProvider, stripCodeFence, stripJsonComments, tpmToChars } from "./base";
+import { AnalyzerProvider, SignalDetail, stripCodeFence, stripJsonComments, tpmToChars } from "./base";
 import { createLogger } from "../logger";
 import { saveRawResponse } from "../aiRaw";
 import { ProposalEntry } from "@shared/analysis";
@@ -115,6 +115,16 @@ export class OpenAiCompatibleProvider implements AnalyzerProvider {
      */
     get kbItemCap(): number {
         return Number(process.env["OPENAI_KB_ITEM_CAP"] ?? 20);
+    }
+
+    /**
+     * Compact signals by default for small local models.
+     * Override via OPENAI_SIGNAL_DETAIL=full|compact|minimal.
+     */
+    get signalDetail(): SignalDetail {
+        const val = process.env["OPENAI_SIGNAL_DETAIL"] ?? "compact";
+        if (val === "full" || val === "compact" || val === "minimal") return val;
+        return "compact";
     }
 
     async isAvailable(): Promise<boolean> {

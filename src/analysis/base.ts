@@ -4,6 +4,23 @@
  */
 import type { ProposalEntry } from "@shared/analysis";
 
+/**
+ * Controls how much signal data is included in each day's prompt payload.
+ *
+ * "full"    — all available signals: attendee names, email subjects (20 × 100 chars),
+ *             Teams grouped by chat topic with counts, SVN paths, browser task IDs,
+ *             KB tags + userActivities for ID-matched entries.
+ *             Use for large-context cloud providers (Claude API, Gemini, CLI).
+ *
+ * "compact" — reduced signals safe for mid-size local models: attendee count,
+ *             email subjects (5 × 80 chars), unique Teams topics (no count),
+ *             browser task IDs only, KB name only (no summary/tags/activities).
+ *
+ * "minimal" — legacy behavior: email/Teams as counts only, no browser visits.
+ *             Use for very small local models (≤3B params, ≤5K token budget).
+ */
+export type SignalDetail = "full" | "compact" | "minimal";
+
 export interface AnalyzerProvider {
     readonly name: string;
     /**
@@ -12,6 +29,13 @@ export interface AnalyzerProvider {
      * Used by the batch-building loop in analyzer.ts to size prompts correctly.
      */
     readonly maxInputChars: number;
+    /**
+     * Controls signal verbosity in the user prompt.
+     * Large-context providers should leave this unset (defaults to "full").
+     * Small local models should declare "compact" or "minimal" to stay within budget.
+     * Configurable at runtime via provider-specific env vars.
+     */
+    readonly signalDetail?: SignalDetail;
     /**
      * Maximum number of KB items to include in a single prompt.
      * Cloud providers with large context windows can handle the full KB list.

@@ -11,8 +11,9 @@ dotenv.config();
 
 import { hhmmToHours } from "../targetprocess/format";
 import { createLogger } from "../logger";
+import { readMeta } from "../collectors/utils";
 import { ZucchettiDay } from "@shared/zucchetti";
-import { extractMonthStr } from "@shared/dates";
+import { dateToString, extractMonthStr } from "@shared/dates";
 import { WORKDAY_HOURS } from "@shared/standards";
 import {
   AggregatedDay,
@@ -102,6 +103,56 @@ async function loadMonthFile<T>(dir: string, monthStr: string): Promise<T[]> {
   }
 }
 
+/** Load Teams messages explicitly matching date via .meta.json activeDays property to limit I/O. */
+async function loadTeamsForDate(dir: string, date: string): Promise<TeamsMessageRaw[]> {
+  const meta = await readMeta(dir);
+  const matchedFiles: string[] = [];
+
+  for (const [fileName, fileMeta] of Object.entries(meta)) {
+    if (fileMeta.activeDays?.includes(date)) {
+      matchedFiles.push(`${fileName}.json`);
+    }
+  }
+
+  const allMsgs: TeamsMessageRaw[] = [];
+  for (const file of matchedFiles) {
+    try {
+      const raw = await fs.readFile(path.join(dir, file), "utf-8");
+      const data = JSON.parse(raw) as TeamsMessageRaw[];
+      allMsgs.push(...data.filter((m) => m.createdDateTime?.slice(0, 10) === date));
+    } catch {
+      // Skip missing
+    }
+  }
+  return allMsgs;
+}
+
+/** Load all Teams chat files explicitly. */
+async function loadDirTeams(dir: string): Promise<TeamsMessageRaw[]> {
+  let entries: string[];
+  try {
+    entries = await fs.readdir(dir);
+  } catch {
+    return [];
+  }
+
+  // Support for both legacy monthly files and newer per-chat files
+  const files = entries.filter((f) => /^\d{4}-\d{2}\.json$/.test(f) || /^(O2O|GRP|MET)__.*\.json$/.test(f));
+  const all: TeamsMessageRaw[] = [];
+
+  for (const file of files) {
+    try {
+      const raw = await fs.readFile(path.join(dir, file), "utf-8");
+      const data = JSON.parse(raw) as TeamsMessageRaw[];
+      if (Array.isArray(data)) all.push(...data);
+    } catch {
+      // Skip unreadable files
+    }
+  }
+
+  return all;
+}
+
 /**
  * Aggregate a single day: reads raw source files for the target month,
  * filters by date, builds and writes AggregatedDay, and returns it.
@@ -116,7 +167,7 @@ export async function aggregateSingleDay(
     await Promise.all([
       loadMonthFile<CalendarEventRaw>(CAL_DIR, monthStr),
       loadMonthFile<EmailRaw>(EMAIL_DIR, monthStr),
-      loadMonthFile<TeamsMessageRaw>(TEAMS_DIR, monthStr),
+      loadTeamsForDate(TEAMS_DIR, date),
       loadMonthFile<SvnCommit>(SVN_DIR, monthStr),
       loadMonthFile<GitCommit>(GIT_DIR, monthStr),
       loadMonthFile<BrowserVisit>(CHROME_DIR, monthStr),
@@ -125,6 +176,7 @@ export async function aggregateSingleDay(
     ]);
 
   const workday = isWorkday(zDay);
+  const isComplete = date < dateToString();
   const rawOre = zDay.hOrd ? hhmmToHours(zDay.hOrd) : null;
   const oreTarget = workday ? (rawOre ?? WORKDAY_HOURS) : 0;
   const nibol = nibolMonth.find((b) => b.date === date) ?? null;
@@ -132,6 +184,7 @@ export async function aggregateSingleDay(
   const bundle: AggregatedDay = {
     date,
     isWorkday: workday,
+    isComplete,
     oreTarget,
     location: workday ? parseZucchettiLocation(zDay) : "unknown",
     nibol,
@@ -165,7 +218,7 @@ async function run(): Promise<void> {
   const zuccDays = await loadDirMonthly<ZucchettiDay>(ZUCC_DIR);
   const calendar = await loadDirMonthly<CalendarEventRaw>(CAL_DIR);
   const emails = await loadDirMonthly<EmailRaw>(EMAIL_DIR);
-  const teams = await loadDirMonthly<TeamsMessageRaw>(TEAMS_DIR);
+  const teams = await loadDirTeams(TEAMS_DIR);
   const svn = await loadDirMonthly<SvnCommit>(SVN_DIR);
   const git = await loadDirMonthly<GitCommit>(GIT_DIR);
   const chromeBrows = await loadDirMonthly<BrowserVisit>(CHROME_DIR);
@@ -249,12 +302,14 @@ async function run(): Promise<void> {
     const date = zDay.date;
     if (date < sinceDate) continue;
     const workday = isWorkday(zDay);
+    const isComplete = date < dateToString();
     const rawOre = zDay.hOrd ? hhmmToHours(zDay.hOrd) : null;
     const oreTarget = workday ? (rawOre ?? WORKDAY_HOURS) : 0;
 
     const bundle: AggregatedDay = {
       date,
       isWorkday: workday,
+      isComplete,
       oreTarget,
       location: workday ? parseZucchettiLocation(zDay) : "unknown",
       nibol: nibolByDate.get(date) ?? null,
