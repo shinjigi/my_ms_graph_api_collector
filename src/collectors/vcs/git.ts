@@ -6,8 +6,12 @@ import { createLogger } from "../../logger";
 
 const log = createLogger("vcs-git");
 import { mergeByKey, readMeta, writeMeta, shouldSkipMonth } from "../utils";
-import { GitCommit } from "@shared/aggregator";
-import { dateToString, currentMonthString, extractMonthStr } from "@shared/dates";
+import { GitCommitRaw } from "@shared/aggregator";
+import {
+  dateToString,
+  currentMonthString,
+  extractMonthStr,
+} from "@shared/dates";
 
 const GIT_DIR = path.join(process.cwd(), "data", "raw", "git");
 
@@ -26,7 +30,7 @@ function findGitRepos(root: string): string[] {
   }
 }
 
-function getCommitsFromRepo(repoPath: string, since: string): GitCommit[] {
+function getCommitsFromRepo(repoPath: string, since: string): GitCommitRaw[] {
   const SEP = "\x1F";
   const REC = "\x1E";
   const fmt = `--format=%H${SEP}%an${SEP}%ae${SEP}%ad${SEP}%B${REC}`;
@@ -77,7 +81,7 @@ export async function collectGitCommits(force = false): Promise<string[]> {
   await fs.mkdir(GIT_DIR, { recursive: true });
 
   // Collect all commits across all repos
-  const allCommits: GitCommit[] = [];
+  const allCommits: GitCommitRaw[] = [];
   for (const root of roots) {
     const repos = findGitRepos(root);
     for (const repo of repos) {
@@ -92,7 +96,7 @@ export async function collectGitCommits(force = false): Promise<string[]> {
       : allCommits;
 
   // Group by month
-  const byMonth = new Map<string, GitCommit[]>();
+  const byMonth = new Map<string, GitCommitRaw[]>();
   for (const commit of filtered) {
     const month = commit.date ? extractMonthStr(commit.date) : undefined;
     if (!month) continue;
@@ -119,7 +123,7 @@ export async function collectGitCommits(force = false): Promise<string[]> {
     }
 
     const newCommits = byMonth.get(month) ?? [];
-    const merged = await mergeByKey<GitCommit>(outPath, newCommits, "hash");
+    const merged = await mergeByKey<GitCommitRaw>(outPath, newCommits, "hash");
     await fs.writeFile(outPath, JSON.stringify(merged, null, 2), "utf-8");
     await writeMeta(GIT_DIR, month, {
       lastExtractedDate: today,

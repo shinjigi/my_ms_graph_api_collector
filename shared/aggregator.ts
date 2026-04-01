@@ -1,8 +1,8 @@
 import { ZucchettiDay } from "./zucchetti";
 
 export interface NibolBooking {
-  date:     string;  // YYYY-MM-DD
-  type:     string;  // e.g. "office", "home", "external"
+  date: string; // YYYY-MM-DD
+  type: string; // e.g. "office", "home", "external"
   details?: string;
 }
 
@@ -38,7 +38,8 @@ export interface CalendarEventRaw {
 export interface EmailRaw {
   id: string;
   subject: string;
-  from: { emailAddress: { name: string; address: string } } | null;
+  from: { emailAddress: EmailAddress } | null;
+  toRecipients: [{ emailAddress: EmailAddress }] | null;
   receivedDateTime: string;
   bodyPreview: string;
   webLink: string;
@@ -63,7 +64,7 @@ export interface ChatState {
   chatType: string;
 }
 
-export interface GitCommit {
+export interface GitCommitRaw {
   hash: string;
   author: string;
   email: string;
@@ -72,7 +73,7 @@ export interface GitCommit {
   repo: string;
 }
 
-export interface SvnCommit {
+export interface SvnCommitRaw {
   revision: string;
   author: string;
   date: string; // YYYY-MM-DD
@@ -91,7 +92,7 @@ export interface AggregatedDay {
   calendar: CalendarEventRaw[];
   emails: EmailRaw[];
   teams: TeamsMessageRaw[];
-  svnCommits: SvnCommit[];
-  gitCommits: GitCommit[];
+  svnCommits: SvnCommitRaw[];
+  gitCommits: GitCommitRaw[];
   browserVisits: BrowserVisit[];
 }

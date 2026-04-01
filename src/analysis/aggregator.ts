@@ -20,8 +20,8 @@ import {
   CalendarEventRaw,
   EmailRaw,
   TeamsMessageRaw,
-  SvnCommit,
-  GitCommit,
+  SvnCommitRaw,
+  GitCommitRaw,
   BrowserVisit,
   NibolBooking,
 } from "@shared/aggregator";
@@ -35,11 +35,11 @@ const ZUCC_DIR = path.join(RAW_DIR, "zucchetti");
 const CAL_DIR = path.join(RAW_DIR, "graph-calendar");
 const EMAIL_DIR = path.join(RAW_DIR, "graph-email");
 const TEAMS_DIR = path.join(RAW_DIR, "graph-teams");
-const GIT_DIR    = path.join(RAW_DIR, "git");
-const SVN_DIR    = path.join(RAW_DIR, "svn");
+const GIT_DIR = path.join(RAW_DIR, "git");
+const SVN_DIR = path.join(RAW_DIR, "svn");
 const CHROME_DIR = path.join(RAW_DIR, "browser-chrome");
 const FIREFOX_DIR = path.join(RAW_DIR, "browser-firefox");
-const NIBOL_DIR  = path.join(RAW_DIR, "nibol");
+const NIBOL_DIR = path.join(RAW_DIR, "nibol");
 
 export function parseZucchettiLocation(
   day: ZucchettiDay,
@@ -50,9 +50,9 @@ export function parseZucchettiLocation(
     .map((r) => r.text.toUpperCase());
   const allSignals = [...giust, ...reqs];
 
-  if (allSignals.some((s) => s.includes("SMART")))             return "smart";
-  if (allSignals.some((s) => s.includes("TRASFERTA")))         return "travel";
-  if (allSignals.some((s) => s.includes("SERVIZIO ESTERNO")))  return "external";
+  if (allSignals.some((s) => s.includes("SMART"))) return "smart";
+  if (allSignals.some((s) => s.includes("TRASFERTA"))) return "travel";
+  if (allSignals.some((s) => s.includes("SERVIZIO ESTERNO"))) return "external";
 
   // If we have no signals at all, it's typically office work (default).
   // If we have signals but they don't match location keywords, it's unknown.
@@ -104,7 +104,10 @@ async function loadMonthFile<T>(dir: string, monthStr: string): Promise<T[]> {
 }
 
 /** Load Teams messages explicitly matching date via .meta.json activeDays property to limit I/O. */
-async function loadTeamsForDate(dir: string, date: string): Promise<TeamsMessageRaw[]> {
+async function loadTeamsForDate(
+  dir: string,
+  date: string,
+): Promise<TeamsMessageRaw[]> {
   const meta = await readMeta(dir);
   const matchedFiles: string[] = [];
 
@@ -119,7 +122,9 @@ async function loadTeamsForDate(dir: string, date: string): Promise<TeamsMessage
     try {
       const raw = await fs.readFile(path.join(dir, file), "utf-8");
       const data = JSON.parse(raw) as TeamsMessageRaw[];
-      allMsgs.push(...data.filter((m) => m.createdDateTime?.slice(0, 10) === date));
+      allMsgs.push(
+        ...data.filter((m) => m.createdDateTime?.slice(0, 10) === date),
+      );
     } catch {
       // Skip missing
     }
@@ -137,7 +142,9 @@ async function loadDirTeams(dir: string): Promise<TeamsMessageRaw[]> {
   }
 
   // Support for both legacy monthly files and newer per-chat files
-  const files = entries.filter((f) => /^\d{4}-\d{2}\.json$/.test(f) || /^(O2O|GRP|MET)__.*\.json$/.test(f));
+  const files = entries.filter(
+    (f) => /^\d{4}-\d{2}\.json$/.test(f) || /^(O2O|GRP|MET)__.*\.json$/.test(f),
+  );
   const all: TeamsMessageRaw[] = [];
 
   for (const file of files) {
@@ -168,8 +175,8 @@ export async function aggregateSingleDay(
       loadMonthFile<CalendarEventRaw>(CAL_DIR, monthStr),
       loadMonthFile<EmailRaw>(EMAIL_DIR, monthStr),
       loadTeamsForDate(TEAMS_DIR, date),
-      loadMonthFile<SvnCommit>(SVN_DIR, monthStr),
-      loadMonthFile<GitCommit>(GIT_DIR, monthStr),
+      loadMonthFile<SvnCommitRaw>(SVN_DIR, monthStr),
+      loadMonthFile<GitCommitRaw>(GIT_DIR, monthStr),
       loadMonthFile<BrowserVisit>(CHROME_DIR, monthStr),
       loadMonthFile<BrowserVisit>(FIREFOX_DIR, monthStr),
       loadMonthFile<NibolBooking>(NIBOL_DIR, monthStr),
@@ -219,8 +226,8 @@ async function run(): Promise<void> {
   const calendar = await loadDirMonthly<CalendarEventRaw>(CAL_DIR);
   const emails = await loadDirMonthly<EmailRaw>(EMAIL_DIR);
   const teams = await loadDirTeams(TEAMS_DIR);
-  const svn = await loadDirMonthly<SvnCommit>(SVN_DIR);
-  const git = await loadDirMonthly<GitCommit>(GIT_DIR);
+  const svn = await loadDirMonthly<SvnCommitRaw>(SVN_DIR);
+  const git = await loadDirMonthly<GitCommitRaw>(GIT_DIR);
   const chromeBrows = await loadDirMonthly<BrowserVisit>(CHROME_DIR);
   const firefoxBrows = await loadDirMonthly<BrowserVisit>(FIREFOX_DIR);
   const nibolAll = await loadDirMonthly<NibolBooking>(NIBOL_DIR);
@@ -236,13 +243,13 @@ async function run(): Promise<void> {
   log.debug(`Nibol: ${nibolAll.length} prenotazioni`);
 
   // Build date-indexed maps for fast lookup
-  const calByDate     = new Map<string, CalendarEventRaw[]>();
-  const emailByDate   = new Map<string, EmailRaw[]>();
-  const teamsByDate   = new Map<string, TeamsMessageRaw[]>();
-  const svnByDate     = new Map<string, SvnCommit[]>();
-  const gitByDate     = new Map<string, GitCommit[]>();
+  const calByDate = new Map<string, CalendarEventRaw[]>();
+  const emailByDate = new Map<string, EmailRaw[]>();
+  const teamsByDate = new Map<string, TeamsMessageRaw[]>();
+  const svnByDate = new Map<string, SvnCommitRaw[]>();
+  const gitByDate = new Map<string, GitCommitRaw[]>();
   const browserByDate = new Map<string, BrowserVisit[]>();
-  const nibolByDate   = new Map<string, NibolBooking>();
+  const nibolByDate = new Map<string, NibolBooking>();
 
   for (const ev of calendar) {
     const d = ev.start?.dateTime?.slice(0, 10);

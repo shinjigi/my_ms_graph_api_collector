@@ -1,4 +1,4 @@
-import { TpOpenItem, TpUserStat, TpTimeEntry } from "./types";
+import { TpOpenItem, TpUserStat, TpTimeEntry } from "@shared/targetprocess";
 
 /**
  * Collezione di prompt per Gemini per l'analisi dei task e dei log

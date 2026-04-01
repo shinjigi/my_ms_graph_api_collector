@@ -45,7 +45,9 @@ async function fetchEmails(
         : await client
             .api("/me/messages")
             .filter(filter)
-            .select("id,subject,from,receivedDateTime,bodyPreview,webLink")
+            .select(
+              "id,subject,from,toRecipients,receivedDateTime,bodyPreview,webLink",
+            )
             .orderby("receivedDateTime desc")
             .top(Math.min(maxItems, 50))
             .get()

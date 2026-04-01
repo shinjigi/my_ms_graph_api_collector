@@ -1,17 +1,8 @@
 {
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2022",
-    "lib": ["ES2022", "ESNext.String", "DOM"],
-    "module": "CommonJS",
-    "moduleResolution": "node",
-    "esModuleInterop": true,
-    "allowJs": true,
     "checkJs": false,
-    "strict": true,
-    "skipLibCheck": true,
     "outDir": "dist",
-    "resolveJsonModule": true,
-    "baseUrl": ".",
     "paths": {
       "@shared/*": ["shared/*"]
     },
