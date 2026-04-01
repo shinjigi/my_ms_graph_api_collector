@@ -13,6 +13,14 @@ export interface AnalyzerProvider {
      */
     readonly maxInputChars: number;
     /**
+     * Maximum number of KB items to include in a single prompt.
+     * Cloud providers with large context windows can handle the full KB list.
+     * Small local models (≤8B params) should declare a low cap (e.g. 20) to
+     * prevent hallucinations caused by long, unfamiliar task lists.
+     * Defaults to Infinity when not declared (no cap beyond the char budget).
+     */
+    readonly kbItemCap?: number;
+    /**
      * Returns true if the provider is configured AND reachable.
      * Performs a lightweight probe call (model list or minimal inference)
      * to confirm the service is up and the credentials are valid.

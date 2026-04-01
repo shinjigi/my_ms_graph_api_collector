@@ -37,7 +37,10 @@ src/analysis/
 ├── analyzer.ts          ← orchestrator: interface, shared logic, analyzeDay(), run()
 ├── base.ts              ← AnalyzerProvider interface, stripCodeFence, tpmToChars
 ├── prompts.ts           ← prompt templates (static text + variable interpolation)
-├── claudeProvider.ts    ← Anthropic API (ClaudeApiProvider) + OpenAI-compat (OpenAiCompatibleProvider) + CLI (ClaudeCliProvider)
+├── claudeApiProvider.ts ← Anthropic API (ClaudeApiProvider)
+├── openAiCompatProvider.ts ← OpenAI-compat / Ollama / LM Studio (OpenAiCompatibleProvider)
+├── claudeCliProvider.ts ← Claude Code CLI (ClaudeCliProvider)
+├── claudeProvider.ts    ← re-export shim (backwards compat only — prefer direct imports)
 └── geminiProvider.ts    ← Google Generative AI SDK (GeminiProvider)
 ```
 

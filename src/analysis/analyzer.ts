@@ -21,12 +21,10 @@ import type { ProposalEntry, DayProposal } from "@shared/analysis";
 import type { KbEntry, KbStore } from "@shared/kb";
 import { SYSTEM_PROMPT, userInstruction } from "./prompts";
 import { createLogger } from "../logger";
-import {
-  ClaudeApiProvider,
-  ClaudeCliProvider,
-  OpenAiCompatibleProvider,
-} from "./claudeProvider";
-import { GeminiProvider } from "./geminiProvider";
+import { ClaudeApiProvider }        from "./claudeApiProvider";
+import { OpenAiCompatibleProvider } from "./openAiCompatProvider";
+import { ClaudeCliProvider }        from "./claudeCliProvider";
+import { GeminiProvider }           from "./geminiProvider";
 export { AnalyzerProvider, stripCodeFence } from "./base";
 
 const log = createLogger("analyzer");
@@ -89,12 +87,30 @@ export function buildUserPromptBatched(
   kbItems: KbEntry[],
   defaults: DefaultsConfig,
 ): string {
-  const activeTasks = kbItems.map((kb) => ({
-    id: kb.id,
-    entityType: kb.entityType,
-    name: kb.name,
-    summary: kb.summary,
-  }));
+  // Extra check for keywords to decide whether to include summaries
+  const keywords = new Set<string>();
+  for (const day of days) {
+      const text = [
+          ...day.gitCommits.map(c => c.message),
+          ...day.svnCommits.map(c => c.message),
+          ...day.calendar.map(e => e.subject)
+      ].join(' ').toLowerCase();
+      const matches = text.match(/\b\w{4,}\b/g) ?? [];
+      for (const m of matches) keywords.add(m);
+  }
+
+  const activeTasks = kbItems.map((kb) => {
+    const entryText = `${kb.name} ${kb.id}`.toLowerCase();
+    const hasMatch = Array.from(keywords).some(kw => entryText.includes(kw));
+    
+    return {
+      id: kb.id,
+      entityType: kb.entityType,
+      name: kb.name,
+      // Only include summary if it's highly relevant to today's keywords
+      summary: hasMatch ? kb.summary : undefined,
+    };
+  });
 
   const daysContext = days.map((day) => {
     const recurringHours = defaults.recurringActivities.reduce(
@@ -197,21 +213,50 @@ function filterKbByPeriod(items: KbEntry[], batchDates: string[]): KbEntry[] {
 }
 
 /** Sorts KB items by relevance to the batch period (most relevant first). */
-function sortKbByRelevance(items: KbEntry[], batchDates: string[]): KbEntry[] {
+function sortKbByRelevance(items: KbEntry[], batch: AggregatedDay[]): KbEntry[] {
+  const batchDates = batch.map(d => d.date);
   if (batchDates.length === 0) return items;
+  
   const batchSet = new Set(batchDates);
   const batchMin = batchDates.reduce((a, b) => (a < b ? a : b));
   const windowDays = Number(process.env["KB_RELEVANCE_WINDOW_DAYS"] ?? 90);
   const windowStart = shiftDate(batchMin, -windowDays);
 
+  // Extract keywords from all signals in the batch to find related KB items
+  const keywords = new Set<string>();
+  for (const day of batch) {
+      const text = [
+          ...day.gitCommits.map(c => c.message),
+          ...day.svnCommits.map(c => c.message),
+          ...day.calendar.map(e => e.subject),
+          day.location
+      ].join(' ').toLowerCase();
+      // Match words with at least 4 characters
+      const matches = text.match(/\b\w{4,}\b/g) ?? [];
+      for (const m of matches) keywords.add(m);
+  }
+
   const score = (e: KbEntry): number => {
     let s = 0;
-    if (e.lastActivityDate) {
-      if (batchSet.has(e.lastActivityDate)) s += 3;
-      else if (e.lastActivityDate >= windowStart) s += 2;
-      else s += 1;
+    
+    // Keyword match (highest boost)
+    const entryText = `${e.name} ${e.summary ?? ""} ${e.id}`.toLowerCase();
+    for (const kw of keywords) {
+        if (entryText.includes(kw)) {
+            s += 10; // Strong relevance
+            break; // Found one is enough for a big boost
+        }
     }
+
+    // Temporal relevance
+    if (e.lastActivityDate) {
+      if (batchSet.has(e.lastActivityDate)) s += 5;
+      else if (e.lastActivityDate >= windowStart) s += 2;
+    }
+    
+    // State relevance
     if (e.isFinalState === false) s += 1;
+    
     return s;
   };
 
@@ -222,11 +267,14 @@ function sortKbByRelevance(items: KbEntry[], batchDates: string[]): KbEntry[] {
   });
 }
 
-/** Truncate KB items to fit within a character budget (for small-context providers). */
-function fitKbItems(items: KbEntry[], budgetChars: number): KbEntry[] {
+/** Truncate KB items to fit within a character budget and the provider's declared item cap. */
+function fitKbItems(items: KbEntry[], budgetChars: number, provider: AnalyzerProvider): KbEntry[] {
   let total = 0;
   const result: KbEntry[] = [];
+  const maxCount = provider.kbItemCap ?? Infinity;
+
   for (const item of items) {
+    if (result.length >= maxCount) break;
     const est = item.name.length + (item.summary?.length ?? 0) + 40;
     if (total + est > budgetChars) break;
     result.push(item);
@@ -246,7 +294,7 @@ export async function analyzeBatch(
 
   const batchDates = batch.map((d) => d.date);
   const filteredKb = filterKbByPeriod(kbItems, batchDates);
-  const sortedKb = sortKbByRelevance(filteredKb, batchDates);
+  const sortedKb = sortKbByRelevance(filteredKb, batch);
   log.info(
     `KB filtrata: ${sortedKb.length}/${kbItems.length} items per il periodo`,
   );
@@ -255,7 +303,7 @@ export async function analyzeBatch(
   for (const provider of providers) {
     // Fit KB items within 60% of the provider's budget — leave the rest for day data + response
     const kbBudgetChars = Math.floor(provider.maxInputChars * 0.6);
-    const kbItemsForProvider = fitKbItems(sortedKb, kbBudgetChars);
+    const kbItemsForProvider = fitKbItems(sortedKb, kbBudgetChars, provider);
     if (kbItemsForProvider.length < sortedKb.length) {
       log.warn(
         `[${provider.name}] KB ridotto: ${kbItemsForProvider.length}/${sortedKb.length} items (budget ${kbBudgetChars} chars)`,
