@@ -4,7 +4,7 @@ import type { Client } from "@microsoft/microsoft-graph-client";
 import { createLogger } from "../../logger";
 
 const log = createLogger("graph-email");
-import { mergeByKey, readMeta, writeMeta, shouldSkipMonth } from "../utils";
+import { mergeByKey, readMeta, writeMeta, shouldSkipMonth } from "../../utils";
 import { EmailRaw } from "@shared/aggregator";
 import {
   dateToString,

@@ -5,7 +5,7 @@ import { createLogger } from "../../logger";
 const log = createLogger("zucchetti-update");
 import { startZucchettiSession } from "./session";
 import { scrapeSingleDay, validateDay, patchRawZucchettiFile } from "./scraper";
-import { aggregateSingleDay } from "../../analysis/aggregator";
+import { aggregateSingleDay } from "../../aggregators/aggregator";
 import type { WeekDayData } from "@shared/week";
 import type { ZucchettiRequestResult } from "@shared/submit";
 import { ZucchettiRequestParams } from "@shared/zucchetti";

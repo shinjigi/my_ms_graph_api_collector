@@ -5,7 +5,7 @@ import { globSync } from "glob";
 import { createLogger } from "../../logger";
 
 const log = createLogger("vcs-git");
-import { mergeByKey, readMeta, writeMeta, shouldSkipMonth } from "../utils";
+import { mergeByKey, readMeta, writeMeta, shouldSkipMonth } from "../../utils";
 import { GitCommitRaw } from "@shared/aggregator";
 import {
   dateToString,
@@ -74,7 +74,7 @@ export async function collectGitCommits(force = false): Promise<string[]> {
   const today = dateToString();
 
   if (roots.length === 0) {
-    console.warn("GIT_ROOTS non configurato — collector Git saltato.");
+    log.warn("GIT_ROOTS non configurato — collector Git saltato.");
     return [];
   }
 

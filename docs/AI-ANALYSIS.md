@@ -37,7 +37,7 @@ flowchart TD
     end
 
     subgraph PROMPT["⑤ Prompt builder  —  analyzer.ts"]
-        AN["extractTaskIds / extractCalendarKeywords\nfilterKbByPeriod\nsortKbByRelevance\nfitKbItems  ← provider.kbItemCap\nbuildSignals ← provider.signalDetail\nbuildUserPromptBatched"]
+        AN["extractTaskIds / extractCalendarKeywords\nfilterKbByPeriod\nsortKbByRelevance\nfitKbItems  ← provider.kbItemCap\nbuildSignals ← provider.signalDetail\nbuildUserPromptBatched\nloadMasterRules ← config/master-rules.md"]
     end
 
     subgraph CHAIN["⑥ Provider chain  —  AnalyzerProvider&#91;&#93;"]
@@ -217,8 +217,10 @@ The `signalDetail` default is `"full"` — providers that do **not** declare the
 
 ```mermaid
 flowchart LR
-    subgraph SystemPrompt["SYSTEM_PROMPT (static)"]
-        SP["Rules:\n1. Output ONLY valid JSON array\n2. One object per day\n3. date + entries fields\n4. Sum of inferredHours == oreTarget\n5. Use all signals to infer tasks\n6. Distribute remaining hours\n7. Keep pre-seeded entries\n8. Skip pre-seeded only if signals\n   explicitly contradict them"]
+    subgraph SystemPrompt["buildSystemPrompt(masterRules?)"]
+        SP["SYSTEM_PROMPT (static rules 1–8)"]
+        MR["## BUSINESS CONTEXT & ALLOCATION RULES\nconfig/master-rules.md content\n(appended only if file exists)"]
+        SP --> MR
     end
 
     subgraph UserPrompt["buildUserPromptBatched(days, kb, defaults, signalDetail)"]
@@ -257,6 +259,23 @@ flowchart LR
 | `svnCommits[].revision/author/date` | Same as above |
 | `zucchetti.*` (raw fields) | Already translated to `oreTarget` + `location` |
 | `nibol.*` | Not relevant for task attribution |
+
+### 5.5 `config/master-rules.md` — runtime business rules
+
+`buildSystemPrompt()` appends the content of `config/master-rules.md` to the base `SYSTEM_PROMPT` under a `## BUSINESS CONTEXT & ALLOCATION RULES` heading. The file is read fresh on every `analyzeBatch()` call — no restart required after edits.
+
+**Behaviour:**
+- File present and non-empty → rules appended to system prompt for all providers.
+- File absent or empty → silently ignored; base `SYSTEM_PROMPT` used unchanged.
+- `analyzer.ts` logs `"Master rules caricate (N chars)"` when the file is loaded.
+
+**Intended content** (see `config/master-rules.md` for the current rules):
+- Default task fallback (BAU project)
+- Recurring / pre-seeded activity overrides (standup, staff meetings, untracked calls)
+- Signal → TP task mappings (Uptrends, TeamCity, Sitecore deploy, Confluence, HR email, Pluralsight, service desk)
+- Commit cross-day attribution heuristic
+- `#NNNNNN` pattern recognition in Teams/email
+- `comment` field quality guidelines
 
 ---
 

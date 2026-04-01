@@ -40,14 +40,14 @@ zucchettiRouter.post("/request", async (req: Request, res: Response) => {
       scrapeAfterSubmit: true, // Always scrape when called from API
     };
 
-    console.log(
+    log.info(
       `[zucchetti-route] Request: ${params.type} on ${params.date} (fullDay=${params.fullDay})`,
     );
     const result = await submitZucchettiRequest(params);
 
     res.json(result);
   } catch (err) {
-    console.error("[zucchetti-route] Unexpected error:", err);
+    log.error("[zucchetti-route] Unexpected error:", err);
     res.status(500).json({ success: false, message: (err as Error).message });
   }
 });

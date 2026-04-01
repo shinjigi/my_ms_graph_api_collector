@@ -43,6 +43,11 @@ export const DEFAULTS_FILE = path.join(
   "config",
   "defaults.json",
 );
+export const MASTER_RULES_FILE = path.join(
+  process.cwd(),
+  "config",
+  "master-rules.md",
+);
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -181,9 +186,19 @@ export async function loadDefaults(): Promise<DefaultsConfig> {
   }
 }
 
+export async function loadMasterRules(): Promise<string | null> {
+  try {
+    const content = (await fs.readFile(MASTER_RULES_FILE, "utf-8")).trim();
+    return content || null;
+  } catch {
+    return null;
+  }
+}
+
 // ─── Prompt building ────────────────────────────────────────────────
-export function buildSystemPrompt(): string {
-  return SYSTEM_PROMPT;
+export function buildSystemPrompt(masterRules?: string | null): string {
+  if (!masterRules) return SYSTEM_PROMPT;
+  return `${SYSTEM_PROMPT}\n\n## BUSINESS CONTEXT & ALLOCATION RULES\n\n${masterRules}`;
 }
 
 // ─── Step 3d: updated buildUserPromptBatched ────────────────────────
@@ -367,7 +382,11 @@ export async function analyzeBatch(
   defaults: DefaultsConfig,
   providers: AnalyzerProvider[],
 ): Promise<DayProposal[]> {
-  const system = buildSystemPrompt();
+  const masterRules = await loadMasterRules();
+  if (masterRules) {
+    log.info(`Master rules caricate (${masterRules.length} chars)`);
+  }
+  const system = buildSystemPrompt(masterRules);
 
   const batchDates = batch.map((d) => d.date);
   const filteredKb = filterKbByPeriod(kbItems, batchDates);

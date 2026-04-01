@@ -17,7 +17,7 @@ import * as dotenv from "dotenv";
 dotenv.config();
 
 import { createLogger } from "../logger";
-import { saveRawResponse } from "../aiRaw";
+import { saveRawResponse } from "../analysers/aiRaw";
 import { TargetprocessClient } from "./client";
 import { dateToString, getISOTimestamp } from "@shared/dates";
 import { AnalysisPrompts } from "./prompts";
@@ -521,7 +521,9 @@ class ReplayProvider implements KbCollectorProvider {
     kbMap: Map<number, KbEntry>,
   ): Promise<void> {
     const raw = await fs.readFile(this.filePath, "utf-8");
-    const record = JSON.parse(raw) as import("../aiRaw").RawResponseRecord;
+    const record = JSON.parse(
+      raw,
+    ) as import("../analysers/aiRaw").RawResponseRecord;
 
     logger.info(`Replay da: ${this.filePath}`);
     logger.info(`  Provider originale : ${record.provider}`);

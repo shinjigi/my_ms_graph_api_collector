@@ -13,8 +13,8 @@ import type { SubmitEdit } from "@shared/submit";
 import { ZucchettiDay } from "@shared/zucchetti";
 import { findHoliday } from "@shared/holidays";
 import { AggregatedDay, NibolBooking } from "@shared/aggregator";
-import { parseZucchettiLocation } from "../../analysis/aggregator";
-import { readMeta } from "../../collectors/utils";
+import { parseZucchettiLocation } from "../../aggregators/aggregator";
+import { readMeta } from "../../utils";
 import { WORKDAY_HOURS } from "@shared/standards";
 
 export const weekRouter = Router();
@@ -44,7 +44,13 @@ interface TpWeekResponse {
   openItems: unknown[];
 }
 
-import { dateToString, currentMonthString, getMonday, shiftDate, parseDateString } from "../../../shared/dates";
+import {
+  dateToString,
+  currentMonthString,
+  getMonday,
+  shiftDate,
+  parseDateString,
+} from "../../../shared/dates";
 
 async function readAggregatedDay(date: string): Promise<AggregatedDay | null> {
   const filePath = path.join(AGG_DIR, `${date}.json`);

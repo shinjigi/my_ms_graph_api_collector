@@ -4,6 +4,7 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import * as dotenv from "dotenv";
 import { parseArgs } from "node:util";
+import { writeMeta } from "../../src/utils";
 
 dotenv.config();
 
@@ -51,18 +52,39 @@ async function main() {
     console.log(`[Nibol] Found ${bookings.length} bookings.`);
     console.table(bookings);
 
-    // Save results to a file for verification
-    const outputPath = path.join(
-      process.cwd(),
-      "data",
-      "nibol_calendar_test.json",
-    );
-    if (!fs.existsSync(path.dirname(outputPath))) {
-      fs.mkdirSync(path.dirname(outputPath), { recursive: true });
+    // Group bookings by month
+    const grouped: Record<string, NibolBooking[]> = {};
+    for (const b of bookings) {
+      if (!b.date) continue;
+      const monthStr = b.date.substring(0, 7);
+      if (!grouped[monthStr]) grouped[monthStr] = [];
+      grouped[monthStr].push(b);
     }
 
-    fs.writeFileSync(outputPath, JSON.stringify(bookings, null, 2));
-    console.log(`[Nibol] Results saved to: ${outputPath}`);
+    const nibolDir = path.join(process.cwd(), "data", "raw", "nibol");
+    if (!fs.existsSync(nibolDir)) {
+      fs.mkdirSync(nibolDir, { recursive: true });
+    }
+
+    const today = new Date().toISOString().slice(0, 10);
+
+    for (const [monthStr, monthBookings] of Object.entries(grouped)) {
+      const outputPath = path.join(nibolDir, `${monthStr}.json`);
+      fs.writeFileSync(outputPath, JSON.stringify(monthBookings, null, 2));
+      console.log(`[Nibol] Results for ${monthStr} saved to: ${outputPath}`);
+
+      // Update metadata (consistent with other collectors)
+      try {
+        await writeMeta(nibolDir, monthStr, {
+          lastExtractedDate: today,
+          sources: ["nibol"],
+        });
+      } catch (err) {
+        console.warn(
+          `[Nibol] Could not update .meta.json: ${(err as Error).message}`,
+        );
+      }
+    }
   }
 }
 

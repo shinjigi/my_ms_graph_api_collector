@@ -17,7 +17,7 @@ import {
   loadKb,
   loadDefaults,
   KB_FILE,
-} from "../../analysis/analyzer";
+} from "../../analysers/analyzer";
 import { DayProposal } from "@shared/analysis";
 import { AggregatedDay } from "@shared/aggregator";
 
@@ -102,11 +102,11 @@ async function runAnalysis(job: AnalysisJob, force: boolean): Promise<void> {
     }
 
     if (daysToProcess.length === 0) {
-      console.log(
+      log.info(
         `[analyze-job ${job.id}] Tutti i giorni già analizzati — nessun nuovo proposal da generare (usa force=true per forzare).`,
       );
     } else {
-      console.log(
+      log.info(
         `[analyze-job ${job.id}] Analisi batch per ${daysToProcess.length} giorni...`,
       );
       try {
@@ -128,7 +128,7 @@ async function runAnalysis(job: AnalysisJob, force: boolean): Promise<void> {
         // Se l'intero batch fallisce, segna errore per tutte le date
         for (const date of daysToProcess.map((d) => d.date)) {
           job.errors[date] = (err as Error).message;
-          console.error(
+          log.error(
             `[analyze-job ${job.id}] Errore per ${date}: ${(err as Error).message}`,
           );
         }

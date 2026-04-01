@@ -16,8 +16,8 @@ import * as path from "node:path";
 
 import { collectZucchetti } from "../../collectors/zucchetti/index";
 import { collectNibol } from "../../collectors/nibol/index";
-import { aggregateSingleDay } from "../../analysis/aggregator";
-import { readMeta } from "../../collectors/utils";
+import { aggregateSingleDay } from "../../aggregators/aggregator";
+import { readMeta } from "../../utils";
 import { ZucchettiDay } from "@shared/zucchetti";
 import { getMonday, shiftDate, currentMonthString } from "@shared/dates";
 
@@ -39,7 +39,6 @@ interface SyncResponse {
   aggregated: string[]; // dates successfully re-aggregated
   errors: string[];
 }
-
 
 /** Reads a Zucchetti monthly raw file and returns its day entries. */
 async function loadZucchettiMonth(month: string): Promise<ZucchettiDay[]> {
@@ -84,7 +83,7 @@ syncRouter.post("/", async (req: Request, res: Response) => {
   } else {
     const monday = getMonday(date);
     for (let i = 0; i < 5; i++) {
-        dates.push(shiftDate(monday, i));
+      dates.push(shiftDate(monday, i));
     }
   }
 
