@@ -57,7 +57,7 @@ export const useTimesheetStore = defineStore(
         ]);
 
         currentMonday.value = weekRes.monday;
-        log.info(
+        console.log(
           "[TS] fetchWeekData:",
           date,
           "monday:",
@@ -83,7 +83,7 @@ export const useTimesheetStore = defineStore(
             holidayName: d.holidayName,
           };
         });
-        log.info(
+        console.log(
           "[TS] days mapped:",
           days.value.map((d) => d.date),
         );
@@ -142,7 +142,7 @@ export const useTimesheetStore = defineStore(
         // Set weekData last — triggers useDayStore watcher after active/pinned are populated
         weekData.value = weekRes;
       } catch (err) {
-        log.warn(
+        console.warn(
           "fetchWeekData failed, falling back to mock data:",
           (err as Error).message,
         );

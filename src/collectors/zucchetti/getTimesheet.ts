@@ -110,10 +110,10 @@ void (async () => {
     allResults.push({ month, year, header, days: validatedData });
   }
 
-  log.info("--- START JSON ---");
+  console.log("--- START JSON ---");
   // If multiple months, return as array of months
   if (allResults.length === 1) {
-    log.info(
+    console.log(
       JSON.stringify(
         { header: allResults[0].header, days: allResults[0].days },
         null,
@@ -121,9 +121,9 @@ void (async () => {
       ),
     );
   } else {
-    log.info(JSON.stringify(allResults, null, 2));
+    console.log(JSON.stringify(allResults, null, 2));
   }
-  log.info("--- END JSON ---");
+  console.log("--- END JSON ---");
 
   await browser.close();
 })();
