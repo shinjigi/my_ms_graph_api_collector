@@ -114,10 +114,14 @@ export const useTimesheetStore = defineStore(
           svn: Array.from({ length: 7 }, (_, i) => svnCounts.get(`${e.tpId}_${i}`) ?? 0),
         }));
 
-        // Items with at least one hour logged (server or local edits) → active
-        // Items with no hours yet → pinned
+        // Partition rows: Active (has hours or local edits) vs Pinned (empty)
         const isRowActive = (r: TsRow) => {
-            return [0,1,2,3,4].some(i => getHours(r.tpId, i) > 0);
+            // Check local edits first
+            for (let i = 0; i < 5; i++) {
+                if (hoursEdits.value[`${r.tpId}_${i}`] > 0) return true;
+            }
+            // Then check server hours in the record we just built
+            return (r.hours as number[]).slice(0, 5).some(h => h > 0);
         };
 
         active.value = allRows.filter(isRowActive);
