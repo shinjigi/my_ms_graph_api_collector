@@ -10,6 +10,7 @@ dotenv.config();
 import express from "express";
 import cors from "cors";
 import { getISOTimestamp } from "@shared/dates";
+import { log } from "../logger";
 
 import { proposalsRouter } from "./routes/proposals";
 import { submitRouter } from "./routes/submit";
@@ -19,6 +20,7 @@ import { zucchettiRouter } from "./routes/zucchetti";
 import { analyzeRouter } from "./routes/analyze";
 import { signalsRouter } from "./routes/signals";
 import { syncRouter } from "./routes/sync";
+
 
 const app = express();
 const PORT = Number(process.env["SERVER_PORT"] ?? 3001);
