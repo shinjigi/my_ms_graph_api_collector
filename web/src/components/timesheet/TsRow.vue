@@ -161,12 +161,12 @@ function computeCellMode(i: number): CellMode {
     const hours   = ts.getHours(props.row.tpId, i);
 
     // If day is balanced, hide pulsating hints (hint-only) for tasks without hours
-    if (Math.abs(ts.totalsRow.delta[i]) < 0.05 && (!hasEdit || hours === 0))
+    if (Math.abs(ts.totalsRow.delta[i]) < 0.05 && hours === 0)
         return 'clean';
 
     if (!hint || hint.inferredHours <= 0)
         return hasEdit && hours > 0 ? 'user-edit' : 'clean';
-    if (!hasEdit || hours === 0) return 'hint-only';
+    if (hours === 0) return 'hint-only';
     if (+hours.toFixed(1) === +hint.inferredHours.toFixed(1)) return 'hint-match';
     return 'hint-differ';
 }

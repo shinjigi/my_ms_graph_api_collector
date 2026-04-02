@@ -12,7 +12,7 @@ dotenv.config();
 import { hhmmToHours, groupTpEntriesByTask, parseTpDate } from "../targetprocess/format";
 import { createLogger } from "../logger";
 import { readMeta } from "../utils";
-import { ZucchettiDay, isWorkday, parseZucchettiLocation } from "@shared/zucchetti";
+import { ZucchettiDay, isWorkday, parseZucchettiLocation, calculateAbsenceHours } from "@shared/zucchetti";
 import { dateToString, extractMonthStr } from "@shared/dates";
 import { WORKDAY_HOURS } from "@shared/standards";
 import { TpTimeEntry } from "@shared/targetprocess";
@@ -102,7 +102,13 @@ export function buildAggregatedDay(
   const workday = isWorkday(zDay);
   const isComplete = date < dateToString();
   const rawOre = zDay.hOrd ? hhmmToHours(zDay.hOrd) : null;
-  const oreTarget = workday ? (rawOre ?? WORKDAY_HOURS) : 0;
+  const assenze = calculateAbsenceHours(zDay);
+  
+  // Se Zucchetti ha valorizzato hOrd (es. 3:51), è il target reale di lavoro per quel giorno.
+  // Se hOrd è vuoto ma è un giorno lavorativo, fall-back a 7.7 meno eventuali assenze.
+  const oreTarget = rawOre !== null 
+    ? rawOre 
+    : (workday ? Math.max(0, WORKDAY_HOURS - assenze) : 0);
 
   return {
     date,

@@ -1,6 +1,7 @@
 /** Shared utility functions — single source of truth. */
 
 import type { ZucchettiJustification } from "@shared/zucchetti";
+import { ABSENCE_KEYWORDS } from "@shared/zucchetti";
 import type { Day } from "./types";
 
 const STATE_COLORS: Record<string, string> = {
@@ -59,7 +60,7 @@ export function locationTitle(location: Day["location"]): string {
 
 /** Maps giustificativi to activity emojis, excluding location-related entries. */
 const ACTIVITY_PATTERNS: Array<{ match: RegExp; emoji: string }> = [
-  { match: /FERIE|EX FESTIVITA|RIPOSO COMPENSATIVO/i, emoji: "🏖️" },
+  { match: new RegExp(ABSENCE_KEYWORDS.join("|"), "i"), emoji: "🏖️" },
   { match: /MALATTIA/i, emoji: "🤒" },
   { match: /VISITA MEDICA/i, emoji: "🩺" },
   { match: /DONAZIONE SANGUE/i, emoji: "🩸" },

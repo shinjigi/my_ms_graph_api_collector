@@ -22,11 +22,11 @@
         </button>
 
         <button class="btn btn-xs btn-outline btn-primary gap-1"
-                :disabled="pendingEditsCount === 0"
+                :disabled="pendingSubmissionsCount === 0"
                 @click="submitPopover?.open()"
-                :title="pendingEditsCount === 0 ? 'Nessuna modifica da inviare' : 'Invia ore a TargetProcess'">
+                :title="pendingSubmissionsCount === 0 ? 'Nessuna modifica da inviare' : 'Invia ore a TargetProcess'">
             Invia a TP
-            <span v-if="pendingEditsCount > 0" class="badge badge-xs badge-primary">{{ pendingEditsCount }}</span>
+            <span v-if="pendingSubmissionsCount > 0" class="badge badge-xs badge-primary">{{ pendingSubmissionsCount }}</span>
         </button>
 
         <!-- Feedback messages -->
@@ -105,25 +105,5 @@ watch(() => analysis.status?.status, (newStatus) => {
 });
 
 // ---- Pending count ----
-
-const pendingEditsCount = computed(() => {
-    const editCount = Object.values(ts.hoursEdits).filter(h => h > 0).length;
-    const monday    = ts.currentMonday;
-    if (!monday) return editCount;
-
-    let hintCount = 0;
-    for (let i = 0; i < 5; i++) {
-        // Skip days that are already balanced (total reported = target)
-        if (Math.abs(ts.totalsRow.delta[i]) < 0.05) continue;
-
-        for (const row of [...ts.active, ...ts.pinned]) {
-            if (`${row.tpId}_${i}` in ts.hoursEdits) continue;
-            const hint = analysis.getHint(row.tpId, i, monday);
-            if (hint && hint.inferredHours > 0) {
-                hintCount++;
-            }
-        }
-    }
-    return editCount + hintCount;
-});
+const pendingSubmissionsCount = computed(() => ts.pendingSubmissions.length);
 </script>

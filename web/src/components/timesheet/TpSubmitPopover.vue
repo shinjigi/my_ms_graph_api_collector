@@ -1,6 +1,6 @@
 <template>
     <dialog ref="dialog" class="modal modal-bottom sm:modal-middle">
-        <div class="modal-box max-w-lg p-4">
+        <div class="modal-box max-w-2xl p-4">
             <button class="btn btn-sm btn-circle btn-ghost absolute right-2 top-2" @click="close">✕</button>
             <h3 class="font-bold text-base mb-3">Invia a TargetProcess</h3>
 
@@ -10,55 +10,58 @@
             </div>
 
             <!-- Entries grouped by day -->
-            <div v-else class="space-y-4 mb-4 max-h-80 overflow-y-auto pr-1">
+            <div v-else class="space-y-4 mb-4 max-h-[70vh] overflow-y-auto pr-1">
                 <div v-for="group in grouped" :key="group.dayIdx">
-                    <div class="text-xs font-semibold text-base-content/50 uppercase tracking-wide mb-1.5">
+                    <div class="text-xs font-semibold text-base-content/50 uppercase tracking-wide mb-1.5 border-b border-base-content/5 pb-1">
                         {{ group.label }}
                     </div>
-                    <div v-for="e in group.entries" :key="e.key" class="flex items-center gap-2 mb-1.5">
+                    <div v-for="e in group.entries" :key="e.key" class="flex items-start gap-3 mb-3">
                         <div class="flex-1 min-w-0">
-                            <div class="text-xs text-base-content/55 truncate mb-0.5 flex items-center gap-1">
-                                {{ e.us }}
-                                <span v-if="e.isHint"
-                                      class="badge badge-xs badge-secondary shrink-0"
-                                      :title="`AI (${e.confidence})`">AI</span>
+                            <div class="text-[11px] text-base-content/60 truncate mb-1 flex items-center gap-1.5">
+                                <span class="font-bold text-base-content/80">#{{ e.tpId }}</span>
+                                <span>{{ e.us }}</span>
+                                <span v-if="e.status" 
+                                      class="badge badge-xs"
+                                      :class="e.status === 'suggested' ? 'badge-secondary opacity-70' : 'badge-ghost'">
+                                    {{ e.status }}
+                                </span>
                             </div>
                             <input
                                 type="text"
-                                class="input input-xs input-bordered w-full"
+                                class="input input-xs input-bordered w-full h-7 text-[11px]"
                                 :class="{ 'input-error': showErrors && !noteFor(e).trim() }"
                                 :placeholder="e.isHint && e.hintComment ? e.hintComment : 'Descrizione...'"
                                 :value="noteFor(e)"
                                 @input="ts.setNote(e.tpId, e.dayIdx, ($event.target as HTMLInputElement).value)"
                             />
                         </div>
-                        <span class="text-xs font-bold text-success shrink-0 w-8 text-right">{{ e.hours }}h</span>
+                        <span class="text-xs font-bold text-success shrink-0 w-10 text-right mt-5">{{ e.hours }}h</span>
                     </div>
                 </div>
             </div>
 
             <!-- Validation warning -->
-            <div v-if="showErrors && missingNotes > 0" class="text-xs text-warning mb-2">
-                ⚠ {{ missingNotes }} entr{{ missingNotes > 1 ? 'ate' : 'ata' }} senza descrizione
+            <div v-if="showErrors && missingNotes > 0" class="text-xs text-warning mb-2 bg-warning/10 p-2 rounded border border-warning/20">
+                ⚠ {{ missingNotes }} entr{{ missingNotes > 1 ? 'ate' : 'ata' }} senza descrizione. La descrizione è obbligatoria per TP.
             </div>
 
             <!-- Submit feedback -->
-            <div v-if="submitMsg" class="text-xs mb-2" :class="submitMsgCls">{{ submitMsg }}</div>
+            <div v-if="submitMsg" class="text-xs mb-2 p-2 rounded bg-base-200" :class="submitMsgCls">{{ submitMsg }}</div>
 
             <!-- Actions -->
-            <div class="modal-action mt-2 flex items-center">
+            <div class="modal-action mt-2 flex items-center gap-2">
                 <button class="btn btn-xs btn-ghost text-error/60 hover:text-error mr-auto"
                         :disabled="grouped.length === 0 || submitting"
                         @click="doReset">
-                    ✕ Reset
+                    ✕ Cancella bozze
                 </button>
-                <button class="btn btn-sm btn-ghost" @click="close">Chiudi</button>
-                <button class="btn btn-sm btn-primary gap-1 ml-1"
+                <button class="btn btn-sm btn-ghost" @click="close">Annulla</button>
+                <button class="btn btn-sm btn-primary gap-2 min-w-[120px]"
                         :disabled="grouped.length === 0 || submitting"
                         @click="doSubmit">
                     <span v-if="submitting" class="loading loading-spinner loading-xs"></span>
-                    <span v-else>Invia ↗</span>
-                    <span v-if="totalEntries > 0" class="badge badge-xs badge-primary-content ml-0.5">{{ totalEntries }}</span>
+                    <span v-else>Invia a TP ↗</span>
+                    <span v-if="totalEntries > 0" class="badge badge-xs badge-primary-content">{{ totalEntries }}</span>
                 </button>
             </div>
         </div>
@@ -83,9 +86,9 @@ interface EntryRow {
     dayIdx:       number;
     us:           string;
     hours:        number;
-    isHint:       boolean;        // true = origine AI (non ancora materializzato)
+    isHint:       boolean;        
     hintComment?: string;
-    confidence?:  'high' | 'medium' | 'low';
+    status?:      string;
 }
 
 interface DayGroup {
@@ -94,47 +97,23 @@ interface DayGroup {
     entries: EntryRow[];
 }
 
-/** Builds the display rows from hoursEdits AND pending AI hints. */
+/** Group pending items by day for a cleaner UI */
 const grouped = computed((): DayGroup[] => {
-    const allRows = [...ts.active, ...ts.pinned];
-    const monday  = ts.currentMonday;
-    const byDay   = new Map<number, EntryRow[]>();
+    const byDay = new Map<number, EntryRow[]>();
 
-    const add = (e: EntryRow) => {
+    for (const e of ts.pendingSubmissions as any[]) {
         if (!byDay.has(e.dayIdx)) byDay.set(e.dayIdx, []);
-        byDay.get(e.dayIdx)!.push(e);
-    };
-
-    // 1. Explicit user edits
-    for (const [key, hours] of Object.entries(ts.hoursEdits)) {
-        if (!hours || hours <= 0) continue;
-        const [tpIdStr, dayIdxStr] = key.split('_');
-        const tpId   = Number(tpIdStr);
-        const dayIdx = Number(dayIdxStr);
-        if (dayIdx < 0 || dayIdx > 4) continue;
-        const row  = allRows.find(r => r.tpId === tpId);
-        const hint = monday ? analysis.getHint(tpId, dayIdx, monday) : null;
-        add({ key, tpId, dayIdx,
-              us: row ? `#${tpId} — ${row.us}` : `#${tpId}`,
-              hours, isHint: false, confidence: hint?.confidence });
-    }
-
-    // 2. Pending AI hints not yet touched by the user
-    if (monday) {
-        for (let i = 0; i < 5; i++) {
-            for (const row of allRows) {
-                const key = `${row.tpId}_${i}`;
-                if (key in ts.hoursEdits) continue;
-                const hint = analysis.getHint(row.tpId, i, monday);
-                if (!hint || hint.inferredHours <= 0) continue;
-                add({ key, tpId: row.tpId, dayIdx: i,
-                      us: `#${row.tpId} — ${row.us}`,
-                      hours: hint.inferredHours,
-                      isHint: true,
-                      hintComment: hint.comment,
-                      confidence: hint.confidence });
-            }
-        }
+        
+        byDay.get(e.dayIdx)!.push({
+            key:          `${e.tpId}_${e.dayIdx}`,
+            tpId:         e.tpId,
+            dayIdx:       e.dayIdx,
+            us:           e.usName,
+            hours:        e.hours,
+            isHint:       e.isHint,
+            hintComment:  e.isHint ? e.description : undefined,
+            status:       e.status,
+        });
     }
 
     return [...byDay.keys()].sort((a, b) => a - b).map(dayIdx => {
@@ -147,9 +126,7 @@ const grouped = computed((): DayGroup[] => {
     });
 });
 
-const totalEntries = computed(() =>
-    grouped.value.reduce((sum, g) => sum + g.entries.length, 0),
-);
+const totalEntries = computed(() => ts.pendingSubmissions.length);
 
 function noteFor(e: EntryRow): string {
     const stored = ts.getNote(e.tpId, e.dayIdx);
@@ -160,10 +137,9 @@ function noteFor(e: EntryRow): string {
 
 const missingNotes = computed(() => {
     let count = 0;
-    for (const g of grouped.value) {
-        for (const e of g.entries) {
-            if (!noteFor(e).trim()) count++;
-        }
+    for (const e of ts.pendingSubmissions as any[]) {
+        const note = ts.getNote(e.tpId, e.dayIdx) || (e.isHint ? e.description : "");
+        if (!note || !note.trim()) count++;
     }
     return count;
 });
@@ -176,33 +152,17 @@ const submitMsg    = ref('');
 const submitMsgCls = ref('text-success');
 
 async function doSubmit() {
-    if (grouped.value.length === 0 || submitting.value) return;
+    if (totalEntries.value === 0 || submitting.value) return;
     showErrors.value = true;
     if (missingNotes.value > 0) return;
-
-    // Materialize hint-only entries in hoursEdits/noteEdits so buildEdits() includes them
-    for (const g of grouped.value) {
-        for (const e of g.entries) {
-            if (!e.isHint) continue;
-            ts.setHours(e.tpId, e.dayIdx, e.hours);
-            const n = noteFor(e);
-            if (n) ts.setNote(e.tpId, e.dayIdx, n);
-            // After materializing, they are no longer "hints" in the next re-render
-        }
-    }
 
     submitting.value = true;
     submitMsg.value  = '';
     try {
-        const result = await ts.submitWeekHours();
-        if (result.errors.length === 0) {
-            submitMsg.value    = `✓ ${result.submitted} ore inviate`;
-            submitMsgCls.value = 'text-success';
-            setTimeout(() => close(), 2000);
-        } else {
-            submitMsg.value    = `⚠ ${result.submitted} ok, ${result.errors.length} errori`;
-            submitMsgCls.value = 'text-warning';
-        }
+        await ts.submitWeekHours();
+        submitMsg.value    = `✓ Ore inviate con successo`;
+        submitMsgCls.value = 'text-success';
+        setTimeout(() => close(), 2000);
     } catch (err) {
         submitMsg.value    = `✗ ${(err as Error).message}`;
         submitMsgCls.value = 'text-error';

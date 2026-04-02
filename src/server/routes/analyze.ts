@@ -18,7 +18,7 @@ import {
   loadDefaults,
   KB_FILE,
 } from "../../analysers/analyzer";
-import { AnalysisJobStatus } from "@shared/analysis";
+import { AnalysisJobStatus, DayProposal, ProposalEntry } from "@shared/analysis";
 import { AggregatedDay } from "@shared/aggregator";
 import { createLogger } from "../../logger";
 import { TargetprocessClient } from "../../targetprocess/client";
@@ -130,8 +130,27 @@ async function runAnalysis(job: AnalysisJobStatus & { id: string }, force: boole
           providers,
         );
         for (const proposal of proposals) {
+          const propPath = path.join(PROPOSALS_DIR, `${proposal.date}.json`);
+
+          // Data integrity: merge user-set statuses/approvals from existing file
+          try {
+            const raw = await fs.readFile(propPath, "utf-8");
+            const old = JSON.parse(raw) as DayProposal;
+            if (old.entries) {
+              for (const e of proposal.entries) {
+                const oe = old.entries.find((x: ProposalEntry) => x.taskId === e.taskId);
+                if (oe) {
+                  if (oe.status) e.status = oe.status;
+                  if (oe.approved != null) e.approved = oe.approved;
+                }
+              }
+            }
+          } catch {
+            /* no existing file or invalid — ignore */
+          }
+
           await fs.writeFile(
-            path.join(PROPOSALS_DIR, `${proposal.date}.json`),
+            propPath,
             JSON.stringify(proposal, null, 2),
             "utf-8",
           );
