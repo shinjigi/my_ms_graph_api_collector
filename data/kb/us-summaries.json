@@ -1,0 +1,2107 @@
+{
+  "updatedAt": "2026-04-01T16:15:28.468Z",
+  "items": [
+    {
+      "id": 329301,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "SATISPAY BE new pending field and scheduler",
+      "summary": "This task involves the development of a new pending field and scheduler for the Satispay backend system. The work consists of technical implementation and unit testing to ensure the scheduler functions correctly within the BAU framework. Initial development and testing cycles are ongoing.",
+      "tags": [
+        "Satispay",
+        "Backend",
+        "Scheduler",
+        "Development",
+        "Unit-Testing",
+        "BAU",
+        "Team-ITA-Web",
+        "API",
+        "Integration",
+        "Field-Management"
+      ],
+      "userActivities": {
+        "Luigi De Pinto": "Contributed to the development and testing of the new pending field and scheduler functionality."
+      },
+      "stakeholders": [
+        "Luigi De Pinto"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.463Z",
+      "createDate": "2026-04-01",
+      "currentState": "Development / Unit test",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-04-01",
+      "lastActivityDate": "2026-04-01"
+    },
+    {
+      "id": 329300,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Formazione 2026 IA AI agenti conseguenze ~ opportunità",
+      "summary": "This task focuses on knowledge sharing and training regarding AI agents and their impact, risks, and opportunities for 2026. The team is conducting sessions to evaluate AI tools, establish quality control guidelines, and explore the use of AI in testing, design, and documentation. The project aims to integrate agentic workflows into existing development processes.",
+      "tags": [
+        "AI-Agents",
+        "Training",
+        "Innovation",
+        "Development",
+        "Quality-Control",
+        "Playwright",
+        "Workflow-Optimization",
+        "Documentation",
+        "Prompt-Engineering",
+        "Team-Collaboration"
+      ],
+      "userActivities": {
+        "Luigi De Pinto": "Participated in AI training and explored n8n workflows and Gemini integration."
+      },
+      "stakeholders": [
+        "Luigi De Pinto",
+        "Marco Anselmo",
+        "Nicola Achille",
+        "Matteo",
+        "Chiara Bonasi",
+        "Sara Fiano",
+        "Susanna Castelletti",
+        "Flavio Passera"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.463Z",
+      "createDate": "2026-04-01",
+      "currentState": "Inception",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-04-01",
+      "lastActivityDate": "2026-04-01"
+    },
+    {
+      "id": 329137,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Food app (scan) - bug and release #2026",
+      "summary": "This task tracks bugs and release preparations for the Food app scan feature for 2026. The team is addressing additive updates to specific food additives (E500, E322) to ensure compliance and functionality. Planning phases and meeting coordination are currently in progress.",
+      "tags": [
+        "Food-App",
+        "Bug-Fixing",
+        "Release-Management",
+        "Scan-Feature",
+        "Additive-Tracking",
+        "E500",
+        "E322",
+        "Maintenance",
+        "Compliance",
+        "Planning"
+      ],
+      "userActivities": {
+        "Luigi De Pinto": "Attended meetings to coordinate additive updates for the food scanning module."
+      },
+      "stakeholders": [
+        "Luigi De Pinto"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.463Z",
+      "createDate": "2026-03-27",
+      "currentState": "Planned",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-03-27",
+      "lastActivityDate": "2026-03-27"
+    },
+    {
+      "id": 328787,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "AI - Test altroconsumo page",
+      "summary": "This task involves the evaluation of AI-driven testing tools for the Altroconsumo page. The team is experimenting with the 'Antigravity' tool, creating test scenarios, and setting up comparison sections to validate its reliability. This activity supports the broader goal of modernizing the testing infrastructure.",
+      "tags": [
+        "AI-Testing",
+        "Antigravity",
+        "Automation",
+        "Development",
+        "Page-Testing",
+        "QA",
+        "Docker",
+        "Integration",
+        "Testing-Framework",
+        "Workspaces"
+      ],
+      "userActivities": {
+        "Michela Della Misericordia": "Created and tested new sections and comparison pages while configuring the Antigravity testing environment.",
+        "Luigi De Pinto": "Assisted in setting up the testing environment using Docker."
+      },
+      "stakeholders": [
+        "Michela Della Misericordia",
+        "Luigi De Pinto"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.464Z",
+      "createDate": "2026-03-20",
+      "currentState": "Inception",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-03-20",
+      "lastActivityDate": "2026-03-27"
+    },
+    {
+      "id": 327355,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Scraper - FS treni prezzi",
+      "summary": "This task focuses on the development and maintenance of a web scraper tool to monitor FS train ticket prices. The project involves configuring server-side environments (Python/JS), setting up Azure functions, and implementing email alerting mechanisms based on price thresholds. It requires ongoing monitoring and refinement of the automated data flow.",
+      "tags": [
+        "Scraping",
+        "Python",
+        "JavaScript",
+        "Azure-Functions",
+        "Automation",
+        "Monitoring",
+        "Alerting",
+        "Docker",
+        "Backend-Development",
+        "Terraform"
+      ],
+      "userActivities": {
+        "Flavio Passera": "Provided extensive support, requirements gathering, and feedback on AI tool evaluation for scraping.",
+        "Luigi De Pinto": "Developed the backend logic, configured the scraping environment, and implemented the automated alert flow."
+      },
+      "stakeholders": [
+        "Flavio Passera",
+        "Luigi De Pinto"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.464Z",
+      "createDate": "2026-02-23",
+      "currentState": "Inception",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-02-23",
+      "lastActivityDate": "2026-03-31"
+    },
+    {
+      "id": 327244,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "AI Knowledge Exchange - Sharing Sessions #2026",
+      "summary": "This task comprises a series of knowledge-sharing sessions focused on AI advancements for the year 2026. The objective is to disseminate expertise across the team, share experiences with AI tools like TAHLIA, and discuss practical applications. These sessions promote cross-team learning and alignment on new technology adoption.",
+      "tags": [
+        "Knowledge-Sharing",
+        "AI-Tools",
+        "Team-Alignment",
+        "TAHLIA",
+        "2026-Strategy",
+        "Collaboration",
+        "Professional-Development",
+        "Technical-Exchange",
+        "Innovation",
+        "Inception"
+      ],
+      "userActivities": {
+        "Flavio Passera": "Facilitated the AI knowledge sharing session.",
+        "Marco Anselmo": "Participated in the AI meeting.",
+        "Michela Della Misericordia": "Participated in the AI knowledge sharing session.",
+        "Luigi De Pinto": "Participated in the AI knowledge sharing session."
+      },
+      "stakeholders": [
+        "Flavio Passera",
+        "Marco Anselmo",
+        "Michela Della Misericordia",
+        "Luigi De Pinto"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.464Z",
+      "createDate": "2026-02-19",
+      "currentState": "Inception",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-02-19",
+      "lastActivityDate": "2026-02-19"
+    },
+    {
+      "id": 324913,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "PC emails network TP #2026",
+      "summary": "This task covers routine maintenance, hardware/software updates, and technical support for team workstations. Activities include troubleshooting network/VPN issues, driver updates, and resolving Outlook/Teams connectivity problems to ensure team productivity. The work is distributed across the entire team to minimize downtime.",
+      "tags": [
+        "Hardware-Maintenance",
+        "Software-Updates",
+        "IT-Support",
+        "Workstation-Config",
+        "Network-Troubleshooting",
+        "Windows-Updates",
+        "Docker",
+        "Driver-Management",
+        "Infrastructure",
+        "Productivity"
+      ],
+      "userActivities": {
+        "Flavio Passera": "Managed extensive PC maintenance, software updates, and IT helpdesk tasks throughout the period.",
+        "Michela Della Misericordia": "Handled network, VPN, and system update issues on her workstation.",
+        "Marco Anselmo": "Performed PC maintenance, formatting, and data migration due to persistent system issues.",
+        "Nicola Achille": "Provided support and resolved local configuration issues, including Docker and SQL server setups.",
+        "Marcella Nardone": "Reported and resolved PC-related performance problems.",
+        "Luigi De Pinto": "Performed routine software and system updates.",
+        "Sara Fiano": "Completed administrative tasks related to workstation updates and email management."
+      },
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Flavio Passera",
+        "Michela Della Misericordia",
+        "Marco Anselmo",
+        "Nicola Achille",
+        "Marcella Nardone",
+        "Luigi De Pinto",
+        "Sara Fiano"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.464Z",
+      "createDate": "2026-01-07",
+      "currentState": "Inception",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-01-07",
+      "lastActivityDate": "2026-04-03"
+    },
+    {
+      "id": 324911,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Staff company meetings #2026",
+      "summary": "This task manages the coordination and participation of staff in company-wide meetings, daily stand-ups, and training sessions for 2026. This includes explicitly the daily morning syncs and agile standup ceremonies that happen every morning for team alignment. Activities include strategic planning, cybersecurity training, and team feedback loops.",
+      "tags": [
+        "Company-Meetings",
+        "Standups",
+        "Training",
+        "Strategy",
+        "Professional-Development",
+        "Coordination",
+        "Feedback",
+        "Planning",
+        "Objectives",
+        "Daily-Standup",
+        "Morning-Sync",
+        "Team-Alignment",
+        "Agile-Ceremonies"
+      ],
+      "userActivities": {
+        "Michela Della Misericordia": "Participated in daily stand-ups and cybersecurity training sessions.",
+        "Flavio Passera": "Led and attended numerous stand-ups and professional training workshops.",
+        "Susanna Castelletti": "Attended regular stand-ups and goal-setting sessions.",
+        "Marco Anselmo": "Engaged in daily stand-ups, AI security meetings, and corporate conventions.",
+        "Nicola Achille": "Attended regular stand-ups and AI-related team meetings.",
+        "Marcella Nardone": "Attended stand-ups and corporate meetings regarding AI strategy.",
+        "Sara Fiano": "Participated in HR and company-wide meetings and daily stand-ups.",
+        "Luigi De Pinto": "Attended professional training, staff meetings, and team alignment sessions."
+      },
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Michela Della Misericordia",
+        "Flavio Passera",
+        "Susanna Castelletti",
+        "Marco Anselmo",
+        "Nicola Achille",
+        "Marcella Nardone",
+        "Sara Fiano",
+        "Luigi De Pinto"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.464Z",
+      "createDate": "2026-01-07",
+      "currentState": "Inception",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-01-07",
+      "lastActivityDate": "2026-04-03"
+    },
+    {
+      "id": 321222,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Iac - Landing pages campaigns",
+      "summary": "This task involves the development and deployment of landing pages and UI components for new campaigns. The work includes Sitecore integration, bug fixes, testing, and release management to ensure a smooth user experience across various campaign pages. The team focused on component-based design and efficient routing.",
+      "tags": [
+        "Landing-Pages",
+        "Sitecore",
+        "Campaigns",
+        "UI-Development",
+        "Frontend",
+        "Testing",
+        "Deployment",
+        "Component-Design",
+        "Bug-Fixing",
+        "SEO-Optimization"
+      ],
+      "userActivities": {
+        "Marco Anselmo": "Led the development and testing of landing page components and sitecore integration.",
+        "Sara Fiano": "Created designs for the landing pages and updated site assets.",
+        "Luigi De Pinto": "Provided technical fixes and handled asset versioning issues in Sitecore."
+      },
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Marco Anselmo",
+        "Sara Fiano",
+        "Luigi De Pinto"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.464Z",
+      "createDate": "2025-10-22",
+      "currentState": "Development / Unit test",
+      "isFinalState": false,
+      "lastStateChangeDate": "2025-10-22",
+      "lastActivityDate": "2026-03-19"
+    },
+    {
+      "id": 321215,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Iac Campagne - back end",
+      "summary": "This task focuses on the backend development and integration of services for IaC campaigns. The team worked on enrollment fixes, data management, and report generation for marketing teams. Activities included code reviews, integration testing in acceptance environments, and finalizing service mappings.",
+      "tags": [
+        "Backend-Development",
+        "IaC-Campaigns",
+        "Reporting",
+        "Service-Integration",
+        "Database-Management",
+        "Unit-Testing",
+        "Deployment",
+        "Sitecore",
+        "Data-Mapping",
+        "Code-Review"
+      ],
+      "userActivities": {
+        "Susanna Castelletti": "Coordinated technical meetings and performed testing/fixes in the acceptance environment.",
+        "Nicola Achille": "Developed and tested APIs, managed report generation, and fixed enrollment service issues.",
+        "Flavio Passera": "Facilitated technical meetings and recap sessions.",
+        "Marco Anselmo": "Conducted testing, performed code reviews in Sitecore, and updated NuGet dependencies.",
+        "Luigi De Pinto": "Applied fixes specifically for petition-related functionalities."
+      },
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Susanna Castelletti",
+        "Nicola Achille",
+        "Flavio Passera",
+        "Marco Anselmo",
+        "Luigi De Pinto"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.464Z",
+      "createDate": "2025-10-22",
+      "currentState": "Development / Unit test",
+      "isFinalState": false,
+      "lastStateChangeDate": "2025-10-22",
+      "lastActivityDate": "2026-03-20"
+    },
+    {
+      "id": 319409,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "AssetVersioning updates and migration",
+      "summary": "This task involves the analysis and migration planning for asset versioning updates. The goal is to improve the way assets are handled within the platform, ensuring better version control and stability. Initial efforts include a local proof-of-concept (PoC) to validate the new approach.",
+      "tags": [
+        "Asset-Versioning",
+        "Migration",
+        "Analysis",
+        "Proof-of-Concept",
+        "Maintenance",
+        "Architecture",
+        "Backend",
+        "Development",
+        "Performance",
+        "Version-Control"
+      ],
+      "userActivities": {
+        "Luigi De Pinto": "Performed analysis and created a local PoC to validate the new asset versioning strategy."
+      },
+      "stakeholders": [
+        "Luigi De Pinto"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.464Z",
+      "createDate": "2025-09-19",
+      "currentState": "Development / Unit test",
+      "isFinalState": false,
+      "lastStateChangeDate": "2025-09-19",
+      "lastActivityDate": "2025-09-19"
+    },
+    {
+      "id": 315996,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "English Course - Altrelingue AltreAule 2025",
+      "summary": "This task tracks participation in the 'Altrelingue AltreAule' English language course for professional development. Team members completed linguistic assessments and participated in oral tests and ongoing course modules throughout the period to enhance their business English skills.",
+      "tags": [
+        "English-Course",
+        "Professional-Development",
+        "Linguistic-Assessment",
+        "Training",
+        "Education",
+        "Altrelingue",
+        "Business-Skills",
+        "Assessment",
+        "Skill-Growth",
+        "Personal-Development"
+      ],
+      "userActivities": {
+        "Michela Della Misericordia": "Participated in regular English courses and completed oral assessment tests.",
+        "Luigi De Pinto": "Completed the required English proficiency assessments."
+      },
+      "stakeholders": [
+        "Luigi De Pinto",
+        "Michela Della Misericordia"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.465Z",
+      "createDate": "2025-07-11",
+      "currentState": "Development / Unit test",
+      "isFinalState": false,
+      "lastStateChangeDate": "2025-07-11",
+      "lastActivityDate": "2026-03-20"
+    },
+    {
+      "id": 315994,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Crawler - Scraper FS treni ritardi 2",
+      "summary": "This task covers the re-installation and configuration of a Python-based train delay monitoring tool on a new virtual machine. Activities included troubleshooting runtime errors, optimizing monitoring scripts, and providing support for the team to access and run the tool. The scraper is now integrated into the updated environment.",
+      "tags": [
+        "Scraping",
+        "Python",
+        "Virtual-Machine",
+        "Maintenance",
+        "Automation",
+        "Troubleshooting",
+        "Monitoring",
+        "Infrastructure",
+        "Deployment",
+        "Data-Collection"
+      ],
+      "userActivities": {
+        "Luigi De Pinto": "Led the recovery and installation of the Python script and monitored the scraping tool stability.",
+        "Flavio Passera": "Attended coordination meetings and provided feedback on scraper performance."
+      },
+      "stakeholders": [
+        "Luigi De Pinto",
+        "Flavio Passera"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.465Z",
+      "createDate": "2025-07-11",
+      "currentState": "Development / Unit test",
+      "isFinalState": false,
+      "lastStateChangeDate": "2025-07-11",
+      "lastActivityDate": "2026-02-17"
+    },
+    {
+      "id": 329077,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Restyling AC Connect #2026",
+      "summary": "This task involves redesigning AC Connect to enhance user experience (UX) and commercial effectiveness. Recommendations include repositioning key homepage elements, modernizing product icons, incorporating editorial sections, and improving overall accessibility and SEO structure. The task is currently in the inception phase, with feedback and requirements consolidation ongoing.",
+      "tags": [
+        "Redesign",
+        "UX-Design",
+        "Homepage-Optimization",
+        "SEO",
+        "Commercial-Effectiveness",
+        "Accessibility",
+        "UI-Improvement",
+        "Landing-Page",
+        "Planning",
+        "Product-Presentation"
+      ],
+      "userActivities": {
+        "Flavio Passera": "Consolidated requirements and provided feedback through multiple meetings.",
+        "Michela Della Misericordia": "Participated in meetings to check and evaluate redesign progress."
+      },
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Flavio Passera",
+        "Michela Della Misericordia"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.465Z",
+      "createDate": "2026-03-26",
+      "currentState": "Inception",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-03-26",
+      "lastActivityDate": "2026-03-31"
+    },
+    {
+      "id": 328311,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Sviluppo componente editoriale per news di affiliazione",
+      "summary": "This task aims to develop a new editorial component for affiliate news, designed to better present product cards and enhance click-through rates. The component will feature custom H2 titles, image uploads, CTA buttons, and descriptive text. The design is intended to be distinct from standard paragraph content.",
+      "tags": [
+        "Editorial-Component",
+        "Affiliate-Marketing",
+        "Web-Development",
+        "Design",
+        "CTA-Optimization",
+        "Prototyping",
+        "UX",
+        "Product-Card",
+        "Content-Management",
+        "Inception"
+      ],
+      "userActivities": {
+        "Sara Fiano": "Led the design and prototyping of the new editorial component.",
+        "Marco Anselmo": "Performed initial technical evaluation for the component development."
+      },
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Sara Fiano",
+        "Marco Anselmo"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.465Z",
+      "createDate": "2026-03-12",
+      "currentState": "Inception",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-03-27",
+      "lastActivityDate": "2026-03-27"
+    },
+    {
+      "id": 328202,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "corso figma",
+      "summary": "This task tracks Marcella Nardone's professional development through a comprehensive Figma UI/UX design course. The objective is to enhance design skills using industry-standard tools to improve internal UI/UX projects and prototyping capabilities.",
+      "tags": [
+        "Figma",
+        "UI-Design",
+        "UX-Design",
+        "Professional-Training",
+        "Skill-Development",
+        "Prototypes",
+        "Online-Course",
+        "Skillshare",
+        "Learning",
+        "Development"
+      ],
+      "userActivities": {
+        "Marcella Nardone": "Successfully completed a series of Figma design modules through an online course."
+      },
+      "stakeholders": [
+        "Marcella Nardone"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.465Z",
+      "createDate": "2026-03-10",
+      "currentState": "Development / Unit test",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-03-10",
+      "lastActivityDate": "2026-03-10"
+    },
+    {
+      "id": 327946,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Modifiche ai file delle fee nel BD",
+      "summary": "This task involves updating the database fee files to accommodate structural changes from providers (e.g., Genialpiù, CONTE, WTW). The focus is on ensuring data consistency and accuracy in the database, with support for updated columns and schema alignments for monthly data processing.",
+      "tags": [
+        "Database-Maintenance",
+        "Data-Alignment",
+        "Fee-Management",
+        "Excel-Data",
+        "Insurance-Providers",
+        "Schema-Update",
+        "Data-Quality",
+        "Inception",
+        "Backend",
+        "Reporting"
+      ],
+      "userActivities": {
+        "Flavio Passera": "Performed analysis, coordinated feedback, and provided support for structural data updates."
+      },
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Flavio Passera"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.465Z",
+      "createDate": "2026-03-05",
+      "currentState": "Inception",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-03-05",
+      "lastActivityDate": "2026-03-26"
+    },
+    {
+      "id": 326986,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Database fee - aggiunta di WTW -polizze professionali",
+      "summary": "This task involves adding WTW professional policy fee data into the insurance database. The process requires mapping new product categories (e.g., nurses, engineers, architects) and ensuring data consistency for historical and new monthly data feeds. Standardizing the extraction formulas is a core part of the task.",
+      "tags": [
+        "Database-Integration",
+        "Insurance-Fees",
+        "Data-Mapping",
+        "WTW",
+        "Professional-Policies",
+        "Category-Management",
+        "Formula-Extraction",
+        "Data-Management",
+        "Inception",
+        "Development"
+      ],
+      "userActivities": {
+        "Flavio Passera": "Evaluated the data requirements, provided feedback, and supported the integration process."
+      },
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Flavio Passera"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.465Z",
+      "createDate": "2026-02-12",
+      "currentState": "Inception",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-02-12",
+      "lastActivityDate": "2026-03-09"
+    },
+    {
+      "id": 325559,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Legal agent",
+      "summary": "This task explores the development of a 'Legal Agent' chatbot. It involves evaluating feasibility, technical requirements, and testing to understand how AI can support legal inquiries for users. The task is in the inception phase, focused on gathering feedback and testing initial prototypes.",
+      "tags": [
+        "Legal-Agent",
+        "Chatbot",
+        "AI",
+        "Development",
+        "Inception",
+        "Testing",
+        "Feasibility",
+        "User-Support",
+        "Innovation",
+        "Planning"
+      ],
+      "userActivities": {
+        "Flavio Passera": "Participated in requirement meetings and performed preliminary tests on the legal agent bot."
+      },
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Flavio Passera"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.465Z",
+      "createDate": "2026-01-15",
+      "currentState": "Inception",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-01-15",
+      "lastActivityDate": "2026-02-13"
+    },
+    {
+      "id": 325218,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Gestione contatti marketing Hubspot",
+      "summary": "This task focuses on managing the HubSpot marketing contacts limit to avoid extra charges while planning for upcoming email marketing campaigns. The team is implementing a routine to transition marketing contacts to non-marketing status based on defined lifecycle rules.",
+      "tags": [
+        "HubSpot",
+        "Marketing-Contacts",
+        "Database-Management",
+        "Email-Strategy",
+        "Budgeting",
+        "Routine-Automation",
+        "Contact-Cleanup",
+        "Inception",
+        "Operational-Optimization",
+        "Planning"
+      ],
+      "userActivities": {
+        "Marco Anselmo": "Managed contact status transitions to avoid unnecessary billing and performed verifications.",
+        "Flavio Passera": "Analyzed requirements, evaluated email flow strategies, and coordinated feedback."
+      },
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Marco Anselmo",
+        "Flavio Passera"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.465Z",
+      "createDate": "2026-01-12",
+      "currentState": "Inception",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-01-12",
+      "lastActivityDate": "2026-03-16"
+    },
+    {
+      "id": 325214,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Motivi reason not converted da rivedere",
+      "summary": "This task focuses on reviewing and refining the 'ReasonNotConverted' picklist values for leads in the sales process. The goal is to remove redundant outcomes, re-map existing lead records to new values, and maintain the integrity of the conversion workflow.",
+      "tags": [
+        "Lead-Management",
+        "Salesforce",
+        "Workflow-Refinement",
+        "Sales-Operations",
+        "Data-Mapping",
+        "Process-Optimization",
+        "Inception",
+        "Data-Consistency",
+        "CRM",
+        "Planning"
+      ],
+      "userActivities": {
+        "Flavio Passera": "Provided critical feedback on change requests and workflow impacts."
+      },
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Flavio Passera",
+        "Marco Anselmo"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.465Z",
+      "createDate": "2026-01-12",
+      "currentState": "Inception",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-01-12",
+      "lastActivityDate": "2026-01-12"
+    },
+    {
+      "id": 324923,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Tutela legale - supporto roll out hubspot",
+      "summary": "This task supports the rollout of HubSpot integrations for legal assistance, including report generation, dashboard configuration for external vendors (Jakala), and managing contact properties for internal forms. The focus is on providing a scalable reporting structure and seamless data flow.",
+      "tags": [
+        "HubSpot",
+        "Integration",
+        "Reporting",
+        "Dashboard-Configuration",
+        "Vendor-Management",
+        "Backend-Support",
+        "Development",
+        "Form-Management",
+        "Data-Flow",
+        "Analytics"
+      ],
+      "userActivities": {
+        "Marco Anselmo": "Provided technical support, managed vendor dashboard creation, and adjusted contact properties for new forms."
+      },
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Marco Anselmo"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.465Z",
+      "createDate": "2026-01-07",
+      "currentState": "Development / Unit test",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-01-07",
+      "lastActivityDate": "2026-03-24"
+    },
+    {
+      "id": 324920,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "VW - supporto gestione ultimi casi",
+      "summary": "This task handles the support for the Volkswagen (VW) case management platform during its final stages. Tasks include updating data, managing re-admissions, performing IBAN checks, preparing convention counts, and finalizing the platform shutdown.",
+      "tags": [
+        "VW-Support",
+        "Case-Management",
+        "Platform-Maintenance",
+        "Data-Management",
+        "Testing",
+        "IBAN-Verification",
+        "Shutdown",
+        "Reporting",
+        "Database-Configuration",
+        "Operations"
+      ],
+      "userActivities": {
+        "Nicola Achille": "Handled script creation, token management, and data updates to prepare for the final platform closing.",
+        "Marco Anselmo": "Performed data verification, IBAN checks, and managed the final platform configuration."
+      },
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Nicola Achille",
+        "Marco Anselmo"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.465Z",
+      "createDate": "2026-01-07",
+      "currentState": "Testing",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-01-07",
+      "lastActivityDate": "2026-03-31"
+    },
+    {
+      "id": 324917,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "IAC - preparazione golive",
+      "summary": "This task focuses on the Go-Live preparation for the 'IaC' project, including site localization, configuring promotion forms, and integration testing. The work involves coordinating with various stakeholders to resolve technical issues and ensure a stable environment for deployment.",
+      "tags": [
+        "Go-Live",
+        "Localization",
+        "IaC",
+        "Integration-Testing",
+        "Deployment",
+        "Form-Configuration",
+        "Sitecore",
+        "Collaboration",
+        "Testing-Support",
+        "Quality-Assurance"
+      ],
+      "userActivities": {
+        "Flavio Passera": "Extensively supported the localization efforts, performed bug fixing, and provided feedback for the Go-Live deployment.",
+        "Susanna Castelletti": "Handled package installation in the production environment and finalized system configurations.",
+        "Marco Anselmo": "Configured landing pages in the preview environment and verified deployments."
+      },
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Flavio Passera",
+        "Susanna Castelletti",
+        "Marco Anselmo"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.465Z",
+      "createDate": "2026-01-07",
+      "currentState": "Testing",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-03-19",
+      "lastActivityDate": "2026-03-19"
+    },
+    {
+      "id": 324916,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Sitecore Refactors and Updates #2026",
+      "summary": "This task covers necessary Sitecore refactoring and updates to ensure compatibility with security tools like ZScaler. The work includes updating the development solutions, resetting environments, and rebuilding the project to resolve technical blocks.",
+      "tags": [
+        "Sitecore",
+        "Refactoring",
+        "ZScaler",
+        "Security-Updates",
+        "Maintenance",
+        "Build-Management",
+        "System-Reset",
+        "Deployment",
+        "Backend",
+        "Performance-Optimization"
+      ],
+      "userActivities": {
+        "Marco Anselmo": "Updated and rebuilt the Sitecore solution for ZScaler compatibility.",
+        "Nicola Achille": "Refactored test page lists.",
+        "Michela Della Misericordia": "Rebuilt solutions and configured the project environments."
+      },
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Marco Anselmo",
+        "Nicola Achille",
+        "Michela Della Misericordia"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.465Z",
+      "createDate": "2026-01-07",
+      "currentState": "Inception",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-01-07",
+      "lastActivityDate": "2026-03-24"
+    },
+    {
+      "id": 324915,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "ACC - issues maintenance deploy #2026",
+      "summary": "This task relates to maintenance and deployment support for the 'ACC' project. Key activities include aligning database engines, processing company data, and ensuring header/footer templates are correctly applied.",
+      "tags": [
+        "Deployment",
+        "Maintenance",
+        "Database-Alignment",
+        "Header-Footer",
+        "Template-Configuration",
+        "Data-Processing",
+        "Support",
+        "ACC-Platform",
+        "Quality-Assurance",
+        "Backend"
+      ],
+      "userActivities": {
+        "Nicola Achille": "Aligned database engines, processed company data, and provided guidance on templates."
+      },
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Nicola Achille"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.465Z",
+      "createDate": "2026-01-07",
+      "currentState": "Inception",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-01-07",
+      "lastActivityDate": "2026-03-04"
+    },
+    {
+      "id": 324912,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "calculators/serv/sel/forms updates/ARR/Cookies #2026",
+      "summary": "This task manages updates to various calculators, services, and web forms, including email template maintenance and CRM support (Salesforce). The team is also configuring new providers (like 'ho.') and resolving issues related to API integrations.",
+      "tags": [
+        "Calculator-Updates",
+        "CRM",
+        "Salesforce",
+        "Email-Templates",
+        "Configuration",
+        "API-Integration",
+        "Support",
+        "Maintenance",
+        "Service-Development",
+        "Data-Updates"
+      ],
+      "userActivities": {
+        "Marco Anselmo": "Fixed display issues in repair-related articles.",
+        "Michela Della Misericordia": "Managed data updates, email templates, Salesforce support, and new provider configurations."
+      },
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Marco Anselmo",
+        "Michela Della Misericordia"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.465Z",
+      "createDate": "2026-01-07",
+      "currentState": "Inception",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-01-07",
+      "lastActivityDate": "2026-03-27"
+    },
+    {
+      "id": 324910,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Business support / Other teams support #2026",
+      "summary": "This task is a broad bucket for business support and cross-team collaborations, ranging from technical podcast distribution to WebVitals investigation, AI documentation, and Satispay shop meeting support. It highlights the team's role in maintaining operational efficiency across diverse business units.",
+      "tags": [
+        "Business-Support",
+        "Cross-Team",
+        "WebVitals",
+        "Podcast-Support",
+        "Operations",
+        "AI-Documentation",
+        "Maintenance",
+        "Operational-Efficiency",
+        "Strategy",
+        "Collaboration"
+      ],
+      "userActivities": {
+        "Susanna Castelletti": "Provided support for HP configurations, voucher publications, and IaC registration issues.",
+        "Michela Della Misericordia": "Supported various landing page updates, coupon configurations, and service integrations.",
+        "Flavio Passera": "Led extensive efforts on WebVitals investigation, AI documentation, and Google Play app support.",
+        "Marco Anselmo": "Performed technical checks on new homepage configurations.",
+        "Nicola Achille": "Managed credit broker bank mappings and podcast technical distribution.",
+        "Sara Fiano": "Provided design support for the Vera platform and Sitecore updates."
+      },
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Susanna Castelletti",
+        "Michela Della Misericordia",
+        "Flavio Passera",
+        "Marco Anselmo",
+        "Nicola Achille",
+        "Sara Fiano"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.465Z",
+      "createDate": "2026-01-07",
+      "currentState": "Inception",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-01-07",
+      "lastActivityDate": "2026-03-31"
+    },
+    {
+      "id": 324895,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Deploy process #2026",
+      "summary": "This task oversees the deployment process, including pre-deployment testing, configuration of staging/production environments, and post-deployment hotfixes. The work is crucial for maintaining platform stability during code releases.",
+      "tags": [
+        "Deployment-Process",
+        "Testing",
+        "Quality-Assurance",
+        "Release-Management",
+        "Configuration",
+        "Bug-Fixing",
+        "Staging",
+        "Production",
+        "Platform-Stability",
+        "Maintenance"
+      ],
+      "userActivities": {
+        "Marco Anselmo": "Managed pre-deployment testing and post-deploy configurations.",
+        "Nicola Achille": "Monitored deployment and performed database service restoration.",
+        "Michela Della Misericordia": "Managed test status checks and snaptest evaluations."
+      },
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Marco Anselmo",
+        "Nicola Achille",
+        "Michela Della Misericordia"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.465Z",
+      "createDate": "2026-01-07",
+      "currentState": "Inception",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-01-07",
+      "lastActivityDate": "2026-03-23"
+    },
+    {
+      "id": 324894,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "SnapTest #2026",
+      "summary": "This task tracks the maintenance of automated testing scenarios within 'SnapTest'. The team is actively updating test cases, fixing labels to reflect production changes, and coordinating testing strategy to ensure end-to-end functionality across web applications.",
+      "tags": [
+        "SnapTest",
+        "Automated-Testing",
+        "End-to-End-Testing",
+        "Scenario-Management",
+        "Quality-Assurance",
+        "Testing-Strategy",
+        "Web-Application",
+        "Bug-Fixing",
+        "Documentation",
+        "Maintenance"
+      ],
+      "userActivities": {
+        "Nicola Achille": "Executed and fixed labeling for production/acceptance test cases.",
+        "Michela Della Misericordia": "Coordinated testing sessions with other team members."
+      },
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Nicola Achille",
+        "Michela Della Misericordia"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.465Z",
+      "createDate": "2026-01-07",
+      "currentState": "Inception",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-01-07",
+      "lastActivityDate": "2026-03-09"
+    },
+    {
+      "id": 324893,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Incident #2026",
+      "summary": "This task handles incoming operational incidents, including technical failures, user complaints, and platform errors. The focus is on rapid triaging, managing Salesforce cases, and ensuring that fixes are communicated and implemented efficiently.",
+      "tags": [
+        "Incident-Management",
+        "Troubleshooting",
+        "User-Support",
+        "Salesforce-Cases",
+        "Operational-Fixes",
+        "Bug-Tracking",
+        "Platform-Errors",
+        "Quality-Assurance",
+        "Resolution",
+        "Maintenance"
+      ],
+      "userActivities": {
+        "Michela Della Misericordia": "Managed a high volume of technical incidents across multiple platforms.",
+        "Flavio Passera": "Supported complaint resolution for business relations.",
+        "Marco Anselmo": "Resolved technical bugs related to shop functionality and asynchronous processes.",
+        "Nicola Achille": "Fixed permission issues within the database/services connection."
+      },
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Michela Della Misericordia",
+        "Flavio Passera",
+        "Marco Anselmo",
+        "Nicola Achille"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.465Z",
+      "createDate": "2026-01-07",
+      "currentState": "Inception",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-01-07",
+      "lastActivityDate": "2026-03-25"
+    },
+    {
+      "id": 324447,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Update AC Scan",
+      "summary": "This task updates the 'AC Scan' application to improve nutritional guidance, including the implementation of conditional messaging, categorization adjustments, and new UI tooltips for algorithm explanation. The project also addresses AGCM requirements for transparent scoring explanations.",
+      "tags": [
+        "App-Development",
+        "Nutritional-App",
+        "Frontend",
+        "User-Experience",
+        "AGCM-Compliance",
+        "Algorithm-Transparency",
+        "UI-Design",
+        "Prototyping",
+        "Backend",
+        "Product-Management"
+      ],
+      "userActivities": {
+        "Sara Fiano": "Performed design and prototyping work for the updated UI components."
+      },
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Sara Fiano"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.465Z",
+      "createDate": "2025-12-29",
+      "currentState": "Development / Unit test",
+      "isFinalState": false,
+      "lastStateChangeDate": "2025-12-29",
+      "lastActivityDate": "2025-12-29"
+    },
+    {
+      "id": 324400,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Form IaC Leonteq",
+      "summary": "This task involves the configuration, testing, and development support for the 'Form IaC Leonteq'. The goal is to ensure the form functions correctly, including addressing issues with indexing and search configurations within the Solr engine.",
+      "tags": [
+        "Form-Development",
+        "Configuration",
+        "Testing",
+        "IaC",
+        "Leonteq",
+        "Solr",
+        "Search-Indexing",
+        "Backend-Configuration",
+        "Development",
+        "Data-Troubleshooting"
+      ],
+      "userActivities": {
+        "Susanna Castelletti": "Configured the form, executed tests, and analyzed Solr search indexing issues."
+      },
+      "stakeholders": [
+        "Susanna Castelletti"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.465Z",
+      "createDate": "2025-12-24",
+      "currentState": "Development / Unit test",
+      "isFinalState": false,
+      "lastStateChangeDate": "2025-12-24",
+      "lastActivityDate": "2025-12-24"
+    },
+    {
+      "id": 324120,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Promositi - modifica flusso",
+      "summary": "This task re-engineers the 'Promositi' flow for anonymous users, delegating the state verification of accounts (subscriber/fan/new) to an OrderService. The goal is to provide a unified 'user data' step that triggers the appropriate ordering flow based on service response, improving UX and backend logic.",
+      "tags": [
+        "Workflow-Reengineering",
+        "Promositi",
+        "User-Experience",
+        "Backend",
+        "OrderService",
+        "Flow-Optimization",
+        "Development",
+        "Testing",
+        "API-Integration",
+        "Anonymous-Users"
+      ],
+      "userActivities": {
+        "Nicola Achille": "Developed the re-engineered backend logic and conducted integration testing in the staging environment.",
+        "Susanna Castelletti": "Coordinated with stakeholders for the flow design."
+      },
+      "stakeholders": [
+        "Nicola Achille",
+        "Susanna Castelletti"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.465Z",
+      "createDate": "2025-12-18",
+      "currentState": "Development / Unit test",
+      "isFinalState": false,
+      "lastStateChangeDate": "2025-12-18",
+      "lastActivityDate": "2026-01-13"
+    },
+    {
+      "id": 324100,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "FW: Elty / Altroconsumo",
+      "summary": "This task tracks the platform activation and technical integration of the 'Elty' service, specifically focusing on the SSO authentication flow. The work involves implementing parameterized URL and token-based authentication to retrieve customer data securely.",
+      "tags": [
+        "Elty",
+        "SSO",
+        "Integration",
+        "Platform-Activation",
+        "Authentication",
+        "Security",
+        "Customer-Data",
+        "API-Development",
+        "Partner-Integration",
+        "Backend"
+      ],
+      "userActivities": {
+        "Marco Anselmo": "Estimated development effort, evaluated cryptographic implementations, and led the development and testing of the SSO mechanism."
+      },
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Nicola Achille",
+        "Marco Anselmo"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.465Z",
+      "createDate": "2025-12-18",
+      "currentState": "Development / Unit test",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-02-24",
+      "lastActivityDate": "2026-03-23"
+    },
+    {
+      "id": 323874,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Test sui calcolatori",
+      "summary": "This task is dedicated to comprehensive testing of calculators within the platform, ensuring correct mathematical outputs, data integration, and user-facing accuracy. The focus is on continuous quality assurance through repeated validation cycles.",
+      "tags": [
+        "Calculator-Testing",
+        "Quality-Assurance",
+        "Unit-Testing",
+        "Platform-Validation",
+        "Data-Accuracy",
+        "Testing-Cycles",
+        "Development",
+        "Bug-Detection",
+        "User-Facing-Tools",
+        "Maintenance"
+      ],
+      "userActivities": {
+        "Marcella Nardone": "Executed extensive testing cycles for platform calculators."
+      },
+      "stakeholders": [
+        "Marcella Nardone"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.465Z",
+      "createDate": "2025-12-15",
+      "currentState": "Development / Unit test",
+      "isFinalState": false,
+      "lastStateChangeDate": "2025-12-15",
+      "lastActivityDate": "2025-12-16"
+    },
+    {
+      "id": 323686,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "FW: Selector Mutui - Possibili evolutive",
+      "summary": "This task addresses the evolution of the Mortgage Selector (Selector Mutui) to incorporate new SEO and functional requirements. Improvements include better page editing capabilities in Sitecore and uniform design enhancements across mortgage-related tools (surroga, under 36, green, etc.).",
+      "tags": [
+        "SEO-Evolution",
+        "Mortgage-Selector",
+        "Sitecore-Editing",
+        "Frontend",
+        "Design-Uniformity",
+        "Feature-Expansion",
+        "Development",
+        "Testing",
+        "Productivity-Tool",
+        "Refactoring"
+      ],
+      "userActivities": {
+        "Sara Fiano": "Designed the new mortgage selector components.",
+        "Marco Anselmo": "Led the technical requirements evaluation, implementation, and deployment of the updated mortgage selector."
+      },
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Sara Fiano",
+        "Marco Anselmo"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.465Z",
+      "createDate": "2025-12-09",
+      "currentState": "Development / Unit test",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-03-09",
+      "lastActivityDate": "2026-03-31"
+    },
+    {
+      "id": 323636,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Tutela legale",
+      "summary": "This task involves the integration of a new legal advice site design with internal platforms. Key deliverables include a HubSpot-connected form for appointment booking, a video/slideshow section for lawyers, and automated news population based on categories. The project focuses on improving UX and marketing automation.",
+      "tags": [
+        "Legal-Advice-Integration",
+        "HubSpot-Integration",
+        "Form-Development",
+        "UX-Improvement",
+        "Marketing-Automation",
+        "Content-Management",
+        "Design",
+        "Legal-Bot",
+        "Video-Integration",
+        "Development"
+      ],
+      "userActivities": {
+        "Michela Della Misericordia": "Led the component development, CSS updates, and form integration.",
+        "Matteo Damario": "Contributed to backend and frontend development tasks.",
+        "Flavio Passera": "Performed requirement analysis, provided feedback, and supported the deployment process."
+      },
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Michela Della Misericordia",
+        "Matteo Damario",
+        "Flavio Passera"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.465Z",
+      "createDate": "2025-12-05",
+      "currentState": "Testing",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-03-16",
+      "lastActivityDate": "2026-04-01"
+    },
+    {
+      "id": 321213,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Iac prototype e design",
+      "summary": "This task focuses on the prototyping and design phase for the new 'IaC' (Impegnati a Cambiare) campaign. The work involves repetitive design cycles and prototyping to define the look and feel, ensuring visual consistency across campaign pages and conversion-focused elements.",
+      "tags": [
+        "Prototyping",
+        "Design",
+        "Campaign-Development",
+        "UI-UX",
+        "IaC",
+        "Visual-Consistency",
+        "Landing-Page",
+        "Creative-Design",
+        "User-Interface",
+        "Iterative-Design"
+      ],
+      "userActivities": {
+        "Sara Fiano": "Conducted iterative design and prototyping for the IaC campaign landing pages."
+      },
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Sara Fiano"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.465Z",
+      "createDate": "2025-10-22",
+      "currentState": "Development / Unit test",
+      "isFinalState": false,
+      "lastStateChangeDate": "2025-10-22",
+      "lastActivityDate": "2026-01-30"
+    },
+    {
+      "id": 320802,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "IAC sviluppo front-end Sitecore nuovo sito",
+      "summary": "This task tracks the development of the frontend for the new 'IaC' (Impegnati a Cambiare) platform in Sitecore. It encompasses the migration of content, implementation of pagination, integration with Solr for news lists, and creation of responsive components (header, footer, home, vertical storytelling). The project concludes with schema markup implementation and deployment.",
+      "tags": [
+        "Sitecore",
+        "Frontend",
+        "Development",
+        "Solr",
+        "Responsive-Design",
+        "IaC-Platform",
+        "Pagination",
+        "Schema-Markup",
+        "Component-Architecture",
+        "Deployment"
+      ],
+      "userActivities": {
+        "Susanna Castelletti": "Developed and integrated all major frontend components, implemented Solr news lists, and managed the markup.",
+        "Marco Anselmo": "Managed tracking implementation and system-wide optimizations."
+      },
+      "stakeholders": [
+        "Susanna Castelletti",
+        "Marco Anselmo"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.465Z",
+      "createDate": "2025-10-14",
+      "currentState": "Development / Unit test",
+      "isFinalState": false,
+      "lastStateChangeDate": "2025-10-14",
+      "lastActivityDate": "2026-02-17"
+    },
+    {
+      "id": 317183,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Modifiche mutui",
+      "summary": "This task tracks modifications for mortgage calculators (surroga) to improve validation logic and provide better user guidance. Changes include adding specific alerts for loan amounts and energy classes, and ensuring stricter alignment with bank-side constraints (e.g., LTV ratios, age limits).",
+      "tags": [
+        "Mortgage-Calculator",
+        "Validation-Logic",
+        "Surroga",
+        "User-Guidance",
+        "Backend",
+        "Frontend",
+        "Product-Configuration",
+        "Constraints",
+        "Calculator-Updates",
+        "Development"
+      ],
+      "userActivities": {
+        "Sara Fiano": "Designed the updated calculator interfaces.",
+        "Marco Anselmo": "Implemented the requested calculator logic updates."
+      },
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Luigi De Pinto",
+        "Sara Fiano",
+        "Marco Anselmo"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.465Z",
+      "createDate": "2025-08-05",
+      "currentState": "Development / Unit test",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-03-13",
+      "lastActivityDate": "2026-03-13"
+    },
+    {
+      "id": 317065,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Integrazione servizi time per db assicurativo",
+      "summary": "This task focuses on coordinating and integrating time-sensitive data services for the insurance database project. The primary activities involve technical alignment, data quality checks, and cross-team coordination to ensure accurate data handling across the integration services.",
+      "tags": [
+        "Integration",
+        "Insurance-Database",
+        "Technical-Coordination",
+        "Data-Quality",
+        "Service-Development",
+        "Alignment",
+        "Backend",
+        "Coordination",
+        "Database-Integration",
+        "Planning"
+      ],
+      "userActivities": {
+        "Nicola Achille": "Facilitated technical alignment and coordination meetings for service integration."
+      },
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Nicola Achille"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.465Z",
+      "createDate": "2025-08-01",
+      "currentState": "Development / Unit test",
+      "isFinalState": false,
+      "lastStateChangeDate": "2025-08-01",
+      "lastActivityDate": "2025-08-01"
+    },
+    {
+      "id": 316787,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Completamento DB Fee - step 2",
+      "summary": "This task involves the second phase of completing the insurance database (DB) fee records. The work is focused on integrating data from various insurance products beyond standard RCA, ensuring historical data (Zurich Connect) can be processed, and finalizing the formula structures within the fee database.",
+      "tags": [
+        "Insurance-DB",
+        "Data-Integration",
+        "Fee-Database",
+        "Data-Completeness",
+        "Analysis",
+        "Formula-Development",
+        "Backend-Support",
+        "Development",
+        "Testing",
+        "Maintenance"
+      ],
+      "userActivities": {
+        "Flavio Passera": "Conducted thorough data analysis, requirements refinement, integration support, and formula validation across all fee Excel files."
+      },
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Flavio Passera"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.466Z",
+      "createDate": "2025-07-28",
+      "currentState": "Testing",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-01-16",
+      "lastActivityDate": "2026-03-04"
+    },
+    {
+      "id": 316620,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Newsletter IAC saleforce",
+      "summary": "This task is dedicated to the development and testing of a newsletter for the IaC (Impegnati a Cambiare) campaign integrated via Salesforce. The work involves iterative HTML development and testing to ensure compatibility and correct link/tracking functionality.",
+      "tags": [
+        "Newsletter",
+        "Salesforce",
+        "HTML-Development",
+        "Email-Testing",
+        "IaC",
+        "Campaign-Development",
+        "Development",
+        "Quality-Assurance",
+        "Testing",
+        "Marketing"
+      ],
+      "userActivities": {
+        "Sara Fiano": "Led the design, HTML coding, and testing of the newsletter templates."
+      },
+      "stakeholders": [
+        "Sara Fiano"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.466Z",
+      "createDate": "2025-07-24",
+      "currentState": "Testing",
+      "isFinalState": false,
+      "lastStateChangeDate": "2025-10-22",
+      "lastActivityDate": "2026-01-13"
+    },
+    {
+      "id": 329234,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Nuova pagina Vera Legal e WebForm",
+      "summary": "This task covers the implementation of 'Vera' on the website, focusing on adding entry points for the legal product, configuring widgets for specific URL targets, and ensuring seamless integration with the existing customer assistance framework.",
+      "tags": [
+        "Vera-Implementation",
+        "Widget-Configuration",
+        "User-Assistance",
+        "Integration",
+        "Web-Development",
+        "Legal-Service",
+        "Planning",
+        "EntryPoint",
+        "Product-Integration",
+        "UX"
+      ],
+      "userActivities": {},
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Marco Colombo"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.466Z",
+      "createDate": "2026-03-30",
+      "currentState": "Development / Unit test",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-03-31",
+      "lastActivityDate": "2026-03-31"
+    },
+    {
+      "id": 329230,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Nuovi form pagina contattaci",
+      "summary": "This task tracks the integration of two specific contact forms into the 'contattaci' page: one for medical malpractice (in collaboration with Prontodanno.it) and one for pension consulting. Key requirements include data handling (excluding Salesforce for the medical form) and configuring existing back-office collection processes.",
+      "tags": [
+        "Contact-Forms",
+        "Backend-Integration",
+        "Data-Handling",
+        "Consulting-Services",
+        "Form-Configuration",
+        "Development",
+        "Back-Office",
+        "Integration",
+        "Planning",
+        "UI-Configuration"
+      ],
+      "userActivities": {},
+      "stakeholders": [
+        "Chiara Bonasi"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.466Z",
+      "createDate": "2026-03-30",
+      "currentState": "Development / Unit test",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-03-31",
+      "lastActivityDate": "2026-03-31"
+    },
+    {
+      "id": 328991,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Fuel Chart new import character (T260300199)",
+      "summary": "This task addresses a specific fuel chart import issue involving a new character in the T260300199 import set. The fix requires updating the import logic to correctly process this character and maintain data integrity in the database.",
+      "tags": [
+        "Data-Import",
+        "Fuel-Chart",
+        "Character-Encoding",
+        "Database-Integrity",
+        "Bug-Fix",
+        "Data-Processing",
+        "Maintenance",
+        "Development",
+        "Data-Fix",
+        "Backend"
+      ],
+      "userActivities": {},
+      "stakeholders": [
+        "Susanna Castelletti"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.466Z",
+      "createDate": "2026-03-25",
+      "currentState": "Development / Unit test",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-03-25",
+      "lastActivityDate": "2026-03-25"
+    },
+    {
+      "id": 328933,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Landing marketing IAC - Ricettario primaverile",
+      "summary": "This task involves creating a new landing page for the spring recipe campaign (Ricettario primaverile). The landing page leverages existing winter recipe templates, requires updates to content and titles, and follows specific URL and branding requirements.",
+      "tags": [
+        "Landing-Page",
+        "Campaign",
+        "Recipe-Book",
+        "SEO",
+        "Web-Development",
+        "Content-Updates",
+        "UI-Design",
+        "Planning",
+        "Campaign-Execution",
+        "URL-Configuration"
+      ],
+      "userActivities": {},
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Serena Tendas"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.466Z",
+      "createDate": "2026-03-24",
+      "currentState": "Inception",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-03-25",
+      "lastActivityDate": "2026-03-25"
+    },
+    {
+      "id": 328506,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Rolling Altroconsumo Investi",
+      "summary": "This task focuses on rolling out updated templates for the 'Altroconsumo Investi' service, utilizing A/B testing to compare different communication styles and layouts. The work involves adapting existing visual identities to ensure consistency with brand standards.",
+      "tags": [
+        "Template-Rollout",
+        "A-B-Testing",
+        "Investment-Service",
+        "Visual-Consistency",
+        "Campaign-Development",
+        "Web-Development",
+        "Marketing-Template",
+        "Design",
+        "Testing",
+        "Deployment"
+      ],
+      "userActivities": {},
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Serena Tendas"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.466Z",
+      "createDate": "2026-03-16",
+      "currentState": "Development / Unit test",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-03-18",
+      "lastActivityDate": "2026-03-18"
+    },
+    {
+      "id": 322594,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "02.01.05 - IT Local - SQL 2016 EoL DEV Migration",
+      "summary": "This task is a placeholder for the DEV migration of SQL 2016 due to end-of-life status. The migration ensures the platform remains supported, secure, and performant by moving to an updated database environment.",
+      "tags": [
+        "Migration",
+        "SQL-2016",
+        "End-of-Life",
+        "Database-Infrastructure",
+        "Technical-Debt",
+        "Infrastructure-Security",
+        "Backend-Migration",
+        "Planning",
+        "System-Upgrades",
+        "Technical-Support"
+      ],
+      "userActivities": {},
+      "stakeholders": [
+        "Paulo Gonçalves"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.466Z",
+      "createDate": "2025-11-14",
+      "currentState": "Planned",
+      "isFinalState": false,
+      "lastStateChangeDate": "2025-11-14",
+      "lastActivityDate": "2025-11-14"
+    },
+    {
+      "id": 329324,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Integrazione racuto in landing paragona",
+      "summary": "This task involves integrating a racuto feature or component into the 'paragona' comparison page. It requires technical analysis and frontend implementation to enhance comparison capabilities.",
+      "tags": [
+        "Integration",
+        "Comparison-Page",
+        "Feature-Addition",
+        "Frontend",
+        "Web-Development",
+        "Planning",
+        "Feature-Expansion",
+        "Technical-Implementation",
+        "Comparison-Tool",
+        "Data-Integration"
+      ],
+      "userActivities": {},
+      "stakeholders": [
+        "Chiara Bonasi"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.466Z",
+      "createDate": "2026-04-01",
+      "currentState": "Planned",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-04-01",
+      "lastActivityDate": "2026-04-01"
+    },
+    {
+      "id": 329318,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Conversione infografica Infogram in HTML (SEO)",
+      "summary": "This task involves converting an Infogram-based infographic into static HTML/markup. This is a crucial SEO task to ensure that the content within the infographic—previously hidden from search engines as an external embed—is indexed correctly.",
+      "tags": [
+        "SEO",
+        "Infographic-Conversion",
+        "HTML",
+        "Content-Accessibility",
+        "Search-Engine-Indexing",
+        "Mark-up",
+        "Accessibility",
+        "Planning",
+        "SEO-Audit",
+        "Web-Optimization"
+      ],
+      "userActivities": {},
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Verena Birocchi"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.466Z",
+      "createDate": "2026-04-01",
+      "currentState": "Planned",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-04-01",
+      "lastActivityDate": "2026-04-01"
+    },
+    {
+      "id": 329309,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Dem commerciale per il dieselgate",
+      "summary": "This task includes creating a commercial email series (DEM) targeting users who received the dieselgate reimbursement and opted for a free trial. The emails will follow the trial period to encourage subscription retention.",
+      "tags": [
+        "DEM",
+        "Commercial-Email",
+        "Retention",
+        "Dieselgate",
+        "Marketing-Automation",
+        "Email-Development",
+        "User-Retention",
+        "Communication-Strategy",
+        "Planning",
+        "Copywriting"
+      ],
+      "userActivities": {},
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Serena Tendas"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.466Z",
+      "createDate": "2026-04-01",
+      "currentState": "Planned",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-04-01",
+      "lastActivityDate": "2026-04-01"
+    },
+    {
+      "id": 329283,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Richiesta nuova follow up email + landing Guida Sanità",
+      "summary": "This task covers the creation of a new follow-up email sequence and an associated landing page for the 'Guida Sanità' product, following existing template designs.",
+      "tags": [
+        "Follow-up-Email",
+        "Landing-Page",
+        "Product-Launch",
+        "Template-Design",
+        "Email-Automation",
+        "Marketing-Support",
+        "Guida-Sanita",
+        "Content-Generation",
+        "Planning",
+        "Web-Design"
+      ],
+      "userActivities": {},
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Mattia Chignoli"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.466Z",
+      "createDate": "2026-03-31",
+      "currentState": "Planned",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-03-31",
+      "lastActivityDate": "2026-03-31"
+    },
+    {
+      "id": 329233,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "html email InTavola aprile",
+      "summary": "This task involves updating the HTML template for the 'InTavola' magazine email to include the latest PDF issue for April 2026.",
+      "tags": [
+        "Newsletter",
+        "Email-Template",
+        "InTavola",
+        "PDF-Integration",
+        "HTML",
+        "Marketing-Communication",
+        "Content-Update",
+        "Email-Marketing",
+        "Planning",
+        "Operations"
+      ],
+      "userActivities": {},
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Bianca"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.466Z",
+      "createDate": "2026-03-30",
+      "currentState": "Planned",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-03-30",
+      "lastActivityDate": "2026-03-30"
+    },
+    {
+      "id": 329231,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "html email InTavola gennaio",
+      "summary": "This task involves updating the HTML template for the 'InTavola' magazine email for January 2026, including specific apologetic messaging due to a delay in distribution.",
+      "tags": [
+        "Newsletter",
+        "Email-Template",
+        "InTavola",
+        "Communication-Update",
+        "Apology-Message",
+        "HTML",
+        "Content-Correction",
+        "Delay-Management",
+        "Planning",
+        "Operations"
+      ],
+      "userActivities": {},
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Bianca"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.466Z",
+      "createDate": "2026-03-30",
+      "currentState": "Development / Unit test",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-03-30",
+      "lastActivityDate": "2026-03-30"
+    },
+    {
+      "id": 328960,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Landing Uppa Merendine - Pagina co-branded",
+      "summary": "This task involves creating a new landing page for the 'Uppa' merendine campaign. The key challenge is the co-branding requirement, necessitating the display of both Uppa and Altroconsumo logos in the header.",
+      "tags": [
+        "Landing-Page",
+        "Co-Branding",
+        "Campaign",
+        "Uppa",
+        "Web-Development",
+        "Design-Integration",
+        "Logo-Configuration",
+        "Collaboration",
+        "Planning",
+        "Campaign-Development"
+      ],
+      "userActivities": {},
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Serena Tendas"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.466Z",
+      "createDate": "2026-03-24",
+      "currentState": "Planned",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-03-24",
+      "lastActivityDate": "2026-03-24"
+    },
+    {
+      "id": 328915,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Corsi di aggiornamento",
+      "summary": "This task tracks internal requests for professional updating courses to ensure team members stay aligned with new technological standards.",
+      "tags": [
+        "Training",
+        "Updating-Courses",
+        "Professional-Skills",
+        "Inception",
+        "Team-Growth",
+        "Skills-Development",
+        "Education",
+        "Training-Request",
+        "Planning",
+        "Continuous-Learning"
+      ],
+      "userActivities": {},
+      "stakeholders": [
+        "Sara Fiano"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.466Z",
+      "createDate": "2026-03-24",
+      "currentState": "Inception",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-03-24",
+      "lastActivityDate": "2026-03-24"
+    },
+    {
+      "id": 328331,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "FW: Legalbot urls",
+      "summary": "This task involves the requested integration of 'Legalbot' URLs across multiple pages. The team manages a repository to track all chatbot locations for consistency and timely rollouts, with direct collaboration from the chatbot support teams.",
+      "tags": [
+        "Legalbot",
+        "Chatbot-Integration",
+        "URL-Management",
+        "AI-Agent",
+        "Configuration",
+        "Planning",
+        "Integration",
+        "Web-Optimization",
+        "Backend-Configuration",
+        "Collaboration"
+      ],
+      "userActivities": {},
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Cristina Lombardo"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.466Z",
+      "createDate": "2026-03-12",
+      "currentState": "Planned",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-03-12",
+      "lastActivityDate": "2026-03-12"
+    },
+    {
+      "id": 328330,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Configurazione Vera su /acquisti",
+      "summary": "This task involves configuring the 'Vera' assistance chatbot within the '/acquisti' section. The goal is to provide a unified experience for fan/subscriber users across shopping and product pages, requiring cross-team coordination with the assistance service teams.",
+      "tags": [
+        "Vera-Integration",
+        "Chatbot-Configuration",
+        "Assistant-Service",
+        "User-Experience",
+        "Planning",
+        "Integration",
+        "User-Support",
+        "Backend-Configuration",
+        "Product-Page",
+        "Collaboration"
+      ],
+      "userActivities": {},
+      "stakeholders": [
+        "Chiara Bonasi",
+        "Cristina Lombardo",
+        "Mauro Milanesi"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.466Z",
+      "createDate": "2026-03-12",
+      "currentState": "Planned",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-03-12",
+      "lastActivityDate": "2026-03-12"
+    },
+    {
+      "id": 326465,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Newsletter IAC genneio",
+      "summary": "This task tracks the development and deployment of the IaC newsletter for January.",
+      "tags": [
+        "Newsletter",
+        "IaC",
+        "Development",
+        "Email-Marketing",
+        "Content-Deployment",
+        "Operational",
+        "Campaign-Management",
+        "Maintenance",
+        "Planning",
+        "Email-Automation"
+      ],
+      "userActivities": {},
+      "stakeholders": [
+        "Marcella Nardone"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.466Z",
+      "createDate": "2026-02-03",
+      "currentState": "Development / Unit test",
+      "isFinalState": false,
+      "lastStateChangeDate": "2026-02-03",
+      "lastActivityDate": "2026-02-03"
+    },
+    {
+      "id": 321214,
+      "entityType": "UserStory",
+      "projectName": "BAU - Team ITA Web",
+      "name": "Iac Campagne e reporting - Backoffice",
+      "summary": "This task is an administrative placeholder for the development and testing of back-office reporting tools and campaign management workflows for IaC.",
+      "tags": [
+        "Backoffice",
+        "Reporting",
+        "Campaign-Management",
+        "IaC",
+        "Workflow-Development",
+        "Development",
+        "Testing",
+        "Tooling",
+        "Planning",
+        "Operations"
+      ],
+      "userActivities": {},
+      "stakeholders": [
+        "Chiara Bonasi"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.466Z",
+      "createDate": "2025-10-22",
+      "currentState": "Development / Unit test",
+      "isFinalState": false,
+      "lastStateChangeDate": "2025-10-22",
+      "lastActivityDate": "2025-10-22"
+    },
+    {
+      "id": 265663,
+      "entityType": "Task",
+      "projectName": "CAAS Integration",
+      "name": "#1.6 Travel attachments section not displayed properly on Private Complaint Details page",
+      "summary": "This task tracks a specific frontend bug where travel attachments are not correctly categorized and displayed on the 'Private Complaint Details' page. The issue stems from the backend not returning the correct 'flowType' value, causing attachments to fall into the generic list.",
+      "tags": [
+        "Frontend-Bug",
+        "Travel-Attachments",
+        "Complaint-System",
+        "Category-Display",
+        "Backend-Integration",
+        "Testing",
+        "UI-Bug",
+        "Data-Binding",
+        "Bug-Resolution",
+        "Documentation"
+      ],
+      "userActivities": {},
+      "stakeholders": [
+        "Flavio Passera"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.466Z",
+      "createDate": "2023-04-12",
+      "currentState": "Open",
+      "isFinalState": false,
+      "lastStateChangeDate": "2023-04-13",
+      "lastActivityDate": "2023-04-13"
+    },
+    {
+      "id": 227782,
+      "entityType": "Task",
+      "projectName": "CAAS Integration",
+      "name": "7.7 Alias Management, 4 aliases (instead of 3) displayed in FE Company Details Page",
+      "summary": "This task addresses a frontend bug on the Company Details page where more than the allowed number of aliases is displayed, and the order of aliases is inconsistent. The team needs to define and enforce a clear business rule for alias prioritization.",
+      "tags": [
+        "Frontend-Bug",
+        "Alias-Management",
+        "Company-Page",
+        "Business-Rules",
+        "Data-Ordering",
+        "Bug-Fix",
+        "UI-Issue",
+        "Data-Limits",
+        "UX-Consistency",
+        "Support"
+      ],
+      "userActivities": {},
+      "stakeholders": [
+        "Flavio Passera"
+      ],
+      "cachedAt": "2026-04-01T16:15:28.466Z",
+      "createDate": "2022-10-24",
+      "currentState": "Open",
+      "isFinalState": false,
+      "lastStateChangeDate": "2022-10-24",
+      "lastActivityDate": "2022-10-24"
+    }
+  ]
+}

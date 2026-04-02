@@ -1,8 +1,12 @@
 node_modules/
 .env
 .token-cache.json
-data/
 .env copy
 .claude/settings.local.json
 web/dist/
 .automation-chrome/nibol/
+
+data/*
+!data/kb/
+data/kb/*
+!data/kb/us-summaries.json

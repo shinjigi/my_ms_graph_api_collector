@@ -74,7 +74,7 @@ submitRouter.post("/:date", async (req: Request, res: Response) => {
   if (results.length > 0) {
     proposal.entries = proposal.entries.map((e) => {
       if (e.approved && e.taskId != null) {
-        return { ...e, submitted: true };
+        return { ...e, status: "applied", approved: true };
       }
       return e;
     });

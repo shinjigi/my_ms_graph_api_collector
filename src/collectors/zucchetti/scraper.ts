@@ -7,6 +7,7 @@ import {
   ZucchettiDay,
   ZucchettiJustification,
   ZucchettiRequest,
+  ABSENCE_KEYWORDS,
 } from "@shared/zucchetti";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
@@ -197,12 +198,7 @@ function minutesToStr(totalMinutes: number): string {
 /** Cross-check hOrd vs richieste/giustificativi and add warnings. */
 export function validateDay(day: ZucchettiDay): ZucchettiDay {
   const hOrdMinutes = timeToMinutes(day.hOrd);
-  const EXCLUDED_FROM_HORD = [
-    "FERIE",
-    "SERVIZIO ESTERNO",
-    "EX FESTIVITA'",
-    "MALATTIA",
-  ];
+  const EXCLUDED_FROM_HORD = ABSENCE_KEYWORDS;
 
   const approvedReqs = (day.richieste ?? []).filter(
     (r: ZucchettiRequest) => r.status === "Approvata",
