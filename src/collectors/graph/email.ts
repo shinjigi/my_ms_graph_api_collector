@@ -4,7 +4,7 @@ import type { Client } from "@microsoft/microsoft-graph-client";
 import { createLogger } from "../../logger";
 
 const log = createLogger("graph-email");
-import { mergeByKey, readMeta, writeMeta, shouldSkipMonth } from "../../utils";
+import { mergeByKey, readMeta, writeMeta, shouldSkipMonth, writeJson } from "../../utils";
 import { EmailRaw } from "@shared/aggregator";
 import {
   dateToString,
@@ -26,6 +26,7 @@ interface GraphPage<T> {
 async function fetchEmails(
   client: Client,
   filter: string,
+  direction: "received" | "sent",
   maxItems: number,
 ): Promise<{ results: EmailRaw[]; excluded: EmailRaw[] }> {
   const results: EmailRaw[] = [];
@@ -37,18 +38,26 @@ async function fetchEmails(
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
 
+  const endpoint =
+    direction === "sent"
+      ? "/me/mailFolders/sentItems/messages"
+      : "/me/messages";
+  const dateField = direction === "sent" ? "sentDateTime" : "receivedDateTime";
+  const selectFields =
+    direction === "sent"
+      ? "id,subject,from,toRecipients,sentDateTime,bodyPreview,webLink"
+      : "id,subject,from,toRecipients,receivedDateTime,bodyPreview,webLink";
+
   let pageNum = 1;
   do {
     const res = (
       nextLink
         ? await client.api(nextLink).get()
         : await client
-            .api("/me/messages")
+            .api(endpoint)
             .filter(filter)
-            .select(
-              "id,subject,from,toRecipients,receivedDateTime,bodyPreview,webLink",
-            )
-            .orderby("receivedDateTime desc")
+            .select(selectFields)
+            .orderby(`${dateField} desc`)
             .top(Math.min(maxItems, 50))
             .get()
     ) as GraphPage<EmailRaw>;
@@ -56,20 +65,22 @@ async function fetchEmails(
     const page = res.value ?? [];
     let skippedCount = 0;
     for (const m of page) {
-      const fromAddr = m.from?.emailAddress?.address?.toLowerCase();
-      if (fromAddr && excludeList.includes(fromAddr)) {
-        excluded.push(m);
-        skippedCount++;
-        continue;
+      m.direction = direction;
+      if (direction === "received") {
+        const fromAddr = m.from?.emailAddress?.address?.toLowerCase();
+        if (fromAddr && excludeList.includes(fromAddr)) {
+          excluded.push(m);
+          skippedCount++;
+          continue;
+        }
       }
       results.push(m);
     }
 
     log.info(
-      `    [Pagina ${pageNum++}] Scaricati ${page.length} messaggi (scartati: ${skippedCount}). Totale accumulato: ${results.length}`,
+      `    [Pagina ${pageNum++}] Scaricati ${page.length} messaggi ${direction} (scartati: ${skippedCount}). Totale: ${results.length}`,
     );
 
-    // Stop if we hit the cap or end of stream
     nextLink =
       results.length < maxItems ? (res["@odata.nextLink"] ?? null) : null;
     if (nextLink && results.length >= maxItems) {
@@ -80,19 +91,19 @@ async function fetchEmails(
     }
   } while (nextLink);
 
-  // LOG UNIVOCO MITTENTI (per facilitare popolamento excludeList nel .env)
-  const allMessages = [...results, ...excluded];
-  const uniqueSenders = new Set<string>();
-  allMessages.forEach((m) => {
-    const addr = m.from?.emailAddress?.address?.toLowerCase();
-    if (addr) uniqueSenders.add(addr);
-  });
-  const sortedSenders = Array.from(uniqueSenders).sort();
-
-  log.info(
-    `    [Debug] Mittenti univoci trovati in questo range (${sortedSenders.length}):`,
-  );
-  sortedSenders.forEach((s) => log.debug(`      - ${s}`));
+  if (direction === "received") {
+    const allMessages = [...results, ...excluded];
+    const uniqueSenders = new Set<string>();
+    allMessages.forEach((m) => {
+      const addr = m.from?.emailAddress?.address?.toLowerCase();
+      if (addr) uniqueSenders.add(addr);
+    });
+    const sortedSenders = Array.from(uniqueSenders).sort();
+    log.info(
+      `    [Debug] Mittenti univoci trovati in questo range (${sortedSenders.length}):`,
+    );
+    sortedSenders.forEach((s) => log.debug(`      - ${s}`));
+  }
 
   return { results: results.slice(0, maxItems), excluded };
 }
@@ -127,27 +138,27 @@ export async function collectGraphEmail(
       return [outPath];
     }
 
-    const filter = `receivedDateTime ge ${getApiStartOfDay(date)} and receivedDateTime le ${getApiEndOfDay(date)}`;
-    const { results, excluded } = await fetchEmails(
-      client,
-      filter,
-      effectiveMax,
-    );
+    const receivedFilter = `receivedDateTime ge ${getApiStartOfDay(date)} and receivedDateTime le ${getApiEndOfDay(date)}`;
+    const sentFilter = `sentDateTime ge ${getApiStartOfDay(date)} and sentDateTime le ${getApiEndOfDay(date)}`;
+    const [
+      { results: received, excluded },
+      { results: sent },
+    ] = await Promise.all([
+      fetchEmails(client, receivedFilter, "received", effectiveMax),
+      fetchEmails(client, sentFilter, "sent", effectiveMax),
+    ]);
 
-    const merged = await mergeByKey<EmailRaw>(outPath, results, "id");
+    const combined = [...received, ...sent];
+    const merged = await mergeByKey<EmailRaw>(outPath, combined, "id");
     await fs.writeFile(outPath, JSON.stringify(merged, null, 2), "utf-8");
 
     if (excluded.length > 0) {
       const mergedExcl = await mergeByKey<EmailRaw>(exclPath, excluded, "id");
-      await fs.writeFile(
-        exclPath,
-        JSON.stringify(mergedExcl, null, 2),
-        "utf-8",
-      );
+      await writeJson(exclPath, mergedExcl);
     }
 
     log.info(
-      `  [Graph] Email ${month}: ${results.length} effettive (+${excluded.length} scartate)`,
+      `  [Graph] Email ${month}: ${received.length} ricevute + ${sent.length} inviate (+${excluded.length} scartate)`,
     );
     await writeMeta(EMAIL_DIR, month, {
       lastExtractedDate: today,
@@ -175,15 +186,19 @@ export async function collectGraphEmail(
       outPaths.push(outPath);
     } else {
       try {
-        const filter = `receivedDateTime ge ${getApiStartOfDay(month)} and receivedDateTime le ${getApiEndOfDay(month)}`;
-        const { results, excluded } = await fetchEmails(
-          client,
-          filter,
-          effectiveMax,
-        );
+        const receivedFilter = `receivedDateTime ge ${getApiStartOfDay(month)} and receivedDateTime le ${getApiEndOfDay(month)}`;
+        const sentFilter = `sentDateTime ge ${getApiStartOfDay(month)} and sentDateTime le ${getApiEndOfDay(month)}`;
+        const [
+          { results: received, excluded },
+          { results: sent },
+        ] = await Promise.all([
+          fetchEmails(client, receivedFilter, "received", effectiveMax),
+          fetchEmails(client, sentFilter, "sent", effectiveMax),
+        ]);
 
-        const merged = await mergeByKey<EmailRaw>(outPath, results, "id");
-        await fs.writeFile(outPath, JSON.stringify(merged, null, 2), "utf-8");
+        const combined = [...received, ...sent];
+        const merged = await mergeByKey<EmailRaw>(outPath, combined, "id");
+        await writeJson(outPath, merged);
 
         if (excluded.length > 0) {
           const mergedExcl = await mergeByKey<EmailRaw>(
@@ -191,11 +206,7 @@ export async function collectGraphEmail(
             excluded,
             "id",
           );
-          await fs.writeFile(
-            exclPath,
-            JSON.stringify(mergedExcl, null, 2),
-            "utf-8",
-          );
+          await writeJson(exclPath, mergedExcl);
         }
 
         await writeMeta(EMAIL_DIR, month, {
@@ -204,7 +215,7 @@ export async function collectGraphEmail(
         });
         outPaths.push(outPath);
         log.info(
-          `${month}: ${results.length} email (+${excluded.length} escluse)`,
+          `${month}: ${received.length} ricevute + ${sent.length} inviate (+${excluded.length} escluse)`,
         );
       } catch (err) {
         log.warn(`${month}: ${(err as Error).message}`);

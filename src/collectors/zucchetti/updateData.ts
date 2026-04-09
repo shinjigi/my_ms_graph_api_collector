@@ -11,9 +11,13 @@ import type { ZucchettiRequestResult } from "@shared/submit";
 import { ZucchettiRequestParams } from "@shared/zucchetti";
 
 // Zucchetti valid giustificativi mapped to the HTML select options
-import { ZUCCHETTI_ACTIVITIES as validActivities } from "@shared/zucchetti";
+import { ZUCCHETTI_ACTIVITIES } from "@shared/zucchetti";
+import { fileURLToPath } from "url";
 
-export { validActivities };
+const isMainModule =
+  process.argv[1] &&
+  (process.argv[1] === fileURLToPath(import.meta.url) ||
+    process.argv[1].includes("zucchetti/updateData"));
 
 /**
  * After submit (or skip), scrape the current day from the Cartellino,
@@ -31,7 +35,7 @@ async function postSubmitScrape(
   const validated = validateDay(scraped);
   await patchRawZucchettiFile(targetDate, validated);
 
-  const agg = await aggregateSingleDay(targetDate, validated);
+  const agg = await aggregateSingleDay(new Date(targetDate), validated);
 
   return {
     date: agg.date,
@@ -76,13 +80,13 @@ export async function submitZucchettiRequest(
     };
   }
 
-  const matchedActivity = validActivities.find((a) =>
+  const matchedActivity = ZUCCHETTI_ACTIVITIES.find((a) =>
     a.toUpperCase().includes(activityType),
   );
   if (!matchedActivity) {
     return {
       success: false,
-      message: `Activity type "${activityType}" not recognized. Valid: ${validActivities.join(", ")}`,
+      message: `Activity type "${activityType}" not recognized. Valid: ${ZUCCHETTI_ACTIVITIES.join(", ")}`,
     };
   }
 
@@ -258,7 +262,7 @@ export async function submitZucchettiRequest(
       await newPage.waitForTimeout(3000);
       await newPage.waitForSelector(`text=${matchedActivity}`, {
         state: "visible",
-        timeout: 15000,
+        timeout: 30000,
       });
       log.info(`Verified "${matchedActivity}" on timesheet for ${targetDate}.`);
       result.message = `"${matchedActivity}" submitted for ${targetDate}.`;
@@ -287,7 +291,7 @@ export async function submitZucchettiRequest(
 }
 
 // --- CLI entry point ---
-if (require.main === module || process.argv[1]?.includes("updateData")) {
+if (isMainModule) {
   const cliOptions = {
     date: { type: "string" as const },
     type: { type: "string" as const, default: "SMART WORKING" },

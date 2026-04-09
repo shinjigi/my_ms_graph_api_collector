@@ -18,7 +18,7 @@
                           @click="selectTsDay(i)">
                         <span :class="isToday(d, i) ? 'text-primary font-bold' : ''">{{ d.label }}</span>
                         <span class="font-normal opacity-60 text-xs">{{ d.date }}</span>
-                        <span class="text-xs font-bold" :class="rendIconCls(rend(i))">{{ rendIcon(rend(i)) }}</span>
+                        <span class="text-xs font-bold" :class="rendStatusIconCls(ts.rendPerDay[i] ?? null)">{{ rendStatusIcon(ts.rendPerDay[i] ?? null) }}</span>
                     </span>
                 </template>
             </th>
@@ -58,13 +58,12 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
 import { useTimesheetStore } from '../../stores/useTimesheetStore';
-import { usePickerStore } from '../../stores/usePickerStore';
 import { useUiStore } from '../../stores/useUiStore';
 import type { Day } from '../../types';
+import {  rendStatusIcon, rendStatusIconCls } from '../../utils';
 
 const router = useRouter();
 const ts     = useTimesheetStore();
-const picker = usePickerStore();
 const ui     = useUiStore();
 
 function selectTsDay(i: number) {
@@ -78,28 +77,9 @@ function selectTsDay(i: number) {
     router.push(`/dashboard/${yr}-${mo}-${d}`);
 }
 
-function isToday(d: Day, i: number): boolean {
-    const dayDate = ts.weekData?.days[i]?.date;
-    if (!dayDate) return false;
-    return new Date(dayDate).toDateString() === picker.pickerToday.toDateString();
-}
-
-const rendIcon    = (r: Day['rend']) => r === 'ok' ? '✓' : r === 'warn' ? '⚠' : r === 'err' ? '✗' : '';
-const rendIconCls = (r: Day['rend']) => r === 'ok' ? 'text-success' : r === 'warn' ? 'text-warning' : r === 'err' ? 'text-error opacity-80' : 'opacity-0';
-const rend = (i: number) => ts.rendPerDay[i] ?? null;
+const isToday = (d: Day, i: number) => ts.getDayColCls(i).includes('today-col');
 
 function dayHeadCls(d: Day, i: number): string[] {
-    const cls: string[] = [];
-    if (d?.holiday) {
-        cls.push('holiday-col');
-    } else {
-        const r = rend(i);
-        if (r === 'ok')   cls.push('day-ok');
-        if (r === 'warn') cls.push('day-warn');
-        if (r === 'err')  cls.push('day-err');
-    }
-    if (isToday(d, i))               cls.push('today-col');
-    if (i === picker.selectedDayIdx) cls.push('selected-col');
-    return cls;
+    return ts.getDayColCls(i);
 }
 </script>

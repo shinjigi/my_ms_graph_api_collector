@@ -70,8 +70,8 @@ export interface TpOpenItem {
   parentName: string | null;
   owner: string; // normalized
   assignments: TpAssignmentEntry[];
-  createDate?: string; // YYYY-MM-DD
-  lastStateChangeDate?: string; // YYYY-MM-DD
+  createDate?: Date | null;
+  lastStateChangeDate?: Date | null;
 }
 
 export interface TpTimeEntry {
@@ -100,12 +100,12 @@ export interface TpLogTimeInput {
   entityType?: "UserStory" | "Task" | "Bug";
   description: string;
   spent: number; // hours
-  date?: string; // YYYY-MM-DD, defaults to today
+  date?: Date | string; // Date or YYYY-MM-DD, defaults to today
 }
 
 export interface TpLogTimeResult {
   id: number;
-  date: string;
+  date: Date | null | string;
   spent: number;
   description: string;
   user: string;

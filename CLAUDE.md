@@ -44,7 +44,18 @@ src/analysis/
 └── geminiProvider.ts    ← Google Generative AI SDK (GeminiProvider)
 ```
 
-`config/master-rules.md` — Markdown file with business rules injected into the system prompt at runtime. Loaded fresh on every `analyzeBatch()` call via `loadMasterRules()`. Edit this file to tune AI attribution logic without touching code. Missing file is silently ignored (base `SYSTEM_PROMPT` used as-is).
+**Analysis config files — strict separation of concerns:**
+
+| File | Responsibility |
+|------|---------------|
+| `config/defaults.json` | Recurring activities (taskId, hours, autoApprove), mechanical thresholds. Arrives in AI prompt as `preSeededEntries`. |
+| `config/master-rules.md` | AI reasoning rules: signal hierarchy, signal→task mapping, scenario heuristics. Contains task IDs for mapping but NOT hours. |
+| `src/analysers/prompts.ts` | Prompt structure: output format, general behaviour. No business-specific task IDs. |
+| `data/kb/us-summaries.json` | Task catalog (auto-generated from TP API). Do not manually edit. |
+
+`master-rules.md` is injected into the system prompt at runtime via `loadMasterRules()`. Loaded fresh on every `analyzeBatch()` call. Missing file is silently ignored.
+
+Post-AI normalization (`normalizeEntries()`): recurring entries are kept fixed, AI entries are scaled proportionally to match the target hours. Safety net for models that struggle with arithmetic.
 
 Server endpoints:
 - `POST /api/analyze/:date` — single day (202 + jobId)

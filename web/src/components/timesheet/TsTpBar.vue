@@ -72,7 +72,7 @@ function selectedDateStr(): string {
 }
 
 function runWeekAnalysis(force = false) {
-    const monday = ts.currentMonday || selectedDateStr();
+    const monday = ts.currentMonday ? dateToString(ts.currentMonday) : selectedDateStr();
     analysis.runWeek(monday, force);
 }
 

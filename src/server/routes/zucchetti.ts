@@ -6,11 +6,11 @@
  * in updateData.ts (when scrapeAfterSubmit is true).
  */
 import { Router, Request, Response } from "express";
+import { submitZucchettiRequest } from "../../collectors/zucchetti/updateData";
 import {
-  submitZucchettiRequest,
-  validActivities,
-} from "../../collectors/zucchetti/updateData";
-import { ZucchettiRequestParams } from "@shared/zucchetti";
+  ZUCCHETTI_ACTIVITIES,
+  ZucchettiRequestParams,
+} from "@shared/zucchetti";
 import { createLogger } from "../../logger";
 const logger = createLogger("zucchetti-route");
 
@@ -18,7 +18,7 @@ export const zucchettiRouter = Router();
 
 // GET /api/zucchetti/activities — list valid activity types
 zucchettiRouter.get("/activities", (_req: Request, res: Response) => {
-  res.json({ activities: validActivities });
+  res.json({ activities: ZUCCHETTI_ACTIVITIES });
 });
 
 // POST /api/zucchetti/request — submit activity via Playwright

@@ -7,8 +7,9 @@
  */
 import { Router, Request, Response } from "express";
 import * as crypto from "node:crypto";
-import * as fs from "node:fs/promises";
+import { access, mkdir } from "node:fs/promises";
 import * as path from "node:path";
+import { readJson, writeJson } from "../../json-io";
 import {
   AGG_DIR,
   PROPOSALS_DIR,
@@ -21,8 +22,7 @@ import {
 import { AnalysisJobStatus, DayProposal, ProposalEntry } from "@shared/analysis";
 import { AggregatedDay } from "@shared/aggregator";
 import { createLogger } from "../../logger";
-import { TargetprocessClient } from "../../targetprocess/client";
-import { parseTpDate, groupTpEntriesByTask } from "../../targetprocess/format";
+import { refreshReportedHours } from "../../targetprocess/refreshHours";
 const logger = createLogger("api-analyze");
 
 export const analyzeRouter = Router();
@@ -33,7 +33,7 @@ const jobs = new Map<string, AnalysisJobStatus>();
 /** Check if KB file exists. */
 async function kbExists(): Promise<boolean> {
   try {
-    await fs.access(KB_FILE);
+    await access(KB_FILE);
     return true;
   } catch {
     return false;
@@ -42,32 +42,27 @@ async function kbExists(): Promise<boolean> {
 
 /** Load aggregated day from disk, or null if missing. */
 async function loadAggDay(date: string): Promise<AggregatedDay | null> {
-  try {
-    const raw = await fs.readFile(path.join(AGG_DIR, `${date}.json`), "utf-8");
-    return JSON.parse(raw) as AggregatedDay;
-  } catch {
-    return null;
-  }
+  return readJson<AggregatedDay | null>(path.join(AGG_DIR, `${date}.json`), null);
 }
 
 /** Check if proposal already exists for a date. */
 async function proposalExists(date: string): Promise<boolean> {
   try {
-    await fs.access(path.join(PROPOSALS_DIR, `${date}.json`));
+    await access(path.join(PROPOSALS_DIR, `${date}.json`));
     return true;
   } catch {
     return false;
   }
 }
 
-import { getMonday, shiftDate, getISOTimestamp } from "@shared/dates";
+import { getMonday, shiftDateString, getISOTimestamp, dateToString } from "@shared/dates";
 
 /** Get Monday-to-Friday dates for the week containing the given date. */
 function weekDates(dateStr: string): string[] {
   const monday = getMonday(dateStr);
   const dates: string[] = [];
   for (let i = 0; i < 5; i++) {
-    dates.push(shiftDate(monday, i));
+    dates.push(shiftDateString(monday, i));
   }
   return dates;
 }
@@ -81,7 +76,7 @@ async function runAnalysis(job: AnalysisJobStatus & { id: string }, force: boole
     const defaults = await loadDefaults();
     const providers = buildProviders();
 
-    await fs.mkdir(PROPOSALS_DIR, { recursive: true });
+    await mkdir(PROPOSALS_DIR, { recursive: true });
 
     const daysToProcess: AggregatedDay[] = [];
 
@@ -96,22 +91,9 @@ async function runAnalysis(job: AnalysisJobStatus & { id: string }, force: boole
       daysToProcess.push(day);
     }
 
-    // Context enrichment: fetch actual hours already on TP to avoid redundant hints
+    // Refresh reported hours from TP API (persists to aggregated files too)
     if (daysToProcess.length > 0) {
-      try {
-        const minDate = daysToProcess[0].date;
-        const maxDate = daysToProcess[daysToProcess.length - 1].date;
-        const tp = new TargetprocessClient();
-        const me = await tp.getMe();
-        const entries = await tp.getTimesByUserAndDateRange(me.Id, minDate, maxDate);
-
-        for (const day of daysToProcess) {
-          const daily = entries.filter(e => parseTpDate(e.Date) === day.date);
-          day.reportedHours = groupTpEntriesByTask(daily);
-        }
-      } catch (err) {
-        logger.warn(`[analyze-job ${job.id}] Fallito recupero ore reali TP: ${(err as Error).message}`);
-      }
+      await refreshReportedHours(daysToProcess);
     }
 
     if (daysToProcess.length === 0) {
@@ -133,32 +115,35 @@ async function runAnalysis(job: AnalysisJobStatus & { id: string }, force: boole
           const propPath = path.join(PROPOSALS_DIR, `${proposal.date}.json`);
 
           // Data integrity: merge user-set statuses/approvals from existing file
-          try {
-            const raw = await fs.readFile(propPath, "utf-8");
-            const old = JSON.parse(raw) as DayProposal;
-            if (old.entries) {
-              for (const e of proposal.entries) {
-                const oe = old.entries.find((x: ProposalEntry) => x.taskId === e.taskId);
-                if (oe) {
-                  if (oe.status) e.status = oe.status;
-                  if (oe.approved != null) e.approved = oe.approved;
+          const old = await readJson<DayProposal | null>(propPath, null);
+          if (old?.entries) {
+            for (const e of proposal.entries) {
+              const oe = old.entries.find((x: ProposalEntry) => x.taskId === e.taskId);
+              if (oe) {
+                // Mantiene 'dismissed' sempre.
+                if (oe.status === 'dismissed') {
+                  e.status = 'dismissed';
+                } else if (oe.status === 'applied') {
+                  // Mantiene 'applied' solo se NON è un rianalizza forzato E se le ore non sono cambiate.
+                  if (!force && oe.inferredHours === e.inferredHours) {
+                    e.status = 'applied';
+                  }
+                } else if (oe.status) {
+                  e.status = oe.status;
                 }
+
+                // Gestione vecchi custom overrides
+                if (!force && oe.approved != null) e.approved = oe.approved;
               }
             }
-          } catch {
-            /* no existing file or invalid — ignore */
           }
 
-          await fs.writeFile(
-            propPath,
-            JSON.stringify(proposal, null, 2),
-            "utf-8",
-          );
-          job.completed[proposal.date] = proposal;
+          await writeJson(propPath, proposal);
+          job.completed[dateToString(proposal.date)] = proposal;
         }
       } catch (err) {
         // Se l'intero batch fallisce, segna errore per tutte le date
-        for (const date of daysToProcess.map((d) => d.date)) {
+        for (const date of daysToProcess.map((d) => dateToString(d.date))) {
           job.errors[date] = (err as Error).message;
           logger.error(
             `[analyze-job ${job.id}] Errore per ${date}: ${(err as Error).message}`,

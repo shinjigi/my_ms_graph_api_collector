@@ -107,11 +107,28 @@ export class TargetprocessClient {
 
   async logTime(input: TpLogTimeInput): Promise<TpLogTimeResult> {
     const me = await this.getMe();
-    const date = input.date ?? dateToString();
+    const date = dateToString(input.date);
 
     // 1. Check for existing time entries for this user, date and usId
     const existing = await this.getTimesByUserAndDate(me.Id, date);
     const matches = existing.filter((e) => e.Assignable?.Id === input.usId);
+    
+    if (input.spent <= 0) {
+      if (matches.length > 0) {
+        log.info(`Deleting time entries for US#${input.usId} on ${date} (spent 0)`);
+        for (const match of matches) {
+          await this.deleteTime(match.Id);
+        }
+      }
+      return {
+        id: 0,
+        date: parseTpDate(date),
+        spent: 0,
+        description: "",
+        user: me.FullName,
+        assignable: "",
+      };
+    }
 
     const payload = {
       Assignable: { Id: input.usId },
@@ -393,10 +410,11 @@ export class TargetprocessClient {
    */
   async getTimesByUserAndDate(
     userId: number,
-    date: string,
+    date: Date | string,
   ): Promise<TpTimeEntry[]> {
+    const dStr = dateToString(date);
     const result = await this.request<TpList<TpTimeEntry>>("v1", "Times", {
-      where: `(User.Id eq ${userId}) and (Date gte '${date}') and (Date lte '${date}')`,
+      where: `(User.Id eq ${userId}) and (Date gte '${dStr}') and (Date lte '${dStr}')`,
       include: "[Id,Date,Spent,Description,User[FullName],Assignable[Id,Name]]",
       take: "200",
     });
@@ -408,16 +426,18 @@ export class TargetprocessClient {
    */
   async getTimesByUserAndDateRange(
     userId: number,
-    from: string,
-    to: string,
+    from: Date | string,
+    to: Date | string,
   ): Promise<TpTimeEntry[]> {
+    const fromStr = dateToString(from);
+    const toStr = dateToString(to);
     const allItems: TpTimeEntry[] = [];
     let skip = 0;
     const take = 200;
 
     while (true) {
       const result = await this.request<TpList<TpTimeEntry>>("v1", "Times", {
-        where: `(User.Id eq ${userId}) and (Date gte '${from}') and (Date lte '${to}')`,
+        where: `(User.Id eq ${userId}) and (Date gte '${fromStr}') and (Date lte '${toStr}')`,
         include:
           "[Id,Date,Spent,Description,User[FullName],Assignable[Id,Name,EntityState[Name],Project[Id,Name]]]",
         orderby: "Date",

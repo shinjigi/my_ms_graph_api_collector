@@ -4,7 +4,7 @@
     "checkJs": false,
     "outDir": "dist",
     "paths": {
-      "@shared/*": ["shared/*"]
+      "@shared/*": ["./shared/*"]
     },
     "sourceMap": true
   },

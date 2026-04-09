@@ -282,7 +282,7 @@ function applyResults(
     }
     const timeEntryDates = original.logs
       .map((l) => parseTpDate(l.Date))
-      .filter((d) => d !== "-");
+      .filter((d): d is Date => d !== null);
     const maxTimeEntry =
       timeEntryDates.length > 0
         ? timeEntryDates.reduce((a, b) => (a > b ? a : b))
@@ -290,7 +290,7 @@ function applyResults(
     const stateDate = original.item.lastStateChangeDate;
     const lastActivityDate =
       maxTimeEntry && stateDate
-        ? maxTimeEntry > stateDate
+        ? maxTimeEntry.getTime() > stateDate.getTime()
           ? maxTimeEntry
           : stateDate
         : (maxTimeEntry ?? stateDate);

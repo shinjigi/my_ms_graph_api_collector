@@ -3,6 +3,7 @@
  * that the standup chat messages are retrievable.
  * Usage: npx tsx scripts/test-teams-thursday.ts [YYYY-MM-DD]
  */
+import { ChatMessage } from "@microsoft/microsoft-graph-types";
 import * as dotenv from "dotenv";
 dotenv.config();
 
@@ -13,14 +14,6 @@ interface GraphResponse<T> {
   "@odata.context"?: string;
 }
 
-interface ChatMessage {
-  // O il nome che usi nel tuo codice
-  id: string;
-  topic: string | null;
-  chatType: string;
-  lastUpdatedDateTime?: string; // Aggiungi questa!
-}
-
 // Graph client will be imported dynamically in run()
 
 const targetDate = process.argv[2] ?? "2026-03-05";
@@ -28,13 +21,12 @@ const targetDate = process.argv[2] ?? "2026-03-05";
 async function run(): Promise<void> {
   console.log(`\nTest fetch Teams messages — ${targetDate}\n`);
 
-  const { createGraphClient } = (await import(
-    "../src/graphClient"
-  )) as unknown as {
-    createGraphClient: () => Promise<
-      import("@microsoft/microsoft-graph-client").Client
-    >;
-  };
+  const { createGraphClient } =
+    (await import("../src/graphClient")) as unknown as {
+      createGraphClient: () => Promise<
+        import("@microsoft/microsoft-graph-client").Client
+      >;
+    };
   const client = await createGraphClient();
   const c = client;
 
@@ -44,7 +36,11 @@ async function run(): Promise<void> {
   let nextLink: string | null = null;
 
   do {
-    const res: GraphResponse<{ id: string; topic: string | null; chatType: string }> = nextLink
+    const res: GraphResponse<{
+      id: string;
+      topic: string | null;
+      chatType: string;
+    }> = nextLink
       ? await client.api(nextLink).get()
       : await client
           .api("/me/chats")

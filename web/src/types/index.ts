@@ -2,28 +2,46 @@
 
 // --- Shared types (re-exported from @shared/* for single-import convenience) ---
 
-import type { ProposalEntry, DayProposal, AnalysisJobStatus, AnalyzeStartResponse } from "@shared/analysis";
+import type {
+  ProposalEntry,
+  DayProposal,
+  AnalysisJobStatus,
+  AnalyzeStartResponse,
+} from "@shared/analysis";
 import type { SubmitEdit, ZucchettiRequestResult } from "@shared/submit";
 import type { WeekDayData, ApiWeekResponse } from "@shared/week";
-import type { TpWeekEntry as ApiTpWeekEntry, TpWeekResponse as ApiTpWeekResponse } from "@shared/targetprocess";
+import type {
+  TpWeekEntry as ApiTpWeekEntry,
+  TpWeekResponse as ApiTpWeekResponse,
+} from "@shared/targetprocess";
 import type { ZucchettiDay, WorkLocation } from "@shared/zucchetti";
-import type { NibolBooking, TeamsMessageRaw, BrowserVisit } from "@shared/aggregator";
+import type { NibolBooking, BrowserVisit, TeamsChatData, TeamsChatMessage } from "@shared/aggregator";
 
 export type {
-  ProposalEntry, DayProposal, AnalysisJobStatus, AnalyzeStartResponse,
-  SubmitEdit, ZucchettiRequestResult,
-  WeekDayData, ApiWeekResponse,
-  ApiTpWeekEntry, ApiTpWeekResponse,
-  ZucchettiDay, WorkLocation,
-  NibolBooking, TeamsMessageRaw, BrowserVisit
+  ProposalEntry,
+  DayProposal,
+  AnalysisJobStatus,
+  AnalyzeStartResponse,
+  SubmitEdit,
+  ZucchettiRequestResult,
+  WeekDayData,
+  ApiWeekResponse,
+  ApiTpWeekEntry,
+  ApiTpWeekResponse,
+  ZucchettiDay,
+  WorkLocation,
+  NibolBooking,
+  BrowserVisit,
+  TeamsChatData,
+  TeamsChatMessage,
 };
 
 export type CellMode =
-    | 'clean'        // nessun hint, nessun edit
-    | 'hint-only'    // hint AI presente, non ancora toccato dall'utente
-    | 'hint-match'   // utente ha accettato o inserito lo stesso valore
-    | 'hint-differ'  // utente ha inserito un valore diverso
-    | 'user-edit';   // utente ha editato, nessun hint
+  | "clean" // nessun hint, nessun edit
+  | "hint-only" // hint AI presente, non ancora toccato dall'utente
+  | "hint-match" // utente ha accettato o inserito lo stesso valore
+  | "hint-differ" // utente ha inserito un valore diverso
+  | "user-edit"; // utente ha editato, nessun hint
 
 export interface Holiday {
   m: number;
@@ -120,7 +138,6 @@ export interface QuickLogItem extends UsCard {
   totAllTime: number;
   rem?: number;
 }
-
 
 // Retro-compatibility for FE components
 export type WeekDayResponse = WeekDayData;

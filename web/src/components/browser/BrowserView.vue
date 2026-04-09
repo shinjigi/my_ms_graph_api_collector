@@ -45,7 +45,7 @@
                     <div class="space-y-1">
                         <div v-for="v in filteredVisits" :key="v.visitId"
                              class="flex items-start gap-2 py-1 border-b border-base-200/50 last:border-0">
-                            <span class="text-xs text-base-content/30 shrink-0 tabular-nums w-10">{{ formatTime(v.visitTime) }}</span>
+                            <span class="text-xs text-base-content/30 shrink-0 tabular-nums w-10">{{ getTimeStringNoSeconds(v.visitTime) }}</span>
                             <div class="min-w-0 flex-1">
                                 <div v-if="v.title" class="text-xs text-base-content/70 truncate" :title="v.title">{{ v.title }}</div>
                                 <div class="text-xs font-mono text-base-content/30 truncate" :title="v.url">{{ v.url }}</div>
@@ -65,7 +65,7 @@
 import { ref, computed, watch }   from 'vue';
 import { usePickerStore }         from '../../stores/usePickerStore';
 import { useDayStore }            from '../../stores/useDayStore';
-import { getTimeString }          from '@shared/dates';
+import { getTimeStringNoSeconds }          from '@shared/dates';
 import type { BrowserDomain }     from '../../types';
 
 const picker = usePickerStore();
@@ -107,10 +107,6 @@ const filteredVisits = computed(() => {
         (v.title ?? '').toLowerCase().includes(needle)
     );
 });
-
-function formatTime(iso: string): string {
-    return getTimeString(iso).slice(0, 5);
-}
 
 watch(() => picker.pickerSelected, (d) => {
     dateLabel.value = d.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'short' });

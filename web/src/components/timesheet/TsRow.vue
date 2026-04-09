@@ -66,15 +66,17 @@
                     <template v-else>
                         <TimeCellWidget
                             :model-value="ts.getHours(row.tpId, i)"
-                            :extra-val-cls="`font-bold text-xs ${i === 4 ? 'text-primary' : ''}`"
+                            :extra-val-cls="`font-bold text-xs ${i === picker.selectedDayIdx ? 'text-primary' : ''}`"
                             :day-delta="ts.totalsRow.delta[i]"
                             :hint-val="cellHint(i)?.inferredHours"
                             :cell-mode="computeCellMode(i)"
                             @update="val => {
                                 ts.setHours(row.tpId, i, val);
                                 if (val === 0) ts.setNote(row.tpId, i, '');
-                                else if (cellHint(i)?.comment)
-                                    ts.setNote(row.tpId, i, cellHint(i)!.comment!);
+                                else {
+                                    const noteText = cellHint(i)?.comment || cellHint(i)?.reasoning;
+                                    if (noteText) ts.setNote(row.tpId, i, noteText);
+                                }
                             }"
                         />
                     </template>
@@ -165,7 +167,10 @@ function computeCellMode(i: number): CellMode {
         return 'clean';
 
     if (!hint || hint.inferredHours <= 0)
-        return hasEdit && hours > 0 ? 'user-edit' : 'clean';
+        return hasEdit ? 'user-edit' : 'clean';
+        
+    if (hasEdit) return 'user-edit';
+    
     if (hours === 0) return 'hint-only';
     if (+hours.toFixed(1) === +hint.inferredHours.toFixed(1)) return 'hint-match';
     return 'hint-differ';
@@ -175,8 +180,9 @@ function acceptHint(dayIdx: number) {
     const hint = cellHint(dayIdx);
     if (!hint || !ts.currentMonday) return;
     ts.setHours(props.row.tpId, dayIdx, hint.inferredHours);
-    if (hint.comment)
-        ts.setNote(props.row.tpId, dayIdx, hint.comment);
+    const noteText = hint.comment || hint.reasoning;
+    if (noteText)
+        ts.setNote(props.row.tpId, dayIdx, noteText);
     
     // Persist to server
     const dateStr = shiftDate(ts.currentMonday!, dayIdx);
@@ -188,8 +194,9 @@ function quickAdd(dayIdx: number) {
     const current = ts.getHours(props.row.tpId, dayIdx);
     if (hint && current === 0) {
         ts.setHours(props.row.tpId, dayIdx, hint.inferredHours);
-        if (hint.comment)
-            ts.setNote(props.row.tpId, dayIdx, hint.comment);
+        const noteText = hint.comment || hint.reasoning;
+        if (noteText)
+            ts.setNote(props.row.tpId, dayIdx, noteText);
     } else {
         ts.setHours(props.row.tpId, dayIdx, current + 0.5);
     }
@@ -223,18 +230,7 @@ const weekTotal = computed(() =>
 );
 
 function cellCls(d: Day, i: number): string[] {
-    const cls: string[] = [];
-    if (d.holiday) {
-        cls.push('holiday-col');
-    } else {
-        const r = ts.rendPerDay[i] ?? null;
-        if (r === 'ok')   cls.push('day-ok');
-        if (r === 'warn') cls.push('day-warn');
-        if (r === 'err')  cls.push('day-err');
-    }
-    if (i === picker.todayDayIdx)    cls.push('today-col');
-    if (i === picker.selectedDayIdx) cls.push('selected-col');
-    return cls;
+    return ts.getDayColCls(i);
 }
 </script>
 

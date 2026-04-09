@@ -77,7 +77,7 @@ export class ClaudeCliProvider implements AnalyzerProvider {
     systemPrompt: string,
     userPromptBatched: string,
     context = "analysis-cli",
-  ): Promise<{ date: string; entries: ProposalEntry[] }[]> {
+  ): Promise<{ date: Date; entries: ProposalEntry[] }[]> {
     const model = process.env["CLAUDE_MODEL"] ?? "claude-haiku-4-5-20251001";
     const promptChars = systemPrompt.length + userPromptBatched.length;
     log.info(
@@ -112,6 +112,6 @@ export class ClaudeCliProvider implements AnalyzerProvider {
       raw: responseText,
     });
 
-    return parsed;
+    return parsed.map((r) => ({ ...r, date: new Date(r.date) }));
   }
 }

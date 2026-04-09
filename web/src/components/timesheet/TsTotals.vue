@@ -5,11 +5,11 @@
             <td colspan="2" class="text-right pr-3 text-base-content/50 text-xs font-semibold">Ore TP</td>
             <td v-for="(d, i) in ts.days.slice(0, 5)" :key="i" class="text-center text-xs font-bold" :class="totalsCellCls(d, i, 'tp')">
                 <template v-if="d.holiday">🇮🇹</template>
-                <template v-else>{{ ts.totalsRow.tp[i] || '—' }}</template>
+                <template v-else>{{ +ts.totalsRow.tp[i].toFixed(1) || '—' }}</template>
             </td>
             <td class="text-center text-xs font-bold weekend-col we-col opacity-35">—</td>
             <td v-if="ui.weVisible" class="text-center text-xs font-bold weekend-col opacity-35">—</td>
-            <td class="text-center font-bold text-primary text-xs">{{ tpWeekTotal }}</td>
+            <td class="text-center font-bold text-primary text-xs">{{ +ts.tpWeekTotal.toFixed(1) }}h</td>
             <td></td>
         </tr>
         <tr class="text-xs ts-totals-bg">
@@ -33,7 +33,7 @@
             </td>
             <td class="text-center text-xs font-bold weekend-col we-col opacity-35">—</td>
             <td v-if="ui.weVisible" class="text-center text-xs font-bold weekend-col opacity-35">—</td>
-            <td class="text-center font-bold text-success text-xs">{{ zucWeekTotal }}</td>
+            <td class="text-center font-bold text-success text-xs">{{ +ts.zucWeekTotal.toFixed(1) }}h</td>
             <td></td>
         </tr>
         <tr class="text-xs border-b-2 border-base-300 ts-totals-bg">
@@ -42,13 +42,13 @@
                 <template v-if="d.holiday">—</template>
                 <template v-else>
                     <span :class="ts.totalsRow.delta[i] === 0 ? 'text-success font-black' : ts.totalsRow.delta[i] > 0 ? 'text-error' : 'text-primary font-bold'">
-                        {{ ts.totalsRow.delta[i] === 0 ? '✓' : ts.totalsRow.delta[i] > 0 ? `−${ts.totalsRow.delta[i]}h` : `+${Math.abs(ts.totalsRow.delta[i])}h` }}
+                        {{ formatDeltaHours(ts.totalsRow.delta[i]) }}
                     </span>
                 </template>
             </td>
             <td class="text-center text-xs weekend-col we-col opacity-35">—</td>
             <td v-if="ui.weVisible" class="text-center text-xs weekend-col opacity-35">—</td>
-            <td class="text-center font-bold text-error text-xs">{{ deltaWeekTotal }}</td>
+            <td class="text-center font-bold text-error text-xs">{{ formatDeltaHours(ts.windowDeltaTotal) }}</td>
             <td></td>
         </tr>
     </tbody>
@@ -56,10 +56,10 @@
 
 <script setup lang="ts">
 import { computed, ref } from 'vue';
-import { useTimesheetStore }                     from '../../stores/useTimesheetStore';
-import { usePickerStore }                        from '../../stores/usePickerStore';
+import { useTimesheetStore } from "../../stores/useTimesheetStore";
+import { usePickerStore } from "../../stores/usePickerStore";
 import { useUiStore }                            from '../../stores/useUiStore';
-import { locationEmoji, locationTitle, giustActivityEmojis } from '../../utils';
+import { locationEmoji, locationTitle, giustActivityEmojis, formatDeltaHours } from '../../utils';
 import type { Day } from '../../types';
 import type { ZucchettiJustification } from '@shared/zucchetti';
 import DayLocationPopover from './DayLocationPopover.vue';
@@ -71,24 +71,14 @@ const ui     = useUiStore();
 const popover = ref<InstanceType<typeof DayLocationPopover> | null>(null);
 
 function isToday(i: number): boolean {
-    const dayDate = ts.weekData?.days[i]?.date;
-    if (!dayDate) return false;
-    return new Date(dayDate).toDateString() === picker.pickerToday.toDateString();
+    return ts.getDayColCls(i).includes('today-col');
 }
 
 function totalsCellCls(d: Day, i: number, row: 'tp' | 'zuc' | 'delta'): string[] {
-    const cls: string[] = [];
-    if (d?.holiday) {
-        cls.push('holiday-col', 'text-xs');
-    } else {
-        const r = ts.rendPerDay[i] ?? null;
-        if (r === 'ok')   cls.push('day-ok');
-        if (r === 'warn') cls.push('day-warn');
-        if (r === 'err')  cls.push('day-err');
-        if (row === 'tp' && isToday(i)) cls.push('text-primary');
+    const cls = ts.getDayColCls(i);
+    if (row === 'tp' && cls.includes('today-col')) {
+        cls.push('text-primary');
     }
-    if (isToday(i))                  cls.push('today-col');
-    if (i === picker.selectedDayIdx) cls.push('selected-col');
     return cls;
 }
 
@@ -108,13 +98,6 @@ function zucBadges(d: Day, i: number): Badge[] {
     }
     return badges;
 }
-
-const tpWeekTotal    = computed(() => ts.totalsRow.tp.reduce((a, b) => a + b, 0));
-const zucWeekTotal   = computed(() => ts.days.reduce((a, d) => a + (d.zucHours || 0), 0).toFixed(1));
-const deltaWeekTotal = computed(() => {
-    const d = +(+zucWeekTotal.value - tpWeekTotal.value).toFixed(1);
-    return (d === 0) ? '✓' : d > 0 ? `−${d}h` : `+${Math.abs(d)}h`;
-});
 </script>
 
 <style scoped>

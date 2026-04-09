@@ -36,20 +36,20 @@
                 <tfoot>
                     <tr class="font-bold text-xs">
                         <td>Totale settimana</td>
-                        <td class="text-center">{{ totalZuc }}h</td>
-                        <td class="text-center">{{ totalTp }}h</td>
-                        <td class="text-center" :class="totalDelta === 0 ? 'text-success' : 'text-error'">
-                            {{ totalDelta === 0 ? '✓' : (totalDelta > 0 ? '−' + totalDelta : '+' + Math.abs(totalDelta)) + 'h' }}
+                        <td class="text-center">{{ ts.zucWorkdayTotal }}h</td>
+                        <td class="text-center">{{ ts.tpWorkdayTotal }}h</td>
+                        <td class="text-center" :class="ts.workdayDeltaTotal === 0 ? 'text-success' : 'text-error'">
+                            {{ formatDeltaHours(ts.workdayDeltaTotal) }}
                         </td>
                         <td></td>
                     </tr>
                 </tfoot>
             </table>
-            <div v-if="pendingEditsCount > 0" class="alert alert-info text-xs p-2 mb-3">
+            <div v-if="ts.pendingSubmissions.length > 0" class="alert alert-info text-xs p-2 mb-3">
                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
                 </svg>
-                <span>Hai {{ pendingEditsCount }} ore modificate non ancora inviate a TP.</span>
+                <span>Hai {{ ts.pendingSubmissions.length }} ore modificate non ancora inviate a TP.</span>
             </div>
             <div class="modal-action mt-2">
                 <button class="btn btn-sm" @click="$emit('close')">Chiudi</button>
@@ -62,13 +62,12 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useTimesheetStore } from '../../stores/useTimesheetStore';
-import { usePickerStore } from '../../stores/usePickerStore';
+import { formatDeltaHours } from '../../utils';
 
 defineProps<{ open: boolean }>();
 defineEmits<{ (e: 'close'): void }>();
 
 const ts     = useTimesheetStore();
-const picker = usePickerStore();
 
 interface VerificaRow {
     label:   string;
@@ -87,10 +86,7 @@ const verificaRows = computed<VerificaRow[]>(() =>
         const zuc   = d.zucHours;
         const tp    = +ts.totalsRow.tp[i].toFixed(1);
         const delta = +(zuc - tp).toFixed(1);
-
-        const today   = picker.pickerToday;
-        const dayDate = ts.weekData?.days[i]?.date;
-        const isToday = !!dayDate && new Date(dayDate).toDateString() === today.toDateString();
+        const isToday = ts.getDayColCls(i).includes('today-col');
 
         if (zuc === 0 && tp === 0) return { label: d.label, zuc, tp, delta: 0, status: 'skip', isToday };
         if (delta === 0)           return { label: d.label, zuc, tp, delta: 0, status: 'ok',   isToday };
@@ -98,13 +94,5 @@ const verificaRows = computed<VerificaRow[]>(() =>
         if (delta < 0)             return { label: d.label, zuc, tp, delta,    status: 'over', isToday };
         return                            { label: d.label, zuc, tp, delta,    status: 'warn', isToday };
     })
-);
-
-const totalZuc   = computed(() => +ts.days.slice(0,5).reduce((a, d) => a + d.zucHours, 0).toFixed(1));
-const totalTp    = computed(() => +ts.totalsRow.tp.slice(0,5).reduce((a, b) => a + b, 0).toFixed(1));
-const totalDelta = computed(() => +(totalZuc.value - totalTp.value).toFixed(1));
-
-const pendingEditsCount = computed(() =>
-    Object.values(ts.hoursEdits).filter(h => h > 0).length
 );
 </script>

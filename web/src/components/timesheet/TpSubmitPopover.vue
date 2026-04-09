@@ -29,9 +29,10 @@
                             <input
                                 type="text"
                                 class="input input-xs input-bordered w-full h-7 text-[11px]"
-                                :class="{ 'input-error': showErrors && !noteFor(e).trim() }"
-                                :placeholder="e.isHint && e.hintComment ? e.hintComment : 'Descrizione...'"
+                                :class="{ 'input-error': showErrors && e.hours > 0 && !noteFor(e).trim() }"
+                                :placeholder="e.hours <= 0 ? 'Nessuna descrizione richiesta (cancellazione)' : (e.isHint && e.hintComment ? e.hintComment : 'Descrizione...')"
                                 :value="noteFor(e)"
+                                :disabled="e.hours <= 0"
                                 @input="ts.setNote(e.tpId, e.dayIdx, ($event.target as HTMLInputElement).value)"
                             />
                         </div>
@@ -138,6 +139,7 @@ function noteFor(e: EntryRow): string {
 const missingNotes = computed(() => {
     let count = 0;
     for (const e of ts.pendingSubmissions as any[]) {
+        if (e.hours <= 0) continue; // Nessuna nota richiesta per le cancellazioni
         const note = ts.getNote(e.tpId, e.dayIdx) || (e.isHint ? e.description : "");
         if (!note || !note.trim()) count++;
     }

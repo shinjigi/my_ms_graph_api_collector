@@ -74,61 +74,66 @@ flowchart TD
 
 ### 2.1 Graph Calendar → `CalendarEventRaw`
 
-| Raw field | Aggregated as | Sent to AI | Notes |
-|-----------|---------------|------------|-------|
-| `subject` | `calendar[].subject` | ✅ full text | Primary signal for meeting-task attribution |
-| `start.dateTime` | `calendar[].start.dateTime` | ✅ sliced to `HH:mm` | Used to infer duration |
-| `end.dateTime` | `calendar[].end.dateTime` | ✅ sliced to `HH:mm` | — |
-| `attendees` | `calendar[].attendees` | ✅ count or name list | **full** mode: first 5 names; **compact/minimal**: count only |
-| `isOnlineMeeting` | not forwarded | ❌ | Not in current prompt |
-| `organizer` | not forwarded | ❌ | Not in current prompt |
+| Raw field         | Aggregated as               | Sent to AI            | Notes                                                         |
+| ----------------- | --------------------------- | --------------------- | ------------------------------------------------------------- |
+| `subject`         | `calendar[].subject`        | ✅ full text          | Primary signal for meeting-task attribution                   |
+| `start.dateTime`  | `calendar[].start.dateTime` | ✅ sliced to `HH:mm`  | Used to infer duration                                        |
+| `end.dateTime`    | `calendar[].end.dateTime`   | ✅ sliced to `HH:mm`  | —                                                             |
+| `attendees`       | `calendar[].attendees`      | ✅ count or name list | **full** mode: first 5 names; **compact/minimal**: count only |
+| `isOnlineMeeting` | not forwarded               | ❌                    | Not in current prompt                                         |
+| `organizer`       | not forwarded               | ❌                    | Not in current prompt                                         |
 
 ### 2.2 Graph Email → `EmailRaw`
 
-| Raw field | Aggregated as | Sent to AI | Notes |
-|-----------|---------------|------------|-------|
-| `subject` | `emails[].subject` | ✅ subjects in compact/full | **full**: up to 20 subjects ×100 chars; **compact**: up to 5 ×80 chars; **minimal**: count only (`emailsReceived`) |
-| `body`, `from`, `to`, … | dropped | ❌ | Privacy; never forwarded |
+Emails are collected in both directions: **received** (`/me/messages`) and **sent** (`/me/mailFolders/sentItems/messages`). Each `EmailRaw` carries a `direction: "received" | "sent"` field and the corresponding timestamp (`receivedDateTime` or `sentDateTime`).
 
-### 2.3 Graph Teams → `TeamsMessageRaw`
+| Raw field               | Aggregated as            | Sent to AI                              | Notes                                                                                                                              |
+| ----------------------- | ------------------------ | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| `direction`             | `emails[].direction`     | ✅ prefix `[rcvd]`/`[sent]` on subjects | Distinguishes passive (received) from active (sent) signals                                                                        |
+| `subject`               | `emails[].subject`       | ✅ subjects in compact/full             | **full**: up to 20 subjects ×100 chars; **compact**: up to 5 ×80 chars; **minimal**: counts only (`emailsReceived` + `emailsSent`) |
+| `receivedDateTime`      | date grouping (received) | ❌                                      | Used for aggregation date filtering                                                                                                |
+| `sentDateTime`          | date grouping (sent)     | ❌                                      | Used for aggregation date filtering                                                                                                |
+| `body`, `from`, `to`, … | dropped                  | ❌                                      | Privacy; never forwarded                                                                                                           |
 
-| Raw field | Aggregated as | Sent to AI | Notes |
-|-----------|---------------|------------|-------|
-| `chatTopic` | `teams[].chatTopic` | ✅ in compact/full | **full**: `{ topic: count }` map; **compact**: unique topic list; **minimal**: total count only |
-| message body | dropped | ❌ | Privacy; never forwarded |
+### 2.3 Graph Teams → `ChatMessage`
+
+| Raw field    | Aggregated as       | Sent to AI         | Notes                                                                                           |
+| ------------ | ------------------- | ------------------ | ----------------------------------------------------------------------------------------------- |
+| `chatTopic`  | `teams[].chatTopic` | ✅ in compact/full | **full**: `{ topic: count }` map; **compact**: unique topic list; **minimal**: total count only |
+| message body | dropped             | ❌                 | Privacy; never forwarded                                                                        |
 
 ### 2.4 Git commits → `GitCommit`
 
-| Raw field | Aggregated as | Sent to AI | Notes |
-|-----------|---------------|------------|-------|
-| `repo` | `gitCommits[].repo` | ✅ | Helps attribute to projects |
-| `message` | `gitCommits[].message` | ✅ | Full message body (`%B`): subject + blank line + body. Key signal for `#TASKID` extraction |
-| `hash`, `author`, `email`, `date` | aggregated | ❌ | Stripped from AI payload |
+| Raw field                         | Aggregated as          | Sent to AI | Notes                                                                                      |
+| --------------------------------- | ---------------------- | ---------- | ------------------------------------------------------------------------------------------ |
+| `repo`                            | `gitCommits[].repo`    | ✅         | Helps attribute to projects                                                                |
+| `message`                         | `gitCommits[].message` | ✅         | Full message body (`%B`): subject + blank line + body. Key signal for `#TASKID` extraction |
+| `hash`, `author`, `email`, `date` | aggregated             | ❌         | Stripped from AI payload                                                                   |
 
 ### 2.5 SVN commits → `SvnCommit`
 
-| Raw field | Aggregated as | Sent to AI | Notes |
-|-----------|---------------|------------|-------|
-| `message` | `svnCommits[].message` | ✅ | Same role as git commit messages |
-| `paths` | `svnCommits[].paths` | ✅ in **full** mode | First 3 paths; stripped in compact/minimal |
-| `revision`, `author`, `date` | aggregated | ❌ | Stripped from AI payload |
+| Raw field                    | Aggregated as          | Sent to AI          | Notes                                      |
+| ---------------------------- | ---------------------- | ------------------- | ------------------------------------------ |
+| `message`                    | `svnCommits[].message` | ✅                  | Same role as git commit messages           |
+| `paths`                      | `svnCommits[].paths`   | ✅ in **full** mode | First 3 paths; stripped in compact/minimal |
+| `revision`, `author`, `date` | aggregated             | ❌                  | Stripped from AI payload                   |
 
 ### 2.6 Zucchetti → `ZucchettiDay`
 
-| Raw field | Aggregated as | Sent to AI | Notes |
-|-----------|---------------|------------|-------|
-| `hOrd` | `oreTarget` (parsed to decimal) | ✅ | Core constraint: AI must fill exactly this many hours |
-| `orario` | `isWorkday` flag | ✅ indirect | `"DOM"`/`"SAB"` → skip day entirely |
-| `giustificativi[].text` | `location` (derived) | ✅ as `location` string | `"SMART WORKING"` → `"smart"`, office otherwise |
-| `timbrature`, `hEcc`, `richieste` | `zucchetti` field | ❌ | Not forwarded to AI prompt |
+| Raw field                         | Aggregated as                   | Sent to AI              | Notes                                                 |
+| --------------------------------- | ------------------------------- | ----------------------- | ----------------------------------------------------- |
+| `hOrd`                            | `oreTarget` (parsed to decimal) | ✅                      | Core constraint: AI must fill exactly this many hours |
+| `orario`                          | `isWorkday` flag                | ✅ indirect             | `"DOM"`/`"SAB"` → skip day entirely                   |
+| `giustificativi[].text`           | `location` (derived)            | ✅ as `location` string | `"SMART WORKING"` → `"smart"`, office otherwise       |
+| `timbrature`, `hEcc`, `richieste` | `zucchetti` field               | ❌                      | Not forwarded to AI prompt                            |
 
 ### 2.7 Browser history → `BrowserVisit`
 
-| Raw field | Sent to AI | Notes |
-|-----------|------------|-------|
-| `url` | ✅ **task IDs only** (compact/full) | Regex `/\/entity\/\w+\/(\d{5,6})\b/g` extracts TP task IDs — URL itself never sent |
-| `title` | ✅ **task IDs only** (compact/full) | Regex `/#(\d{5,6})\b/g` extracts TP task IDs — title text never sent |
-| `visitTime`, host, path | ❌ | Privacy; not forwarded |
+| Raw field               | Sent to AI                          | Notes                                                                              |
+| ----------------------- | ----------------------------------- | ---------------------------------------------------------------------------------- |
+| `url`                   | ✅ **task IDs only** (compact/full) | Regex `/\/entity\/\w+\/(\d{5,6})\b/g` extracts TP task IDs — URL itself never sent |
+| `title`                 | ✅ **task IDs only** (compact/full) | Regex `/#(\d{5,6})\b/g` extracts TP task IDs — title text never sent               |
+| `visitTime`, host, path | ❌                                  | Privacy; not forwarded                                                             |
 
 ---
 
@@ -139,7 +144,7 @@ flowchart TD
     subgraph Inputs["Monthly raw files (all sources)"]
         I1["graph-calendar/YYYY-MM.json\n→ CalendarEventRaw&#91;&#93;"]
         I2["graph-email/YYYY-MM.json\n→ EmailRaw&#91;&#93;"]
-        I3["graph-teams/YYYY-MM.json\n→ TeamsMessageRaw&#91;&#93;"]
+        I3["graph-teams/YYYY-MM.json\n→ ChatMessage&#91;&#93;"]
         I4["git/YYYY-MM.json\n→ GitCommit&#91;&#93;"]
         I5["svn/YYYY-MM.json\n→ SvnCommit&#91;&#93;"]
         I6["zucchetti/YYYY-MM.json\n→ ZucchettiDay&#91;&#93;"]
@@ -148,7 +153,7 @@ flowchart TD
     end
 
     subgraph Aggregator["aggregator.ts — per calendar day"]
-        AGG["AggregatedDay\n─────────────────\ndate: YYYY-MM-DD\nisWorkday: bool  ← zucchetti.orario\noreTarget: float ← zucchetti.hOrd parsed\nlocation: enum   ← giustificativi keywords\nnibol: NibolBooking | null\nzucchetti: ZucchettiDay | null\ncalendar: CalendarEventRaw&#91;&#93;\nemails: EmailRaw&#91;&#93;\nteams: TeamsMessageRaw&#91;&#93;\ngitCommits: GitCommit&#91;&#93;\nsvnCommits: SvnCommit&#91;&#93;\nbrowserVisits: BrowserVisit&#91;&#93;"]
+        AGG["AggregatedDay\n─────────────────\ndate: YYYY-MM-DD\nisWorkday: bool  ← zucchetti.orario\noreTarget: float ← zucchetti.hOrd parsed\nlocation: enum   ← giustificativi keywords\nnibol: NibolBooking | null\nzucchetti: ZucchettiDay | null\ncalendar: CalendarEventRaw&#91;&#93;\nemails: EmailRaw&#91;&#93;\nteams: ChatMessage&#91;&#93;\ngitCommits: GitCommit&#91;&#93;\nsvnCommits: SvnCommit&#91;&#93;\nbrowserVisits: BrowserVisit&#91;&#93;"]
     end
 
     subgraph Output["data/aggregated/YYYY-MM-DD.json"]
@@ -160,14 +165,14 @@ flowchart TD
 
 **Location derivation** (from `giustificativi[].text`):
 
-| Zucchetti text contains | `location` value |
-|-------------------------|-----------------|
-| `SMART WORKING` | `"smart"` |
-| `TRASFERTA` | `"travel"` |
-| `ESTERNO` | `"external"` |
-| Office (no giustificativo) | `"office"` |
-| Multiple matching | `"mixed"` |
-| No Zucchetti data | `"unknown"` |
+| Zucchetti text contains    | `location` value |
+| -------------------------- | ---------------- |
+| `SMART WORKING`            | `"smart"`        |
+| `TRASFERTA`                | `"travel"`       |
+| `ESTERNO`                  | `"external"`     |
+| Office (no giustificativo) | `"office"`       |
+| Multiple matching          | `"mixed"`        |
+| No Zucchetti data          | `"unknown"`      |
 
 ---
 
@@ -190,6 +195,7 @@ flowchart TD
 ```
 
 **Scoring rationale:**
+
 - **+15 for direct ID match**: a commit or browser visit referencing `#NNNNN` is an unambiguous signal — scored highest.
 - **+10 for calendar keyword match**: used only as a fallback when no commit/browser task IDs are found (avoids noisy 4-char word matching).
 - **Calendar keyword extraction** uses a stopword filter (generic meeting words like `"standup"`, `"weekly"`, `"review"`, Italian equivalents) so only meaningful project-specific words are matched.
@@ -205,11 +211,11 @@ Small local models (≤8B params) tend to hallucinate task IDs or invent tasks w
 
 The `AnalyzerProvider` interface exposes an optional `signalDetail?: "full" | "compact" | "minimal"` field. `buildUserPromptBatched()` accepts this as a parameter and delegates per-day signal serialisation to `buildSignals(day, detail)`.
 
-| Level | Who uses it | Signals included |
-|-------|-------------|------------------|
-| `"full"` | Claude API, Gemini, Claude CLI (default) | attendees as name list (×5), Teams as `{topic: count}` map, email subjects ×20, SVN paths, browser task IDs, KB tags + userActivities for ID-matched tasks |
-| `"compact"` | OpenAI-compat / Ollama (default) | attendees as count, Teams unique topic list, email subjects ×5 ×80 chars, browser task IDs (no SVN paths, no KB extras) |
-| `"minimal"` | explicit opt-in via env | current pre-enrichment behaviour: attendee count, Teams count, email count — no subjects/topics/browser |
+| Level       | Who uses it                              | Signals included                                                                                                                                           |
+| ----------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `"full"`    | Claude API, Gemini, Claude CLI (default) | attendees as name list (×5), Teams as `{topic: count}` map, email subjects ×20, SVN paths, browser task IDs, KB tags + userActivities for ID-matched tasks |
+| `"compact"` | OpenAI-compat / Ollama (default)         | attendees as count, Teams unique topic list, email subjects ×5 ×80 chars, browser task IDs (no SVN paths, no KB extras)                                    |
+| `"minimal"` | explicit opt-in via env                  | current pre-enrichment behaviour: attendee count, Teams count, email count — no subjects/topics/browser                                                    |
 
 The `signalDetail` default is `"full"` — providers that do **not** declare the field are treated as full.
 
@@ -218,7 +224,7 @@ The `signalDetail` default is `"full"` — providers that do **not** declare the
 ```mermaid
 flowchart LR
     subgraph SystemPrompt["buildSystemPrompt(masterRules?)"]
-        SP["SYSTEM_PROMPT (static rules 1–8)"]
+        SP["SYSTEM_PROMPT (static rules 1–6)"]
         MR["## BUSINESS CONTEXT & ALLOCATION RULES\nconfig/master-rules.md content\n(appended only if file exists)"]
         SP --> MR
     end
@@ -235,47 +241,50 @@ flowchart LR
 
 ### 5.3 `buildSignals()` output by detail level
 
-| Signal key | `minimal` | `compact` | `full` |
-|------------|-----------|-----------|--------|
-| `calendarEvents[].subject` | ✅ | ✅ | ✅ |
-| `calendarEvents[].attendees` | count | count | name list ×5 |
-| `teamsMessages` | count | — | `{topic: count}` map |
-| `teamsTopics` | — | unique list | — |
-| `gitCommits[].repo + message` | ✅ | ✅ | ✅ |
-| `svnCommits[].message` | ✅ | ✅ | ✅ |
-| `svnCommits[].paths` | — | — | first 3 |
-| `emailsReceived` | count | — | — |
-| `emailSubjects` | — | ×5 ×80 chars | ×20 ×100 chars |
-| `browserTaskIds` | — | ✅ | ✅ |
+| Signal key                    | `minimal` | `compact`                 | `full`                     |
+| ----------------------------- | --------- | ------------------------- | -------------------------- |
+| `calendarEvents[].subject`    | ✅        | ✅                        | ✅                         |
+| `calendarEvents[].attendees`  | count     | count                     | name list ×5               |
+| `teamsMessages`               | count     | —                         | `{topic: count}` map       |
+| `teamsTopics`                 | —         | unique list               | —                          |
+| `gitCommits[].repo + message` | ✅        | ✅                        | ✅                         |
+| `svnCommits[].message`        | ✅        | ✅                        | ✅                         |
+| `svnCommits[].paths`          | —         | —                         | first 3                    |
+| `emailsReceived`              | count     | —                         | —                          |
+| `emailsSent`                  | count     | —                         | —                          |
+| `emailSubjects`               | —         | ×5 `[rcvd]/[sent]` prefix | ×20 `[rcvd]/[sent]` prefix |
+| `browserTaskIds`              | —         | ✅                        | ✅                         |
 
 ### 5.4 What is stripped from the prompt
 
-| Field present in `AggregatedDay` | Reason for exclusion |
-|----------------------------------|----------------------|
-| `browserVisits[].url/title` (raw) | Only task IDs extracted; full URLs/titles never sent |
-| `emails[].body/from/to` | Privacy; only subjects forwarded in compact/full |
-| `teams[].body.content` | Privacy; only topic forwarded |
-| `gitCommits[].hash/author/email/date` | Redundant; `message` + `repo` is sufficient |
-| `svnCommits[].revision/author/date` | Same as above |
-| `zucchetti.*` (raw fields) | Already translated to `oreTarget` + `location` |
-| `nibol.*` | Not relevant for task attribution |
+| Field present in `AggregatedDay`      | Reason for exclusion                                 |
+| ------------------------------------- | ---------------------------------------------------- |
+| `browserVisits[].url/title` (raw)     | Only task IDs extracted; full URLs/titles never sent |
+| `emails[].body/from/to`               | Privacy; only subjects forwarded in compact/full     |
+| `teams[].body.content`                | Privacy; only topic forwarded                        |
+| `gitCommits[].hash/author/email/date` | Redundant; `message` + `repo` is sufficient          |
+| `svnCommits[].revision/author/date`   | Same as above                                        |
+| `zucchetti.*` (raw fields)            | Already translated to `oreTarget` + `location`       |
+| `nibol.*`                             | Not relevant for task attribution                    |
 
-### 5.5 `config/master-rules.md` — runtime business rules
+### 5.5 Configuration file responsibilities
 
-`buildSystemPrompt()` appends the content of `config/master-rules.md` to the base `SYSTEM_PROMPT` under a `## BUSINESS CONTEXT & ALLOCATION RULES` heading. The file is read fresh on every `analyzeBatch()` call — no restart required after edits.
+Each config file has a strict, non-overlapping responsibility:
 
-**Behaviour:**
-- File present and non-empty → rules appended to system prompt for all providers.
-- File absent or empty → silently ignored; base `SYSTEM_PROMPT` used unchanged.
-- `analyzer.ts` logs `"Master rules caricate (N chars)"` when the file is loaded.
+| File                        | Responsibility                                                                                                                                                                        | Consumed by                                |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| `config/defaults.json`      | **Mechanical config**: recurring activities (taskId, hours, autoApprove), thresholds (minHoursForSignals, proposalRoundingStep). These arrive in the AI prompt as `preSeededEntries`. | `analyzer.ts` → `buildUserPromptBatched()` |
+| `config/master-rules.md`    | **AI reasoning rules**: signal hierarchy, signal→task mapping, scenario heuristics, anti-fragmentation, comment quality. Contains task IDs for mapping but NOT hours or config flags. | `analyzer.ts` → `buildSystemPrompt()`      |
+| `src/analysers/prompts.ts`  | **Prompt structure**: output format rules, general AI behavior, language constraint. Static — no business-specific task IDs.                                                          | `analyzer.ts`                              |
+| `data/kb/us-summaries.json` | **Task catalog**: auto-generated from TargetProcess API. Names, summaries, tags, user activities. Dynamic — do not manually edit.                                                     | `analyzer.ts` → `buildUserPromptBatched()` |
 
-**Intended content** (see `config/master-rules.md` for the current rules):
-- Default task fallback (BAU project)
-- Recurring / pre-seeded activity overrides (standup, staff meetings, untracked calls)
-- Signal → TP task mappings (Uptrends, TeamCity, Sitecore deploy, Confluence, HR email, Pluralsight, service desk)
-- Commit cross-day attribution heuristic
-- `#NNNNNN` pattern recognition in Teams/email
-- `comment` field quality guidelines
+**`master-rules.md` runtime injection:**
+
+`buildSystemPrompt()` appends `config/master-rules.md` to the base `SYSTEM_PROMPT` under a `## BUSINESS CONTEXT & ALLOCATION RULES` heading. Read fresh on every `analyzeBatch()` call — no restart needed.
+
+- File present and non-empty → rules appended for all providers.
+- File absent or empty → silently ignored; base `SYSTEM_PROMPT` used as-is.
+- `analyzer.ts` logs `"Master rules caricate (N chars)"` when loaded.
 
 ---
 
@@ -358,20 +367,21 @@ sequenceDiagram
     P-->>ORC: { date, entries }[]
 
     ORC->>ORC: discard results with dates outside batch window
+    ORC->>ORC: normalizeEntries() — fix hour totals mechanically
     ORC->>ORC: recompute totalHours from entries
     ORC-->>ORC: DayProposal[]
 ```
 
 **Where providers differ** (all other steps are identical):
 
-| Step | ClaudeApiProvider | OpenAiCompatibleProvider | GeminiProvider | ClaudeCliProvider |
-|------|-------------------|--------------------------|----------------|-------------------|
-| Transport | Anthropic SDK | `fetch` SSE stream | `@google/genai` SDK | `spawn("claude", ["-p"])` |
-| Structured output | ❌ (text + JSON.parse) | ❌ (+ stripJsonComments) | ✅ `responseSchema` | ❌ (text + JSON.parse) |
-| Token usage logging | ✅ `input_tokens` / `output_tokens` | token count from stream | ❌ | ❌ |
-| `kbItemCap` | ∞ (not declared) | **20** via `OPENAI_KB_ITEM_CAP` | ∞ (not declared) | ∞ (not declared) |
-| `signalDetail` | `"full"` (default) | `"compact"` via `OPENAI_SIGNAL_DETAIL` | `"full"` (default) | `"full"` (default) |
-| Timeout env var | — | `OPENAI_REQUEST_TIMEOUT_MS` | — | — |
+| Step                | ClaudeApiProvider                   | OpenAiCompatibleProvider               | GeminiProvider      | ClaudeCliProvider         |
+| ------------------- | ----------------------------------- | -------------------------------------- | ------------------- | ------------------------- |
+| Transport           | Anthropic SDK                       | `fetch` SSE stream                     | `@google/genai` SDK | `spawn("claude", ["-p"])` |
+| Structured output   | ❌ (text + JSON.parse)              | ❌ (+ stripJsonComments)               | ✅ `responseSchema` | ❌ (text + JSON.parse)    |
+| Token usage logging | ✅ `input_tokens` / `output_tokens` | token count from stream                | ❌                  | ❌                        |
+| `kbItemCap`         | ∞ (not declared)                    | **20** via `OPENAI_KB_ITEM_CAP`        | ∞ (not declared)    | ∞ (not declared)          |
+| `signalDetail`      | `"full"` (default)                  | `"compact"` via `OPENAI_SIGNAL_DETAIL` | `"full"` (default)  | `"full"` (default)        |
+| Timeout env var     | —                                   | `OPENAI_REQUEST_TIMEOUT_MS`            | —                   | —                         |
 
 ---
 
@@ -398,14 +408,15 @@ flowchart TD
     P4 -->|no| ERR
 ```
 
-| Provider | Default token budget | Env var | Notes |
-|----------|---------------------|---------|-------|
-| `ClaudeApiProvider` | 200 000 tokens → 800 000 chars | `CLAUDE_MODEL_MAX_TPM` | Anthropic API SDK |
-| `OpenAiCompatibleProvider` | 5 000 tokens → 20 000 chars | `OPENAI_MODEL_MAX_TPM` | Ollama/LM Studio; SSE streaming |
-| `GeminiProvider` | 1 000 000 tokens → 4 000 000 chars | `GEMINI_MODEL_MAX_TPM` | Structured output via `responseSchema` |
-| `ClaudeCliProvider` | 200 000 tokens → 800 000 chars | `CLAUDE_CLI_MAX_TPM` | Claude Code subscription |
+| Provider                   | Default token budget               | Env var                | Notes                                  |
+| -------------------------- | ---------------------------------- | ---------------------- | -------------------------------------- |
+| `ClaudeApiProvider`        | 200 000 tokens → 800 000 chars     | `CLAUDE_MODEL_MAX_TPM` | Anthropic API SDK                      |
+| `OpenAiCompatibleProvider` | 5 000 tokens → 20 000 chars        | `OPENAI_MODEL_MAX_TPM` | Ollama/LM Studio; SSE streaming        |
+| `GeminiProvider`           | 1 000 000 tokens → 4 000 000 chars | `GEMINI_MODEL_MAX_TPM` | Structured output via `responseSchema` |
+| `ClaudeCliProvider`        | 200 000 tokens → 800 000 chars     | `CLAUDE_CLI_MAX_TPM`   | Claude Code subscription               |
 
 **Batch sizing:** The orchestrator uses the most restrictive active provider's budget to fit as many days as possible per API call, flushing the batch when the projected prompt exceeds the budget. The **sizing probe** now uses:
+
 1. `filterKbByPeriod` + `sortKbByRelevance` on the candidate batch
 2. `fitKbItems` with 60% of the restrictive provider's budget → realistic KB subset
 3. `buildUserPromptBatched` with the restrictive provider's `signalDetail` → accurate char count
@@ -413,6 +424,7 @@ flowchart TD
 This prevents under-estimation: previously the probe used the full KB list with the old fixed signal shape.
 
 **Hallucination mitigations for local models (Ollama):**
+
 - KB hard cap of 20 items (`fitKbItems`)
 - `signalDetail = "compact"` caps emails to 5 subjects ×80 chars and teams to unique topic list
 - `stripJsonComments` removes `//` comments injected by models like qwen2.5-coder
@@ -420,13 +432,13 @@ This prevents under-estimation: previously the probe used the full KB list with 
 - SSE streaming (`stream: true`) prevents proxy/OS TCP timeouts on long inference
 
 **Gemini specifics:**
+
 - Uses `responseMimeType: "application/json"` + `responseSchema` for structured output — eliminates code fences and malformed JSON entirely
 - System prompt merged into user content (Gemini v1beta does not have a separate system role)
 
 ---
 
 ## 7. AI output — `DayProposal` and `ProposalEntry`
-
 
 ```mermaid
 classDiagram
@@ -456,11 +468,33 @@ classDiagram
 
 **`confidence` values:** `high` | `medium` | `low`
 
-**Constraint enforced in prompt:** `sum(entries[].inferredHours) === oreTarget`
+**Constraint enforced in prompt:** `sum(entries[].inferredHours) === oreTarget − totalAlreadyOnTargetProcess`
 
-The orchestrator validates results post-parse:
+The orchestrator validates and normalizes results post-parse:
+
 - Dates outside the batch window → discarded (hallucination guard)
 - `totalHours` is recomputed from entries (not trusted from model output)
+- **Hour normalization** (`normalizeEntries()`): if the AI total doesn't match the target, recurring entries (matched by taskId against `defaults.json`) are kept fixed and the remaining entries are scaled proportionally to fill the gap. Rounding remainder is applied to the largest entry. Tolerance: 0.05h. This is a safety net for smaller models (Haiku, Ollama) that struggle with arithmetic.
+
+### 7b. `reportedHours` lifecycle — `refreshReportedHours()`
+
+`AggregatedDay.reportedHours` (hours already logged on TargetProcess) is the only field in the aggregated file that changes **after** the day's signals have been collected. It changes every time the user submits hours.
+
+A shared utility `src/targetprocess/refreshHours.ts` ensures this field is always fresh:
+
+```
+refreshReportedHours(days: AggregatedDay[], persist = true)
+  1. Calls TP API: getTimesByUserAndDateRange()
+  2. Updates day.reportedHours in-place
+  3. If persist=true, writes updated days back to data/aggregated/
+  4. On TP failure → logs warning, falls back to cached values
+```
+
+Called from three places:
+
+- **CLI analyzer** (`processBatch()` in `analyzer.ts`) — before `analyzeBatch()`
+- **Server analyze route** (`runAnalysis()` in `analyze.ts`) — before `analyzeBatch()`
+- **After submit** (`submit.ts` and `week.ts` submit routes) — fire-and-forget to keep aggregated files in sync
 
 ---
 
@@ -524,9 +558,9 @@ stateDiagram-v2
 
 **API endpoints for analysis:**
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/analyze/:date` | POST | Analyze single day (202 + jobId) |
-| `/api/analyze/week/:date` | POST | Analyze all workdays in week (202 + jobId) |
-| `/api/analyze/status/:jobId` | GET | Poll job status |
-| `/api/sync` | POST | Re-collect Zucchetti + Nibol + re-aggregate for day/week |
+| Endpoint                     | Method | Description                                              |
+| ---------------------------- | ------ | -------------------------------------------------------- |
+| `/api/analyze/:date`         | POST   | Analyze single day (202 + jobId)                         |
+| `/api/analyze/week/:date`    | POST   | Analyze all workdays in week (202 + jobId)               |
+| `/api/analyze/status/:jobId` | GET    | Poll job status                                          |
+| `/api/sync`                  | POST   | Re-collect Zucchetti + Nibol + re-aggregate for day/week |

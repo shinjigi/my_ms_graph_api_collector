@@ -120,7 +120,7 @@ import { useTimesheetStore }              from '../../stores/useTimesheetStore';
 import { syncData, submitZucchettiRequest } from '../../api';
 import { locationEmoji, locationTitle }  from '../../utils';
 import { WORKDAY_HOURS, HALF_WORKDAY_HOURS } from '@shared/standards';
-import { formatDateLabel }               from '@shared/dates';
+import { formatDateLabel, dateToString }  from '@shared/dates';
 import type { WeekDayResponse }          from '../../types';
 import type { ZucchettiJustification, ZucchettiRequest } from '@shared/zucchetti';
 
@@ -185,7 +185,7 @@ async function doSync() {
     try {
         const d = dayData.value;
         if (!d) throw new Error('Giorno non selezionato');
-        const result = await syncData('day', d.date, false);
+        const result = await syncData('day', dateToString(d.date), false);
 
         if (result.errors.length > 0) {
             syncMsg.value    = `⚠ ${result.aggregated.length} aggregati, ${result.errors.length} errori`;
@@ -229,7 +229,7 @@ async function doAction(
         if (!d) throw new Error('Giorno non selezionato');
 
         const result = await submitZucchettiRequest({
-            date:    d.date,
+            date:    dateToString(d.date),
             type,
             fullDay,
             hours:   hours ?? 0,

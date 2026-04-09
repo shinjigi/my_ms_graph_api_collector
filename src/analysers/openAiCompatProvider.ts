@@ -176,7 +176,7 @@ export class OpenAiCompatibleProvider implements AnalyzerProvider {
   async analyzeBatch(
     systemPrompt: string,
     userPromptBatched: string,
-  ): Promise<{ date: string; entries: ProposalEntry[] }[]> {
+  ): Promise<{ date: Date; entries: ProposalEntry[] }[]> {
     const model = process.env["OPENAI_MODEL"] ?? "qwen2.5-coder:3b";
     const promptChars = systemPrompt.length + userPromptBatched.length;
     const timeoutSec = Math.round(
@@ -205,6 +205,7 @@ export class OpenAiCompatibleProvider implements AnalyzerProvider {
 
     // Strip code fences AND inline JS comments (some models emit // comments in JSON)
     const cleaned = stripJsonComments(stripCodeFence(responseText));
-    return JSON.parse(cleaned) as { date: string; entries: ProposalEntry[] }[];
+    const parsed = JSON.parse(cleaned) as { date: string; entries: ProposalEntry[] }[];
+    return parsed.map((r) => ({ ...r, date: new Date(r.date) }));
   }
 }

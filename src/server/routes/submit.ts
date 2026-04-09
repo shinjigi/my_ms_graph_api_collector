@@ -5,10 +5,12 @@
  * Returns a list of created time-entry IDs.
  */
 import { Router, Request, Response } from "express";
-import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { readJson, writeJson } from "../../json-io";
 import { TargetprocessClient } from "../../targetprocess/client";
 import { DayProposal, ProposalEntry } from "@shared/analysis";
+import { refreshReportedHours } from "../../targetprocess/refreshHours";
+import { AggregatedDay } from "@shared/aggregator";
 
 export const submitRouter = Router();
 
@@ -18,11 +20,8 @@ submitRouter.post("/:date", async (req: Request, res: Response) => {
   const date = req.params["date"] as string;
   const filePath = path.join(PROPOSALS_DIR, `${date}.json`);
 
-  let proposal: DayProposal;
-  try {
-    const raw = await fs.readFile(filePath, "utf-8");
-    proposal = JSON.parse(raw) as DayProposal;
-  } catch {
+  const proposal = await readJson<DayProposal | null>(filePath, null);
+  if (!proposal) {
     res.status(404).json({ error: `Nessuna proposta per ${date}` });
     return;
   }
@@ -78,7 +77,14 @@ submitRouter.post("/:date", async (req: Request, res: Response) => {
       }
       return e;
     });
-    await fs.writeFile(filePath, JSON.stringify(proposal, null, 2), "utf-8");
+    await writeJson(filePath, proposal);
+  }
+
+  // Refresh reportedHours in the aggregated file so it stays in sync
+  if (results.length > 0) {
+    const aggPath = path.join(process.cwd(), "data", "aggregated", `${date}.json`);
+    const aggDay = await readJson<AggregatedDay | null>(aggPath, null);
+    if (aggDay !== null) void refreshReportedHours([aggDay]);
   }
 
   res.json({ submitted: results.length, errors, results });

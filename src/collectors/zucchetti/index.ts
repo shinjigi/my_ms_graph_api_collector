@@ -3,6 +3,15 @@ import * as path from "node:path";
 import { spawn } from "node:child_process";
 import { readMeta, writeMeta, shouldSkipMonth } from "../../utils";
 import { createLogger } from "../../logger";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const isMainModule =
+  process.argv[1] &&
+  (process.argv[1] === __filename ||
+    process.argv[1].includes("zucchetti/index"));
 
 const log = createLogger("zucchetti");
 import type { MonthData } from "@shared/zucchetti";
@@ -91,9 +100,17 @@ import {
 export async function collectZucchetti(
   force = false,
   range?: { start: string; end: string },
+  date?: string,
 ): Promise<string[]> {
-  const sinceStr = range?.start || process.env["COLLECT_SINCE"] || "2025-01-01";
-  const endStr = range?.end || currentMonthString(); // Default to current month YYYY-MM
+  let sinceStr = range?.start || process.env["COLLECT_SINCE"] || "2025-01-01";
+  let endStr = range?.end || currentMonthString(); // Default to current month YYYY-MM
+
+  if (date) {
+    const d = parseDateString(date);
+    const mStr = currentMonthString(d);
+    sinceStr = mStr;
+    endStr = mStr;
+  }
 
   const today = dateToString();
   await fs.mkdir(ZUCC_DIR, { recursive: true });
@@ -152,14 +169,25 @@ export async function collectZucchetti(
 }
 
 // --- CLI entry point ---
-if (require.main === module || process.argv[1]?.includes("zucchetti/index")) {
+if (isMainModule) {
   const force = process.argv.includes("--force");
   const start = process.argv
     .find((a) => a.startsWith("--start="))
     ?.split("=")[1];
   const end = process.argv.find((a) => a.startsWith("--end="))?.split("=")[1];
+  let date = process.argv.find((a) => a.startsWith("--date="))?.split("=")[1];
+  const yearArg = process.argv
+    .find((a) => a.startsWith("--year="))
+    ?.split("=")[1];
+  const monthArg = process.argv
+    .find((a) => a.startsWith("--month="))
+    ?.split("=")[1];
 
-  collectZucchetti(force, start && end ? { start, end } : undefined)
+  if (!date && yearArg && monthArg) {
+    date = `${yearArg}-${monthArg.padStart(2, "0")}`;
+  }
+
+  collectZucchetti(force, start && end ? { start, end } : undefined, date)
     .then(() => process.exit(0))
     .catch((err) => {
       log.error(err.message);

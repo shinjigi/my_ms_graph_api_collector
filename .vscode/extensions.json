@@ -1,8 +1,10 @@
 {
-  "recommendations": [
-    "yoavbls.pretty-ts-errors",
-    "jlcodes.antigravity-cockpit",
-    "ms-azuretools.vscode-docker",
-    "donjayamanne.githistory"
-  ]
+    "recommendations": [
+        "yoavbls.pretty-ts-errors",
+        "jlcodes.antigravity-cockpit",
+        "ms-azuretools.vscode-docker",
+        "donjayamanne.githistory",
+        "rogalmic.bash-debug",
+        "vue.volar"
+    ]
 }

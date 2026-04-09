@@ -19,10 +19,12 @@ import { collectGitCommits } from "./collectors/vcs/git";
 import { collectZucchetti } from "./collectors/zucchetti/index";
 import { collectNibol } from "./collectors/nibol/index";
 import { collectBrowserHistory } from "./collectors/browser/history";
+import { runAggregation } from "./aggregators/aggregator";
 
 async function run(): Promise<void> {
   const forceFlag = process.argv.includes("--force");
-  const dateArg = process.argv
+  const aggregateFlag = process.argv.includes("--aggregate");
+  let dateArg = process.argv
     .find((a) => a.startsWith("--date="))
     ?.split("=")[1];
   const startArg = process.argv
@@ -34,6 +36,16 @@ async function run(): Promise<void> {
   const sourceArg = process.argv
     .find((a) => a.startsWith("--source="))
     ?.split("=")[1]?.toLowerCase();
+  const yearArg = process.argv
+    .find((a) => a.startsWith("--year="))
+    ?.split("=")[1];
+  const monthArg = process.argv
+    .find((a) => a.startsWith("--month="))
+    ?.split("=")[1];
+
+  if (!dateArg && yearArg && monthArg) {
+    dateArg = `${yearArg}-${monthArg.padStart(2, "0")}`;
+  }
 
   const range =
     startArg && endArg ? { start: startArg, end: endArg } : undefined;
@@ -42,8 +54,8 @@ async function run(): Promise<void> {
 
   log.info(
     "Avvio raccolta dati" +
-      (dateArg ? ` (giorno: ${dateArg})` : "") +
-      (sourceArg ? ` [solo: ${sourceArg}]` : "") +
+      (dateArg ? ` (Data: ${dateArg})` : "") +
+      (sourceArg ? ` [Sorgente: ${sourceArg}]` : "") +
       (forceFlag ? " [--force]" : ""),
   );
 
@@ -85,7 +97,7 @@ async function run(): Promise<void> {
 
   if (shouldRun("zucchetti")) {
     log.info("[Zucchetti] Raccolta cartellino...");
-    const zuccPaths = await collectZucchetti(forceFlag, range);
+    const zuccPaths = await collectZucchetti(forceFlag, range, dateArg);
     zuccPaths.forEach((p) => log.info(`[Zucchetti] → ${p}`));
   }
 
@@ -104,6 +116,15 @@ async function run(): Promise<void> {
   }
 
   log.info("Raccolta completata.");
+
+  if (aggregateFlag) {
+    log.info("[Aggregator] Avvio aggregazione automatica...");
+    try {
+      await runAggregation();
+    } catch (aggErr) {
+      log.error(`Errore durante l'aggregazione automatica: ${(aggErr as Error).message}`);
+    }
+  }
 }
 
 run().catch((error: Error) => {

@@ -10,15 +10,15 @@ export interface KbEntry {
     tags:                 string[];
     userActivities:       Record<string, string>;
     stakeholders:         string[];
-    cachedAt:             string;
-    createDate?:          string;   // YYYY-MM-DD — item creation date from TP
+    cachedAt:             string | Date;
+    createDate?:          Date | null;   // item creation date from TP
     currentState?:        string;   // EntityState.Name (e.g. "In Progress")
     isFinalState?:        boolean;  // EntityState.IsFinal from TP
-    lastStateChangeDate?: string;   // YYYY-MM-DD of last state transition
-    lastActivityDate?:    string;   // YYYY-MM-DD of most recent activity (max of timeEntry + stateChange)
+    lastStateChangeDate?: Date | null;   // last state transition
+    lastActivityDate?:    Date | null;   // most recent activity (max of timeEntry + stateChange)
 }
 
 export interface KbStore {
-    updatedAt?: string;
+    updatedAt?: string | Date;
     items:      KbEntry[];
 }

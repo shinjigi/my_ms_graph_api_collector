@@ -7,8 +7,9 @@
  *
  * Output: data/raw/ai-responses/YYYY-MM-DD_HHmmss_{provider}_{context}.json
  */
-import * as fs from "fs/promises";
+import { mkdir } from "fs/promises";
 import * as path from "path";
+import { writeJson } from "../json-io";
 
 import { getTimestampFilename } from "@shared/dates";
 
@@ -30,7 +31,7 @@ export interface RawResponseRecord {
 export async function saveRawResponse(
   opts: Omit<RawResponseRecord, "savedAt">,
 ): Promise<string> {
-  await fs.mkdir(RAW_DIR, { recursive: true });
+  await mkdir(RAW_DIR, { recursive: true });
 
   const now = new Date();
   const safe = opts.context.replaceAll(/[^a-zA-Z0-9_-]/g, "-");
@@ -38,6 +39,6 @@ export async function saveRawResponse(
   const filePath = path.join(RAW_DIR, filename);
 
   const record: RawResponseRecord = { savedAt: now.toISOString(), ...opts };
-  await fs.writeFile(filePath, JSON.stringify(record, null, 2), "utf-8");
+  await writeJson(filePath, record);
   return filePath;
 }

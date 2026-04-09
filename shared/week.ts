@@ -2,17 +2,18 @@
 
 import type { ZucchettiDay, WorkLocation } from './zucchetti';
 import type {
-  NibolBooking,
-  CalendarEventRaw,
-  EmailRaw,
-  TeamsMessageRaw,
-  SvnCommitRaw,
-  GitCommitRaw,
-  BrowserVisit,
+    NibolBooking,
+    EmailRaw,
+    TeamsChatData,
+    SvnCommitRaw,
+    GitCommitRaw,
+    BrowserVisit,
 } from './aggregator';
+import { CalendarEventRaw } from './graph';
+
 
 export interface WeekDayData {
-    date:           string;
+    date:           Date;
     isWorkday:      boolean;
     oreTarget:      number;
     location:       WorkLocation;
@@ -22,13 +23,13 @@ export interface WeekDayData {
     zucchetti:      ZucchettiDay | null;
     calendar:       CalendarEventRaw[];
     emails:         EmailRaw[];
-    teams:          TeamsMessageRaw[];
+    teams:          TeamsChatData[];
     svnCommits:     SvnCommitRaw[];
     gitCommits:     GitCommitRaw[];
     browserVisits:  BrowserVisit[];
 }
 
 export interface ApiWeekResponse {
-  monday: string;
+  monday: Date;
   days: WeekDayData[];
 }

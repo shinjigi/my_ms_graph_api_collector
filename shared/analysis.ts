@@ -13,11 +13,11 @@ export interface ProposalEntry {
 }
 
 export interface DayProposal {
-    date:        string;
+    date:        Date;
     oreTarget:   number;
     totalHours:  number;
     entries:     ProposalEntry[];
-    generatedAt: string;
+    generatedAt: Date;
     provider?:   string;
 }
 

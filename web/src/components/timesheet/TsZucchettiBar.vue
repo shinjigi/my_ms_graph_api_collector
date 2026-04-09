@@ -45,7 +45,7 @@ import { usePickerStore }          from '../../stores/usePickerStore';
 import { submitZucchettiRequest }  from '../../api';
 import type { WeekDayResponse }    from '../../types';
 import { HALF_WORKDAY_HOURS, WORKDAY_HOURS } from '@shared/standards';
-import { DAYABB_IT, dateToString } from '@shared/dates';
+import { getDayOfWeek, dateToString } from '@shared/dates';
 
 const ts     = useTimesheetStore();
 const picker = usePickerStore();
@@ -54,7 +54,7 @@ const selectedDayLabel = computed(() => {
     const idx = picker.selectedDayIdx;
     if (idx < 0) return null;
     const d = picker.pickerSelected;
-    return `${DAYABB_IT[d.getDay()]} ${d.getDate()}`;
+    return `${getDayOfWeek(d)} ${d.getDate()}`;
 });
 
 const fillDisabled = computed(() => picker.selectedDayIdx < 0);

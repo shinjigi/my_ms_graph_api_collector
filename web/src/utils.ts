@@ -86,3 +86,32 @@ export function giustActivityEmojis(
   }
   return result;
 }
+
+export function rendStatusCls(status: "ok" | "warn" | "err" | null): string[] {
+  if (!status) return [];
+  if (status === "ok") return ["day-ok"];
+  if (status === "warn") return ["day-warn"];
+  if (status === "err") return ["day-err"];
+  return [];
+}
+
+export function rendStatusIcon(status: "ok" | "warn" | "err" | null): string {
+  if (status === "ok") return "✓";
+  if (status === "warn") return "⚠";
+  if (status === "err") return "✗";
+  return "";
+}
+
+export function rendStatusIconCls(status: "ok" | "warn" | "err" | null): string {
+  if (status === "ok") return "text-success";
+  if (status === "warn") return "text-warning";
+  if (status === "err") return "text-error opacity-80";
+  return "opacity-0";
+}
+
+/** Formats hour deltas as ✓, -Xh, or +Xh */
+export function formatDeltaHours(delta: number): string {
+  const rounded = +delta.toFixed(1);
+  if (Math.abs(rounded) < 0.05) return "✓";
+  return rounded > 0 ? `−${rounded}h` : `+${Math.abs(rounded)}h`;
+}

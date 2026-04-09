@@ -3,15 +3,9 @@ import { computed } from "vue";
 import { usePickerStore } from "./usePickerStore";
 import { useTimesheetStore } from "./useTimesheetStore";
 import { stateColor } from "../utils";
-import type {
-  UsCard,
-  QuickLogItem,
-  TlEvent,
-  Email,
-  TlEventType,
-} from "../types";
+import type { UsCard, QuickLogItem, TlEvent, Email } from "../types";
 import { WORKDAY_HOURS } from "@shared/standards";
-import { getTimeString, dateToString } from "@shared/dates";
+import { getTimeStringNoSeconds } from "@shared/dates";
 
 export const useDayStore = defineStore("day", () => {
     const ts = useTimesheetStore();
@@ -19,8 +13,7 @@ export const useDayStore = defineStore("day", () => {
 
     // The single source of indices
     const dayIdx = computed(() => picker.selectedDayIdx);
-    const dateStr = computed(() => dateToString(picker.pickerSelected));
-    
+
     // The specific day data from the week response
     const dayData = computed(() => {
         if (dayIdx.value < 0 || !ts.weekData) return null;
@@ -29,21 +22,25 @@ export const useDayStore = defineStore("day", () => {
 
     // --- Computed Signals for Dashboard ---
 
-    const teams      = computed(() => dayData.value?.teams || []);
-    const browser    = computed(() => dayData.value?.browserVisits || []);
+    const teams = computed(() => dayData.value?.teams || []);
+    const browser = computed(() => dayData.value?.browserVisits || []);
     const gitCommits = computed(() => dayData.value?.gitCommits || []);
     const svnCommits = computed(() => dayData.value?.svnCommits || []);
 
     const emails = computed<Email[]>(() => {
         if (!dayData.value) return [];
-        return dayData.value.emails.map(e => ({
-            dir: "in",
-            from: e.from?.emailAddress?.address ?? "",
-            to: "me",
-            subject: e.subject,
-            time: getTimeString(new Date(e.receivedDateTime)).slice(0, 5),
-            body: e.bodyPreview,
-        }));
+        return dayData.value.emails.map((e) => {
+            const isSent = e.direction === "sent";
+            const dt = isSent ? e.sentDateTime : e.receivedDateTime;
+            return {
+                dir: isSent ? "out" : "in",
+                from: isSent ? "me" : (e.from?.emailAddress?.address ?? ""),
+                to: isSent ? (e.toRecipients?.[0]?.emailAddress?.address ?? "") : "me",
+                subject: e.subject,
+                time: dt ? getTimeStringNoSeconds(dt) : "--:--",
+                body: e.bodyPreview,
+            };
+        });
     });
 
     const tlEvents = computed<TlEvent[]>(() => {
@@ -53,13 +50,16 @@ export const useDayStore = defineStore("day", () => {
         const events: TlEvent[] = [];
 
         // Meetings
-        d.calendar.forEach(ev => {
-            const start = new Date(ev.start.dateTime);
-            const end = new Date(ev.end.dateTime);
-            const durationMins = Math.max(Math.round((end.getTime() - start.getTime()) / 60_000), 18);
+        d.calendar.forEach((ev) => {
+            const start = new Date(ev.start.dateTime ?? "");
+            const end = new Date(ev.end.dateTime ?? "");
+            const durationMins = Math.max(
+                Math.round((end.getTime() - start.getTime()) / 60_000),
+                18,
+            );
             events.push({
                 type: "meeting",
-                time: getTimeString(start).slice(0, 5),
+                time: getTimeStringNoSeconds(start),
                 label: ev.subject,
                 top: 0,
                 h: durationMins,
@@ -67,7 +67,7 @@ export const useDayStore = defineStore("day", () => {
         });
 
         // Git markers (placed at 10:00)
-        d.gitCommits.forEach(c => {
+        d.gitCommits.forEach((c) => {
             events.push({
                 type: "commit",
                 time: "10:00",
@@ -78,7 +78,7 @@ export const useDayStore = defineStore("day", () => {
         });
 
         // SVN markers (placed at 11:00)
-        d.svnCommits.forEach(c => {
+        d.svnCommits.forEach((c) => {
             events.push({
                 type: "svn",
                 time: "11:00",
@@ -90,10 +90,11 @@ export const useDayStore = defineStore("day", () => {
 
         // Email markers
         d.emails.forEach((e, idx) => {
-            const dt = new Date(e.receivedDateTime);
-            const hm = getTimeString(dt).slice(0, 5);
+            const isSent = e.direction === "sent";
+            const rawDt = isSent ? e.sentDateTime : e.receivedDateTime;
+            const hm = rawDt ? getTimeStringNoSeconds(rawDt) : "00:00";
             events.push({
-                type: "email-in",
+                type: isSent ? "email-out" : "email-in",
                 time: hm,
                 label: e.subject,
                 top: 0,
@@ -115,12 +116,12 @@ export const useDayStore = defineStore("day", () => {
 
         // 1. Gather all possible rows (Active, Pinned, Extra)
         const allPossible = [...ts.active, ...ts.pinned, ...ts.usExtra];
-        
+
         // 2. Filter only those that have hours already set for TODAY
-        const activeToday = allPossible.filter(r => ts.getHours(r.tpId, dayIdx.value) > 0);
+        const activeToday = allPossible.filter((r) => ts.getHours(r.tpId, dayIdx.value) > 0);
 
         // 3. Map to UsCard for the view
-        return activeToday.map(r => ({
+        return activeToday.map((r) => ({
             us: r.us,
             tpId: r.tpId,
             state: r.state,
@@ -136,11 +137,11 @@ export const useDayStore = defineStore("day", () => {
 
     const quickLog = computed<QuickLogItem[]>(() => {
         if (dayIdx.value < 0) return [];
-        const inToday = new Set(usToday.value.map(u => u.tpId));
-        
+        const inToday = new Set(usToday.value.map((u) => u.tpId));
+
         return [...ts.active, ...ts.pinned]
-            .filter(r => !inToday.has(r.tpId))
-            .map(r => ({
+            .filter((r) => !inToday.has(r.tpId))
+            .map((r) => ({
                 us: r.us,
                 tpId: r.tpId,
                 state: r.state,

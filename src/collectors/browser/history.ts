@@ -12,8 +12,10 @@ import {
 
 import { createLogger } from "../../logger";
 
+// Ora questo funzionerà correttamente
+const _require = createRequire(import.meta.url);
+
 const log = createLogger("browser-history");
-const _require = createRequire(__filename);
 
 const CHROME_DIR = path.join(process.cwd(), "data", "raw", "browser-chrome");
 const FIREFOX_DIR = path.join(process.cwd(), "data", "raw", "browser-firefox");
@@ -104,7 +106,7 @@ async function queryChromeProfile(
         url: url ?? "",
         title: title ?? null,
         visitTime: isoTime,
-        date: dateToString(isoTime),
+        date: new Date(dateToString(isoTime)),
       };
     });
   } finally {
@@ -159,7 +161,7 @@ async function queryFirefoxProfile(
         url: url ?? "",
         title: title ?? null,
         visitTime: isoTime,
-        date: dateToString(isoTime),
+        date: new Date(dateToString(isoTime)),
       };
     });
   } finally {

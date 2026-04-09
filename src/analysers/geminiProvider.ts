@@ -93,7 +93,7 @@ export class GeminiProvider implements AnalyzerProvider {
   async analyzeBatch(
     systemPrompt: string,
     userPromptBatched: string,
-  ): Promise<{ date: string; entries: ProposalEntry[] }[]> {
+  ): Promise<{ date: Date; entries: ProposalEntry[] }[]> {
     const apiKey = process.env["GEMINI_API_KEY"]!;
     const promptChars = systemPrompt.length + userPromptBatched.length;
     log.info(
@@ -125,6 +125,7 @@ export class GeminiProvider implements AnalyzerProvider {
       raw,
     });
 
-    return JSON.parse(raw) as { date: string; entries: ProposalEntry[] }[];
+    const parsed = JSON.parse(raw) as { date: string; entries: ProposalEntry[] }[];
+    return parsed.map((r) => ({ ...r, date: new Date(r.date) }));
   }
 }

@@ -14,7 +14,7 @@ export const DAYS: Day[] = [
     date: "1 Giu",
     rend: "ok",
     zucHours: 8,
-    nibol: { date: "2024-06-01", type: "home" },
+    nibol: { date: new Date("2024-06-01"), type: "home" },
     holiday: false,
   },
   {
@@ -31,7 +31,7 @@ export const DAYS: Day[] = [
     date: "3 Giu",
     rend: "warn",
     zucHours: WORKDAY_HOURS,
-    nibol: { date: "2024-06-03", type: "office" },
+    nibol: { date: new Date("2024-06-03"), type: "office" },
     holiday: false,
   },
   {
@@ -39,7 +39,7 @@ export const DAYS: Day[] = [
     date: "4 Giu",
     rend: "err",
     zucHours: 0,
-    nibol: { date: "2024-06-04", type: "office" },
+    nibol: { date: new Date("2024-06-04"), type: "office" },
     holiday: false,
   },
   {
@@ -47,7 +47,7 @@ export const DAYS: Day[] = [
     date: "5 Giu",
     rend: null,
     zucHours: WORKDAY_HOURS,
-    nibol: { date: "2024-06-05", type: "home" },
+    nibol: { date: new Date("2024-06-05"), type: "home" },
     holiday: false,
   },
   {

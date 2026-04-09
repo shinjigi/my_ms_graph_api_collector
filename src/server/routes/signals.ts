@@ -8,8 +8,8 @@
  */
 import { AggregatedDay } from "@shared/aggregator";
 import { Router } from "express";
-import * as fs from "fs/promises";
 import * as path from "path";
+import { readJson } from "../../json-io";
 
 export const signalsRouter = Router();
 
@@ -17,12 +17,7 @@ const AGG_DIR = path.join(process.cwd(), "data", "aggregated");
 
 async function loadDay(date: string): Promise<AggregatedDay | null> {
   const file = path.join(AGG_DIR, `${date}.json`);
-  try {
-    const raw = await fs.readFile(file, "utf-8");
-    return JSON.parse(raw) as AggregatedDay;
-  } catch {
-    return null;
-  }
+  return readJson<AggregatedDay | null>(file, null);
 }
 
 signalsRouter.get("/:date/commits", async (req, res) => {

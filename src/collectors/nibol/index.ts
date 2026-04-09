@@ -385,7 +385,7 @@ export async function nibolFetchCalendarData(range?: {
         log.info(`Scraping month: ${cur.month}/${cur.year}`);
         await page.waitForTimeout(1000); // Wait for grid to stabilize
 
-        const monthBookings: NibolBooking[] = await page.evaluate(
+        const monthBookingsRaw = await page.evaluate(
           ({ month, year, targetName }) => {
             const list: Array<{ date: string; type: string; details: string }> =
               [];
@@ -500,6 +500,10 @@ export async function nibolFetchCalendarData(range?: {
           },
           { month: cur.month, year: cur.year, targetName: userName },
         );
+        const monthBookings: NibolBooking[] = monthBookingsRaw.map((b) => ({
+          ...b,
+          date: new Date(b.date),
+        }));
         allBookings.push(...monthBookings);
         scrapedMonths.add(monthKey);
       }

@@ -61,10 +61,17 @@ async function getAccessToken(): Promise<string> {
 }
 
 export async function createGraphClient(): Promise<Client> {
-  const token = await getAccessToken();
+  // Non chiamiamo getAccessToken qui fuori!
+  
   return Client.init({
-    authProvider: (done) => {
-      done(null, token);
+    // Questa funzione viene eseguita dal Graph Client PRIMA di ogni richiesta API
+    authProvider: async (done) => {
+      try {
+        const token = await getAccessToken(); // MSAL gestisce la cache internamente
+        done(null, token);
+      } catch (error) {
+        done(error as Error, null);
+      }
     },
   });
 }

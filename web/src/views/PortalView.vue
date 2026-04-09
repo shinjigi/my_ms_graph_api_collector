@@ -89,7 +89,7 @@ watch(() => [props.view, props.date] as const, ([newView, newDate]) => {
         }
 
         // Fetch week data and AI hints from backend
-        const monday = dateToString(getMonday(new Date(yr, mo, d)));
+        const monday = getMonday(new Date(yr, mo, d));
         ts.fetchWeekData(monday);
         analysis.loadWeekHints(monday);
     }

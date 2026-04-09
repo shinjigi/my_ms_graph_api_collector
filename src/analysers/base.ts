@@ -57,7 +57,7 @@ export interface AnalyzerProvider {
     analyzeBatch(
         systemPrompt: string,
         userPromptBatched: string,
-    ): Promise<{ date: string; entries: ProposalEntry[] }[]>;
+    ): Promise<{ date: Date; entries: ProposalEntry[] }[]>;
 }
 
 /** Strips markdown code fences from a raw AI response before JSON.parse(). */

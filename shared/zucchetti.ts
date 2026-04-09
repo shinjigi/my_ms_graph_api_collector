@@ -40,7 +40,14 @@ export interface MonthData {
   days: ZucchettiDay[];
 }
 
-export type WorkLocation = "office" | "smart" | "travel" | "external" | "mixed" | "unknown";
+export enum WorkLocation {
+  office = "office",
+  smart = "smart",
+  travel = "travel",
+  external = "external",
+  mixed = "mixed",
+  unknown = "unknown"
+}
 
 // --- Activity Definitions (from Zucchetti dropdowns) ---
 
@@ -79,9 +86,9 @@ export const ZUCCHETTI_ACTIVITIES = [
 
 // Activities that represent working away from the default office
 export const LOCATION_ACTIVITIES: Record<string, WorkLocation> = {
-  "SMART WORKING": "smart",
-  "TRASFERTA": "travel",
-  "SERVIZIO ESTERNO": "external",
+  "SMART WORKING": WorkLocation.smart,
+  "TRASFERTA": WorkLocation.travel,
+  "SERVIZIO ESTERNO": WorkLocation.external,
 };
 
 // Activities that reduce the contractual time to be reported on TargetProcess
@@ -95,6 +102,28 @@ export const ABSENCE_KEYWORDS = [
   "VISITA MEDICA",
   "CONGEDO",
 ];
+
+/** Maps a Nibol booking type string to a canonical WorkLocation. */
+export function parseNibolLocation(nibolType: string): WorkLocation {
+  const t = nibolType.toLowerCase();
+  return t === "remote" || t === "home" ? WorkLocation.smart : WorkLocation.office;
+}
+
+/**
+ * Returns the first absence label from giustificativi/richieste matching
+ * ABSENCE_KEYWORDS, or null if none found. Useful for display purposes.
+ */
+export function findAbsenceLabel(day: ZucchettiDay): string | null {
+  const activeReqs = (day.richieste ?? []).filter(
+    (r) => r.status.toUpperCase() !== "CANCELLATA",
+  );
+  const allSignals = [...day.giustificativi, ...activeReqs];
+  for (const sig of allSignals) {
+    const text = sig.text.toUpperCase();
+    if (ABSENCE_KEYWORDS.some((kw) => text.includes(kw))) return sig.text;
+  }
+  return null;
+}
 
 export function isWorkday(day: ZucchettiDay): boolean {
   const orario = (day.orario ?? "").toUpperCase();
@@ -116,8 +145,8 @@ export function parseZucchettiLocation(day: ZucchettiDay): WorkLocation {
       if (allSignals.some(s => s.includes(kw))) return loc;
   }
 
-  if (giust.length === 0 && reqs.length === 0) return "office";
-  return "unknown";
+  if (giust.length === 0 && reqs.length === 0) return WorkLocation.office;
+  return WorkLocation.unknown;
 }
 
 /**
@@ -146,4 +175,4 @@ export function calculateAbsenceHours(day: ZucchettiDay): number {
     }
 
     return Math.min(7.7, totalAbsence);
-}
+}

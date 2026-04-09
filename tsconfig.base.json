@@ -2,13 +2,13 @@
   "compilerOptions": {
     "target": "ES2022",
     "lib": ["ES2022", "ESNext.String", "DOM"],
-    "module": "CommonJS",
-    "moduleResolution": "node",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
     "esModuleInterop": true,
     "allowJs": true,
     "strict": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
-    "baseUrl": "."
+    // "baseUrl": "." // deprecated in favor of "paths"
   }
 }

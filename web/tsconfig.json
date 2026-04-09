@@ -9,7 +9,7 @@
         "skipLibCheck":     true,
         "resolveJsonModule": true,
         "noEmit":           true,
-        "baseUrl":          ".",
+        // "baseUrl":          ".", // deprecated in favor of "paths" with "." prefix
         "paths": {
             "@shared/*": ["../shared/*"]
         }

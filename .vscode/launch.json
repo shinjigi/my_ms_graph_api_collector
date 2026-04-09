@@ -1,53 +1,65 @@
 {
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "Serve (Express Debug)",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["tsx", "src/server/app.ts"],
-      "cwd": "${workspaceFolder}",
-      "envFile": "${workspaceFolder}/.env",
-      "sourceMaps": true,
-      "console": "integratedTerminal",
-      "skipFiles": ["<node_internals>/**"]
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "Debug TS (Current File)",
-      "runtimeExecutable": "npx",
-      "runtimeArgs": ["tsx", "${file}"],
-      "cwd": "${workspaceFolder}",
-      "envFile": "${workspaceFolder}/.env",
-      "sourceMaps": true,
-      "console": "integratedTerminal",
-      "skipFiles": ["<node_internals>/**"]
-    },
-    {
-      "type": "node",
-      "request": "launch",
-      "name": "Execute current JS/MJS Script",
-      "program": "${file}",
-      "cwd": "${workspaceFolder}",
-      "envFile": "${workspaceFolder}/.env",
-      "console": "integratedTerminal",
-      "skipFiles": ["<node_internals>/**"]
-    },
-    {
-      "type": "bashdb",
-      "request": "launch",
-      "name": "Bash-Debug (select script from list of sh files)",
-      "cwd": "${workspaceFolder}",
-      "program": "${command:SelectScriptName}",
-      "args": []
-    },
-    {
-      "type": "bashdb",
-      "request": "launch",
-      "name": "Bash-Debug (simplest configuration)",
-      "program": "${file}"
-    }
-  ]
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Serve (Express Debug)",
+            "runtimeExecutable": "npx",
+            "runtimeArgs": ["tsx", "src/server/app.ts"],
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "sourceMaps": true,
+            "console": "integratedTerminal",
+            "skipFiles": ["<node_internals>/**"]
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Debug TS (Current File)",
+            "runtimeExecutable": "npx",
+            "runtimeArgs": ["tsx", "${file}"],
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "sourceMaps": true,
+            "console": "integratedTerminal",
+            "skipFiles": ["<node_internals>/**"]
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Execute current JS/MJS Script",
+            "program": "${file}",
+            "cwd": "${workspaceFolder}",
+            "envFile": "${workspaceFolder}/.env",
+            "console": "integratedTerminal",
+            "skipFiles": ["<node_internals>/**"]
+        },
+        {
+            "type": "bashdb",
+            "request": "launch",
+            "name": "Bash-Debug (select script from list of sh files)",
+            "cwd": "${workspaceFolder}",
+            "program": "${command:SelectScriptName}",
+            "args": []
+        },
+        {
+            "type": "bashdb",
+            "request": "launch",
+            "name": "Bash-Debug (simplest configuration)",
+            "program": "${file}"
+        },
+        {
+            "type": "chrome",
+            "request": "launch",
+            "name": "Debug Vue (Vite)",
+            "url": "http://localhost:5173",
+            "webRoot": "${workspaceFolder}/web",
+            "sourceMapPathOverrides": {
+                "webpack:///src/*": "${webRoot}/src/*",
+                "vite/gui/*": "${webRoot}/*"
+            },
+            "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+        }
+    ]
 }

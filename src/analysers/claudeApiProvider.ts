@@ -46,7 +46,7 @@ export class ClaudeApiProvider implements AnalyzerProvider {
     systemPrompt: string,
     userPromptBatched: string,
     context = "analysis",
-  ): Promise<{ date: string; entries: ProposalEntry[] }[]> {
+  ): Promise<{ date: Date; entries: ProposalEntry[] }[]> {
     const model = process.env["CLAUDE_MODEL"] ?? "claude-haiku-4-5-20251001";
     const anthropic = new Anthropic({ apiKey: process.env["CLAUDE_API_KEY"] });
 
@@ -90,9 +90,10 @@ export class ClaudeApiProvider implements AnalyzerProvider {
       raw: responseText,
     });
 
-    return JSON.parse(stripCodeFence(responseText)) as {
+    const raw = JSON.parse(stripCodeFence(responseText)) as {
       date: string;
       entries: ProposalEntry[];
     }[];
+    return raw.map((r) => ({ ...r, date: new Date(r.date) }));
   }
 }

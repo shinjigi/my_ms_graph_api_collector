@@ -54,11 +54,11 @@ flowchart TD
 
 ### Microsoft Graph (Office 365)
 
-| Source | What is collected | Key fields |
-|---|---|---|
-| **Calendar** | All events in range | subject, start/end, attendees, online flag |
-| **Email** | Received messages | subject, sender, received time, body preview |
-| **Teams** | Messages from all chats | text, sender, chat topic, created/modified time |
+| Source       | What is collected       | Key fields                                      |
+| ------------ | ----------------------- | ----------------------------------------------- |
+| **Calendar** | All events in range     | subject, start/end, attendees, online flag      |
+| **Email**    | Received messages       | subject, sender, received time, body preview    |
+| **Teams**    | Messages from all chats | text, sender, chat topic, created/modified time |
 
 Teams collection is **incremental per chat**: each chat stores the timestamp of the last fetched message; only new or edited messages are downloaded on subsequent runs. Default lookback on first run: **1 month**.
 
@@ -81,14 +81,15 @@ sequenceDiagram
 
 ### Version control
 
-| Source | What is collected |
-|---|---|
-| **Git** | All commits across all repos found under `GIT_ROOTS`. Grouped by month. |
+| Source  | What is collected                                                                        |
+| ------- | ---------------------------------------------------------------------------------------- |
+| **Git** | All commits across all repos found under `GIT_ROOTS`. Grouped by month.                  |
 | **SVN** | All commits from `SVN_URL`, fetched month by month. Skipped gracefully when outside VPN. |
 
 ### Zucchetti (HR / timesheet)
 
 The official company timesheet is the **ground truth for workdays**:
+
 - Determines whether a day is a workday (vs. weekend, holiday, leave)
 - Provides the **target hours** for the day (`hOrd` field)
 - Provides the **work location**: office, smart working, or mixed (from `giustificativi`)
@@ -114,7 +115,7 @@ classDiagram
         +NibolBooking nibol
         +CalendarEvent[] calendar
         +EmailRaw[] emails
-        +TeamsMessageRaw[] teams
+        +ChatMessage[] teams
         +SvnCommit[] svnCommits
         +GitCommit[] gitCommits
         +BrowserVisit[] browserVisits
@@ -175,13 +176,13 @@ All state is reactive and persisted to `localStorage`; no page reload is needed 
 
 ### Views
 
-| View | Purpose |
-|---|---|
+| View          | Purpose                                                                          |
+| ------------- | -------------------------------------------------------------------------------- |
 | **Dashboard** | Day summary: KPI strip, week strip, timeline, US cards + quick log, signals grid |
-| **Timesheet** | Weekly TP timesheet with inline hour editing and Zucchetti comparison |
-| **Activity** | Raw activity browser (git, SVN, email, Teams) |
-| **Teams** | Teams message explorer |
-| **Browser** | Browser history explorer (collapsible) |
+| **Timesheet** | Weekly TP timesheet with inline hour editing and Zucchetti comparison            |
+| **Activity**  | Raw activity browser (git, SVN, email, Teams)                                    |
+| **Teams**     | Teams message explorer                                                           |
+| **Browser**   | Browser history explorer (collapsible)                                           |
 
 ### Navigation and day selection
 
@@ -202,6 +203,7 @@ flowchart LR
 ```
 
 Day picker buttons distinguish three states visually:
+
 - **Today (not selected)**: empty primary ring + dot indicator
 - **Selected (not today)**: filled primary pill
 - **Today + selected**: filled pill + dot
@@ -210,12 +212,12 @@ Day picker buttons distinguish three states visually:
 
 The timesheet toolbar provides one-click day population across all active TP tasks:
 
-| Button | Hours distributed | Behaviour |
-|---|---|---|
-| SW 7:42 | 7.7 h | Proportional by `totAllTime` weight; last task absorbs rounding |
-| ½ SW | 3.85 h | Same distribution |
-| Ferie | 0 h | Clears all active tasks for the day |
-| ½ Ferie | 3.85 h | Same as ½ SW from TP perspective |
+| Button  | Hours distributed | Behaviour                                                       |
+| ------- | ----------------- | --------------------------------------------------------------- |
+| SW 7:42 | 7.7 h             | Proportional by `totAllTime` weight; last task absorbs rounding |
+| ½ SW    | 3.85 h            | Same distribution                                               |
+| Ferie   | 0 h               | Clears all active tasks for the day                             |
+| ½ Ferie | 3.85 h            | Same as ½ SW from TP perspective                                |
 
 Standard workday: **7 h 42 min (7.7 h)**. Half day: **3 h 51 min (3.85 h)**.
 Defined as `WORKDAY_HOURS` / `HALF_WORKDAY_HOURS` in `web/src/mock/data.ts`.
@@ -228,13 +230,13 @@ the step is replaced by `delta` so the cell lands exactly on zero without oversh
 
 ### Timesheet column colour semantics
 
-| Class | Trigger | Visual |
-|---|---|---|
-| `day-ok` | delta == 0 | Green tint + green ring |
-| `day-warn` | tp > 0 but delta ≠ 0 | Amber tint + amber ring |
-| `day-err` | tp == 0, zuc > 0 | Red tint + red ring |
-| `holiday-col` | `Day.holiday == true` | Purple tint + purple ring |
-| `today-col` | column == today in week | Primary outline (non-destructive) |
+| Class          | Trigger                  | Visual                                     |
+| -------------- | ------------------------ | ------------------------------------------ |
+| `day-ok`       | delta == 0               | Green tint + green ring                    |
+| `day-warn`     | tp > 0 but delta ≠ 0     | Amber tint + amber ring                    |
+| `day-err`      | tp == 0, zuc > 0         | Red tint + red ring                        |
+| `holiday-col`  | `Day.holiday == true`    | Purple tint + purple ring                  |
+| `today-col`    | column == today in week  | Primary outline (non-destructive)          |
 | `selected-col` | column == pickerSelected | Stronger primary outline (non-destructive) |
 
 `today-col` and `selected-col` use CSS `outline` so they never override `background`
@@ -263,12 +265,12 @@ stateDiagram-v2
 
 ## TargetProcess integration
 
-| Operation | Endpoint | Notes |
-|---|---|---|
-| List open items | `GET /api/v1/Assignables` | Filtered by assignee, non-final state |
-| Log time | `POST /api/v1/Times` | One POST per approved entry |
-| Delete time entry | `DELETE /api/v1/Times/{id}` | Used on re-submit |
-| Search items | `GET /api/v1/Assignables?where=Name contains '...'` | Task panel search |
+| Operation         | Endpoint                                            | Notes                                 |
+| ----------------- | --------------------------------------------------- | ------------------------------------- |
+| List open items   | `GET /api/v1/Assignables`                           | Filtered by assignee, non-final state |
+| Log time          | `POST /api/v1/Times`                                | One POST per approved entry           |
+| Delete time entry | `DELETE /api/v1/Times/{id}`                         | Used on re-submit                     |
+| Search items      | `GET /api/v1/Assignables?where=Name contains '...'` | Task panel search                     |
 
 Authentication: Base64-encoded token as `Authorization: Basic <token>`.
 

@@ -11,15 +11,15 @@
  * excluded from on-demand sync.
  */
 import { Router, Request, Response } from "express";
-import * as fs from "node:fs/promises";
 import * as path from "node:path";
+import { readJson } from "../../json-io";
 
 import { collectZucchetti } from "../../collectors/zucchetti/index";
 import { collectNibol } from "../../collectors/nibol/index";
 import { aggregateSingleDay } from "../../aggregators/aggregator";
 import { readMeta } from "../../utils";
 import { ZucchettiDay } from "@shared/zucchetti";
-import { getMonday, shiftDate, currentMonthString } from "@shared/dates";
+import { getMonday, shiftDateString, currentMonthString } from "@shared/dates";
 
 export const syncRouter = Router();
 
@@ -43,13 +43,9 @@ interface SyncResponse {
 /** Reads a Zucchetti monthly raw file and returns its day entries. */
 async function loadZucchettiMonth(month: string): Promise<ZucchettiDay[]> {
   const filePath = path.join(ZUCC_DIR, `${month}.json`);
-  try {
-    const raw = await fs.readFile(filePath, "utf-8");
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : (parsed.days ?? []);
-  } catch {
-    return [];
-  }
+  // Handle both flat ZucchettiDay[] and wrapped { days: [...] } formats
+  const parsed = await readJson<ZucchettiDay[] | { days?: ZucchettiDay[] }>(filePath, []);
+  return Array.isArray(parsed) ? parsed : (parsed.days ?? []);
 }
 
 /**
@@ -83,7 +79,7 @@ syncRouter.post("/", async (req: Request, res: Response) => {
   } else {
     const monday = getMonday(date);
     for (let i = 0; i < 5; i++) {
-      dates.push(shiftDate(monday, i));
+      dates.push(shiftDateString(monday, i));
     }
   }
 
@@ -133,7 +129,7 @@ syncRouter.post("/", async (req: Request, res: Response) => {
         result.errors.push(`aggregation: no Zucchetti data for ${d}`);
         continue;
       }
-      await aggregateSingleDay(d, zDay);
+      await aggregateSingleDay(new Date(d), zDay);
       result.aggregated.push(d);
     } catch (err) {
       result.errors.push(`aggregation ${d}: ${(err as Error).message}`);

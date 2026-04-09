@@ -1,24 +1,62 @@
+import {
+    addDays,
+    addMonths as addMonthsFns,
+    eachMonthOfInterval,
+    format,
+    getDaysInMonth as getDaysInMonthFns,
+    getYear,
+    isWeekend as isWeekendFns,
+    lastDayOfMonth as lastDayOfMonthFns,
+    parse,
+    parseISO,
+    startOfDay,
+    startOfMonth as startOfMonthFns,
+    startOfWeek,
+    subMonths,
+} from "date-fns";
+
 /**
  * Shared date & time utilities — single source of truth for both FE and BE.
  * Provides centralized operations avoiding local-to-UTC mapping bugs.
  */
 
 export const MONTH_IT = [
-  "Gennaio",
-  "Febbraio",
-  "Marzo",
-  "Aprile",
-  "Maggio",
-  "Giugno",
-  "Luglio",
-  "Agosto",
-  "Settembre",
-  "Ottobre",
-  "Novembre",
-  "Dicembre",
+    "Gennaio",
+    "Febbraio",
+    "Marzo",
+    "Aprile",
+    "Maggio",
+    "Giugno",
+    "Luglio",
+    "Agosto",
+    "Settembre",
+    "Ottobre",
+    "Novembre",
+    "Dicembre",
 ];
 
 export const DAYABB_IT = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
+
+/**
+ * Helper interno per garantire che l'input sia un oggetto Date valido.
+ * Gestisce i formati YYYY-MM e YYYY-MM-DD.
+ */
+function ensureDate(d: Date | string): Date {
+    if (d instanceof Date) return d;
+    // Gestisce YYYY-MM aggiungendo il primo giorno per il parsing ISO
+    const normalized = d.length === 7 ? `${d}-01` : d;
+    return parseISO(normalized);
+}
+
+/**
+ * Helper interno per garantire che l'input sia una stringa formattata correttamente.
+ * Se l'input è una Date, la converte in stringa usando dateToString.
+ * Se l'input è già una stringa, la restituisce così com'è.
+ */
+function ensureString(d: Date | string): string {
+    if (d instanceof Date) return dateToString(d);
+    return d;
+}
 
 /**
  * Returns a new Date object set to today at local midnight.
@@ -26,9 +64,12 @@ export const DAYABB_IT = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
  * @returns {Date} A Date object representing 00:00:00 of the current local day.
  */
 export function todayMidnight(): Date {
-  const d = new Date();
-  d.setHours(0, 0, 0, 0);
-  return d;
+    return startOfDay(new Date());
+}
+
+/** Returns true for Saturday (6) and Sunday (0). */
+export function isWeekend(d: Date): boolean {
+    return isWeekendFns(d);
 }
 
 /**
@@ -38,10 +79,7 @@ export function todayMidnight(): Date {
  * @returns {string} The localized representation string formatted exactly as "YYYY-MM-DD".
  */
 export function dateToString(d: Date | string = new Date()): string {
-  const date = typeof d === "string" ? parseDateString(d) : d;
-  const { year, month } = getYearMonth(date);
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${String(month).padStart(2, "0")}-${day}`;
+    return format(ensureDate(d), "yyyy-MM-dd");
 }
 
 /**
@@ -51,22 +89,30 @@ export function dateToString(d: Date | string = new Date()): string {
  * @returns {string} The formatted local year-month string exactly as "YYYY-MM".
  */
 export function currentMonthString(d: Date | string = new Date()): string {
-  const { year, month } = getYearMonth(d);
-  return `${year}-${String(month).padStart(2, "0")}`;
+    return format(ensureDate(d), "yyyy-MM");
 }
 
 /**
  * Shifts the input date by a specified number of calendar days.
  *
- * @param {string | Date} input - Baseline date to shift (if string, must be "YYYY-MM" or "YYYY-MM-DD").
+ * @param {Date | string} input - Baseline date to shift.
  * @param {number} days - Amount of days to add (or subtract if negative).
- * @returns {string} The shifted date string formatted exactly as "YYYY-MM-DD".
+ * @returns {Date} The shifted date.
  */
-export function shiftDate(input: string | Date, days: number): string {
-  const d =
-    typeof input === "string" ? parseDateString(input) : new Date(input);
-  d.setDate(d.getDate() + days);
-  return dateToString(d);
+export function shiftDate(input: Date | string, days: number): Date {
+    const shifted = addDays(ensureDate(input), days);
+    return shifted;
+}
+
+/**
+ * Shifts the input date string by a specified number of calendar days and returns the result as a "YYYY-MM-DD" string.
+ *
+ * @param {Date | string} input - Baseline date string to shift (e.g., "YYYY-MM" or "YYYY-MM-DD").
+ * @param {number} days - Amount of days to add (or subtract if negative).
+ * @returns {string} The shifted date as a string formatted exactly as "YYYY-MM-DD".
+ */
+export function shiftDateString(input: Date | string, days: number): string {
+    return dateToString(shiftDate(ensureDate(input), days));
 }
 
 /**
@@ -76,14 +122,8 @@ export function shiftDate(input: string | Date, days: number): string {
  * @param {Date | string} input - Any date indicating the target week (if string, format "YYYY-MM" or "YYYY-MM-DD").
  * @returns {Date} The mutated local Date object adjusted back to Monday 00:00:00.
  */
-export function getMonday(input: Date | string): Date {
-  const d =
-    typeof input === "string" ? parseDateString(input) : new Date(input);
-  d.setHours(0, 0, 0, 0);
-  const day = d.getDay(); // 0 = Sun
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  d.setDate(diff);
-  return d;
+export function getMonday(input: Date | string = new Date()): Date {
+    return startOfWeek(ensureDate(input), { weekStartsOn: 1 });
 }
 
 /**
@@ -94,11 +134,7 @@ export function getMonday(input: Date | string): Date {
  * @returns {Date} Native instantiated local Date boundary matching exactly the parsed values at 00:00.
  */
 export function parseDateString(dateStr: string): Date {
-  const parts = dateStr.split("-");
-  const y = Number.parseInt(parts[0], 10);
-  const m = Number.parseInt(parts[1], 10);
-  const d = parts[2] ? Number.parseInt(parts[2], 10) : 1;
-  return new Date(y, m - 1, d);
+    return ensureDate(dateStr);
 }
 
 /**
@@ -108,16 +144,14 @@ export function parseDateString(dateStr: string): Date {
  * @returns {{ year: number; month: number }} Integer numerical mappings of the year and localized calendar month length (1-12).
  */
 export function getYearMonth(input: Date | string = new Date()): {
-  year: number;
-  month: number;
+    year: number;
+    month: number;
 } {
-  if (typeof input === "string") {
-    const parts = input.split("-");
-    const year = Number.parseInt(parts[0], 10);
-    const month = Number.parseInt(parts[1], 10);
-    return { year, month };
-  }
-  return { year: input.getFullYear(), month: input.getMonth() + 1 };
+    const d = ensureDate(input);
+    return {
+        year: getYear(d),
+        month: d.getMonth() + 1,
+    };
 }
 
 /**
@@ -128,7 +162,7 @@ export function getYearMonth(input: Date | string = new Date()): {
  * @returns {number} Integer representing max days capacity for that specific period.
  */
 export function getDaysInMonth(year: number, month: number): number {
-  return new Date(year, month, 0).getDate();
+    return getDaysInMonthFns(new Date(year, month - 1));
 }
 
 /**
@@ -139,10 +173,7 @@ export function getDaysInMonth(year: number, month: number): number {
  * @returns {Date} Valid new Date object reflecting arithmetic adjustments safely resolved locally.
  */
 export function addMonths(input: Date | string, months: number): Date {
-  const d =
-    typeof input === "string" ? parseDateString(input) : new Date(input);
-  d.setMonth(d.getMonth() + months);
-  return d;
+    return addMonthsFns(ensureDate(input), months);
 }
 
 /**
@@ -152,8 +183,7 @@ export function addMonths(input: Date | string, months: number): Date {
  * @returns {Date} Reinstated localized native 00:00 Date strictly on day '1'.
  */
 export function startOfMonth(input: Date | string = new Date()): Date {
-  const { year, month } = getYearMonth(input);
-  return new Date(year, month - 1, 1);
+    return startOfMonthFns(ensureDate(input));
 }
 
 /**
@@ -163,22 +193,32 @@ export function startOfMonth(input: Date | string = new Date()): Date {
  * @param {Date | string} end - Terminating cap sequence marker indicator (if string, format "YYYY-MM" or "YYYY-MM-DD").
  * @returns {string[]} An Array of standard iteration labels strictly formatted as "YYYY-MM" (e.g., ["2026-03", "2026-04"]).
  */
-export function getMonthRange(
-  start: Date | string,
-  end: Date | string,
-): string[] {
-  const s = typeof start === "string" ? parseDateString(start) : start;
-  const e = typeof end === "string" ? parseDateString(end) : end;
+export function getMonthRange(start: Date | string, end: Date | string): string[] {
+    const interval = eachMonthOfInterval({
+        start: ensureDate(start),
+        end: ensureDate(end),
+    });
+    return interval.map((d) => format(d, "yyyy-MM"));
+}
 
-  let current = startOfMonth(s);
-  const endRef = startOfMonth(e);
+/**
+ * Returns the day of the week as a string.
+ * @param {Date | number} input - The date to get the day of the week for.
+ * @returns {string} The day of the week as a string.
+ */
+export function getDayOfWeek(input: Date | number): string {
+    const index = typeof input === "number" ? input : input.getDay();
+    return DAYABB_IT[index];
+}
 
-  const months: string[] = [];
-  while (current <= endRef) {
-    months.push(currentMonthString(current));
-    current = addMonths(current, 1);
-  }
-  return months;
+/**
+ * Returns the month as a string.
+ * @param {Date | number} input - The date to get the month for.
+ * @returns {string} The month as a string.
+ */
+export function getMonth(input: Date | number): string {
+    const index = typeof input === "number" ? input : input.getMonth();
+    return MONTH_IT[index];
 }
 
 /**
@@ -188,10 +228,8 @@ export function getMonthRange(
  * @returns {string} Capitalized standard localized identifier string (e.g., "Lun 31 Mar").
  */
 export function formatDateLabel(input: Date | string): string {
-  const d = typeof input === "string" ? parseDateString(input) : input;
-  const dow = DAYABB_IT[d.getDay()];
-  const mon = MONTH_IT[d.getMonth()];
-  return `${dow} ${d.getDate()} ${mon}`;
+    const d = ensureDate(input);
+    return `${getDayOfWeek(d)} ${d.getDate()} ${getMonth(d).substring(0, 3)}`;
 }
 
 /**
@@ -201,8 +239,8 @@ export function formatDateLabel(input: Date | string): string {
  * @returns {string} Truncated string mapping ignoring Days of Week specificators (e.g., "31 Mar").
  */
 export function formatShortDateLabel(input: Date | string): string {
-  const d = typeof input === "string" ? parseDateString(input) : input;
-  return `${d.getDate()} ${MONTH_IT[d.getMonth()].substring(0, 3)}`;
+    const d = ensureDate(input);
+    return `${d.getDate()} ${getMonth(d).substring(0, 3)}`;
 }
 
 /**
@@ -212,8 +250,8 @@ export function formatShortDateLabel(input: Date | string): string {
  * @returns {string} Clean textual representation emitting standard precise dates indicators (e.g., "Marzo 2026").
  */
 export function formatMonthYearLabel(input: Date | string): string {
-  const { year, month } = getYearMonth(input);
-  return `${MONTH_IT[month - 1]} ${year}`;
+    const d = ensureDate(input);
+    return `${getMonth(d)} ${getYear(d)}`;
 }
 
 /**
@@ -223,8 +261,7 @@ export function formatMonthYearLabel(input: Date | string): string {
  * @returns {string} Strict numerical array representation exactly matching the Month final bounds like "2026-03-31".
  */
 export function lastDayOfMonth(input: Date | string): string {
-  const { year, month } = getYearMonth(input);
-  return dateToString(new Date(year, month, 0));
+    return dateToString(lastDayOfMonthFns(ensureDate(input)));
 }
 
 /**
@@ -234,19 +271,17 @@ export function lastDayOfMonth(input: Date | string): string {
  * @returns {{ start: string; end: string }} Object containing exact "YYYY-MM-DD" boundaries formatting matched localized properties.
  */
 export function getWeekBoundsFromStr(weekStr: string): {
-  start: string;
-  end: string;
+    start: string;
+    end: string;
 } {
-  const parts = weekStr.split("-");
-  const year = Number.parseInt(parts[0], 10);
-  const week = Number.parseInt(parts[1].replace("W", ""), 10);
-  const date = new Date(year, 0, 1 + (week - 1) * 7);
-  const start = getMonday(date);
-  const end = shiftDate(start, 6);
-  return {
-    start: typeof start === "string" ? start : dateToString(start),
-    end,
-  };
+    // date-fns supporta il parsing delle settimane ISO tramite 'I'
+    const date = parse(weekStr, "RRRR-'W'II", new Date());
+    const start = startOfWeek(date, { weekStartsOn: 1 });
+    const end = addDays(start, 6);
+    return {
+        start: dateToString(start),
+        end: dateToString(end),
+    };
 }
 
 /**
@@ -257,11 +292,14 @@ export function getWeekBoundsFromStr(weekStr: string): {
  * @returns {string} Safely serialized isolated temporal suffix identifier syntax "HH:mm:ss" (or matching the chosen separator).
  */
 export function getTimeString(d: Date | string = new Date(), separator = ":"): string {
-  const dt = typeof d === "string" ? new Date(d) : d;
-  const hh = String(dt.getHours()).padStart(2, "0");
-  const mm = String(dt.getMinutes()).padStart(2, "0");
-  const ss = String(dt.getSeconds()).padStart(2, "0");
-  return [hh, mm, ss].join(separator);
+    const dt = typeof d === "string" ? new Date(d) : d;
+    const pattern = ["HH", "mm", "ss"].join(separator);
+    return format(dt, pattern);
+}
+
+export function getTimeStringNoSeconds(d: Date | string = new Date(), separator = ":"): string {
+    const dt = typeof d === "string" ? new Date(d) : d;
+    return format(dt, `HH${separator}mm`);
 }
 
 /**
@@ -271,7 +309,7 @@ export function getTimeString(d: Date | string = new Date(), separator = ":"): s
  * @returns {string} Evaluated representation omitting strictly unsafe numerical identifiers formatted exactly as "YYYY-MM-DD_HHmmss".
  */
 export function getTimestampFilename(d: Date = new Date()): string {
-  return `${dateToString(d)}_${getTimeString(d, "")}`;
+    return format(d, "yyyy-MM-dd_HHmmss");
 }
 
 /**
@@ -281,7 +319,7 @@ export function getTimestampFilename(d: Date = new Date()): string {
  * @returns {string} Returns the full strictly formatted ISO 8601 string (e.g., "2026-03-31T14:30:00.000Z")
  */
 export function getISOTimestamp(d: Date = new Date()): string {
-  return d.toISOString();
+    return d.toISOString();
 }
 
 /**
@@ -291,7 +329,7 @@ export function getISOTimestamp(d: Date = new Date()): string {
  * @returns {string} Returns only the date part of an ISO string strictly formatted as "YYYY-MM-DD" (e.g., "2026-03-31").
  */
 export function getISODate(d: Date = new Date()): string {
-  return d.toISOString().slice(0, 10);
+    return format(d, "yyyy-MM-dd");
 }
 
 /**
@@ -300,17 +338,16 @@ export function getISODate(d: Date = new Date()): string {
  * @param {string | null | undefined} tpDate - Formatted explicit string syntax strictly requiring `/Date(ms±hhmm)/` format.
  * @returns {string} Evaluated properties output translated fully explicitly into "YYYY-MM-DD", defaults identically to "-" upon boundary failure.
  */
-export function parseTpDate(tpDate: string | null | undefined): string {
-  if (!tpDate) return "-";
-  const match = /\/Date\((\d+)([+-])(\d{2})(\d{2})\)\//.exec(tpDate);
-  if (!match) return "-";
-  const ms = Number.parseInt(match[1], 10);
-  const sign = match[2] === "+" ? 1 : -1;
-  const tzMs =
-    sign *
-    (Number.parseInt(match[3], 10) * 60 + Number.parseInt(match[4], 10)) *
-    60_000;
-  return dateToString(new Date(ms + tzMs));
+export function parseTpDate(tpDate: string | null | undefined): Date | null {
+    if (!tpDate) return null;
+    const match = /\/Date\((\d+)([+-])(\d{2})(\d{2})\)\//.exec(tpDate);
+    if (!match) return null;
+    const ms = Number.parseInt(match[1], 10);
+    const sign = match[2] === "+" ? 1 : -1;
+    const tzMinutes =
+        sign * (Number.parseInt(match[3], 10) * 60 + Number.parseInt(match[4], 10));
+    // Aggiungiamo l'offset in millisecondi
+    return new Date(ms + tzMinutes * 60_000);
 }
 
 /**
@@ -320,10 +357,10 @@ export function parseTpDate(tpDate: string | null | undefined): string {
  * @returns {string} Fully isolated formatting elements output strictly matching "HH:MM" format (e.g., "7:42").
  */
 export function hoursToHhmm(h: number): string {
-  const totalMinutes = Math.round(h * 60);
-  const hh = Math.floor(totalMinutes / 60);
-  const mm = Math.abs(totalMinutes % 60);
-  return `${hh}:${String(mm).padStart(2, "0")}`;
+    const totalMinutes = Math.round(h * 60);
+    const hh = Math.floor(totalMinutes / 60);
+    const mm = Math.abs(totalMinutes % 60);
+    return `${hh}:${String(mm).padStart(2, "0")}`;
 }
 
 /**
@@ -333,44 +370,44 @@ export function hoursToHhmm(h: number): string {
  * @returns {number} Standard float decimal formatting equivalents matching the given standard syntax.
  */
 export function hhmmToHours(hhmm: string): number {
-  if (!hhmm || !hhmm.includes(":")) return 0;
-  const [h, m] = hhmm.split(":").map(Number);
-  return h + (m ?? 0) / 60;
+    if (!hhmm || !hhmm.includes(":")) return 0;
+    const [h, m] = hhmm.split(":").map(Number);
+    return h + (m ?? 0) / 60;
 }
 
 /** Default since: 1 month ago from today. */
 export function oneMonthAgo(): string {
-  return getISOTimestamp(addMonths(new Date(), -1));
+    return getISOTimestamp(subMonths(new Date(), 1));
 }
 
 /**
  * Safely extracts the native "YYYY-MM" month prefix from fully structured ISO format strings.
- * 
- * @param {string} isoString - The explicit target string containing formatting bounds (e.g. "2026-03-31").
+ *
+ * @param {string} date - The explicit target string containing formatting bounds (e.g. "2026-03-31").
  * @returns {string} The truncated subset string precisely capturing the Month identifier, handling empty guards seamlessly.
  */
-export function extractMonthStr(isoString: string): string {
-  return isoString ? isoString.substring(0, 7) : "";
+export function extractMonthStr(date: string | Date): string {
+    return ensureString(date).substring(0, 7);
 }
 
 /**
  * Assembles exact start timeline parameters specifically targeting strict APIs matching UTC expectations.
- * 
+ *
  * @param {string} dateOrMonth - Standard representation properties (if "YYYY-MM", enforces "-01" start boundary).
  * @returns {string} Evaluated properties strictly appending "T00:00:00Z".
  */
 export function getApiStartOfDay(dateOrMonth: string): string {
-  const d = dateOrMonth.length === 7 ? `${dateOrMonth}-01` : dateOrMonth;
-  return `${d}T00:00:00Z`;
+    const d = dateOrMonth.length === 7 ? `${dateOrMonth}-01` : dateOrMonth;
+    return `${d}T00:00:00Z`;
 }
 
 /**
  * Bounds the final timeline marker securely mapped against internal maximum dates matching precise UTC boundary endings.
- * 
+ *
  * @param {string} dateOrMonth - Target standard visual context (automatically fetches final Day limit for just "YYYY-MM").
  * @returns {string} Terminal elements evaluating strict suffix "T23:59:59Z".
  */
 export function getApiEndOfDay(dateOrMonth: string): string {
-  const d = dateOrMonth.length === 7 ? lastDayOfMonth(dateOrMonth) : dateOrMonth;
-  return `${d}T23:59:59Z`;
+    const d = dateOrMonth.length === 7 ? lastDayOfMonth(dateOrMonth) : dateOrMonth;
+    return `${d}T23:59:59Z`;
 }
