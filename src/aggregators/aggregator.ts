@@ -56,6 +56,11 @@ const CHROME_DIR = path.join(RAW_DIR, "browser-chrome");
 const FIREFOX_DIR = path.join(RAW_DIR, "browser-firefox");
 const NIBOL_DIR  = path.join(RAW_DIR, "nibol");
 
+/** Coerces a value that may be a Date or an ISO string into a Date object. */
+function coerceDate(d: Date | string): Date {
+    return d instanceof Date ? d : parseDateString(d as string);
+}
+
 /** Reads all YYYY-MM.json files from a directory and concatenates their arrays. */
 async function loadDirMonthly<T>(dir: string): Promise<T[]> {
     const files = await listJsonFiles(dir, { pattern: /^\d{4}-\d{2}\.json$/ });
@@ -213,7 +218,7 @@ async function loadDirTeams(dir: string): Promise<TeamsChatDataRaw[]> {
             path.join(dir, file),
             { chatId: "", chatTopic: "", chatType: "", lastModifiedDateTime: new Date(0), messages: [] },
         );
-        all.push(data);
+        all.push({ ...data, messages: data.messages ?? [] });
     }
 
     return all;
@@ -291,22 +296,26 @@ export async function runAggregation(): Promise<void> {
     await fs.mkdir(AGG_DIR, { recursive: true });
     const sinceDate = parseDateString(CONFIG.COLLECT_SINCE);
 
-    const zuccDays     = await loadDirMonthly<ZucchettiDay>(ZUCC_DIR);
+    const zuccDays     = (await loadDirMonthly<ZucchettiDay>(ZUCC_DIR))
+                            .map(d => ({ ...d, date: coerceDate(d.date) }));
     const calendar     = await loadDirMonthly<CalendarEventRaw>(CAL_DIR);
     const emails       = await loadDirMonthly<EmailRaw>(EMAIL_DIR);
     const teams        = await loadDirTeams(TEAMS_DIR);
     const svn          = await loadDirMonthly<SvnCommitRaw>(SVN_DIR);
     const git          = await loadDirMonthly<GitCommitRaw>(GIT_DIR);
-    const chromeBrows  = await loadDirMonthly<BrowserVisit>(CHROME_DIR);
-    const firefoxBrows = await loadDirMonthly<BrowserVisit>(FIREFOX_DIR);
-    const nibolAll     = await loadDirMonthly<NibolBooking>(NIBOL_DIR);
+    const chromeBrows  = (await loadDirMonthly<BrowserVisit>(CHROME_DIR))
+                            .map(v => ({ ...v, date: coerceDate(v.date) }));
+    const firefoxBrows = (await loadDirMonthly<BrowserVisit>(FIREFOX_DIR))
+                            .map(v => ({ ...v, date: coerceDate(v.date) }));
+    const nibolAll     = (await loadDirMonthly<NibolBooking>(NIBOL_DIR))
+                            .map(b => ({ ...b, date: coerceDate(b.date) }));
     const browser      = [...chromeBrows, ...firefoxBrows];
     const tpAll        = await loadDirTp(ZUCC_DIR.replace("zucchetti", "targetprocess"));
 
     log.info(`Zucchetti: ${zuccDays.length} giorni`);
     log.info(`Calendar: ${calendar.length} eventi`);
     log.info(`Email: ${emails.length}`);
-    log.info(`Teams: ${teams.reduce((s, c) => s + c.messages.length, 0)} messaggi`);
+    log.info(`Teams: ${teams.reduce((s, c) => s + (c.messages?.length ?? 0), 0)} messaggi`);
     log.info(`SVN: ${svn.length} commit`);
     log.info(`Git: ${git.length} commit`);
     log.info(`Browser: ${browser.length} visite`);

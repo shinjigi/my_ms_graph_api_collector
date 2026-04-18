@@ -33,14 +33,17 @@ async function fetchCalendarEvents(
     let pageNum = 1;
 
     do {
-        const request = nextLink ? client.api(nextLink) : client.api(apiPath).query(query);
-        const response = (await request
-            .select(
-                "id,subject,start,end,organizer,attendees,isOnlineMeeting,webLink,body,bodyPreview",
-            )
-            .orderby("start/dateTime")
-            .top(100) // Page size
-            .get()) as GraphPage<Event>;
+        const response = (
+            nextLink
+                ? await client.api(nextLink).get()
+                : await client
+                      .api(apiPath)
+                      .query(query)
+                      .select("id,subject,start,end,organizer,attendees,isOnlineMeeting,webLink,body,bodyPreview")
+                      .orderby("start/dateTime")
+                      .top(100)
+                      .get()
+        ) as GraphPage<Event>;
 
         const page = response.value ?? [];
         events.push(...page);
