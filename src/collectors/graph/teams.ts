@@ -14,7 +14,6 @@ interface ChatProcessParams {
     chat: Chat;
     idx: number;
     total: number;
-    force: boolean;
     range: DateRange;
     myName: string;
 }
@@ -205,7 +204,6 @@ async function processSingleChat({
     chat,
     idx,
     total,
-    force,
     range,
     myName,
 }: ChatProcessParams): Promise<string | null> {
@@ -273,7 +271,7 @@ async function processSingleChat({
 export async function collectGraphTeams(
     client: Client,
     range: DateRange,
-    force = false,
+    _force = false,
 ): Promise<string[]> {
     await mkdir(TEAMS_DIR, { recursive: true });
 
@@ -294,7 +292,6 @@ export async function collectGraphTeams(
             chat: allChats[i],
             idx: i + 1,
             total: allChats.length,
-            force,
             range,
             myName,
         });

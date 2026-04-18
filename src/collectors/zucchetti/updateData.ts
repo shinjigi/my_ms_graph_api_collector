@@ -28,7 +28,7 @@ async function postSubmitScrape(
   targetDate: string,
 ): Promise<WeekDayData> {
   log.info(`Post-submit scrape for ${targetDate}...`);
-  const scraped = await scrapeSingleDay(page, targetDate);
+  const scraped = await scrapeSingleDay(page, new Date(targetDate));
   if (!scraped)
     throw new Error(`Day ${targetDate} not found in Cartellino grid.`);
 

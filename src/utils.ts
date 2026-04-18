@@ -16,7 +16,7 @@ export {
     type MonthMeta,
 } from "./json-io";
 
-import { lastDayOfMonth } from "@shared/dates";
+import { lastDayOfMonthString } from "@shared/dates";
 import type { MonthMeta } from "./json-io";
 
 /**
@@ -30,7 +30,7 @@ export function shouldSkipMonth(
 ): boolean {
     if (!stored) return false;
 
-    const last = lastDayOfMonth(month);
+    const last = lastDayOfMonthString(month);
     if (stored.lastExtractedDate < last) return false;
 
     const storedSorted = [...stored.sources]

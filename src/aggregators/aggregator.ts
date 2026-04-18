@@ -189,7 +189,7 @@ async function loadTeamsForDate(
         const data = await readJson<TeamsChatDataRaw>(
             path.join(dir, file),
             // Fallback: empty chat shape
-            { chatId: "", chatTopic: "", chatType: "", lastModifiedDateTime: "", messages: [] },
+            { chatId: "", chatTopic: "", chatType: "", lastModifiedDateTime: new Date(0), messages: [] },
         );
         const msgs = data.messages.filter(
             (m) => m.createdDateTime?.slice(0, 10) === dStr,
@@ -211,7 +211,7 @@ async function loadDirTeams(dir: string): Promise<TeamsChatDataRaw[]> {
     for (const file of files) {
         const data = await readJson<TeamsChatDataRaw>(
             path.join(dir, file),
-            { chatId: "", chatTopic: "", chatType: "", lastModifiedDateTime: "", messages: [] },
+            { chatId: "", chatTopic: "", chatType: "", lastModifiedDateTime: new Date(0), messages: [] },
         );
         all.push(data);
     }
@@ -329,7 +329,7 @@ export async function runAggregation(): Promise<void> {
     for (const zDay of zuccDays) {
         if (isBefore(zDay.date, sinceDate)) continue;
 
-        const dStr = zDay.date;
+        const dStr = dateToString(zDay.date);
         const bundle = buildAggregatedDay(
             zDay.date,
             zDay,

@@ -1,5 +1,6 @@
 import { ZucchettiSession } from "./session";
 import { createLogger } from "../../logger";
+import { parseDateString } from "@shared/dates";
 
 const log = createLogger("zucchetti-api");
 
@@ -210,7 +211,7 @@ export function mapRawToZucchettiDays(
     }
 
     return {
-      date,
+      date: parseDateString(date),
       dayOfWeek,
       timbrature,
       hOrd,

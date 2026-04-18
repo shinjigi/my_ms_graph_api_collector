@@ -6,6 +6,7 @@ import { createLogger } from "../../logger";
 
 const log = createLogger("graph-email");
 import { mergeByKey, readMeta, writeMeta, shouldSkipMonth, writeJson } from "../../utils";
+import { getJsonRawPath } from "../../json-io";
 import {
   dateToString,
   currentMonthString,

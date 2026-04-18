@@ -12,7 +12,7 @@ import {
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { Page, Locator } from "playwright";
-import { extractMonthStr, parseDateString } from "@shared/dates";
+import { extractMonthStr, parseDateString, dateToString } from "@shared/dates";
 import { getJsonRawPath } from "../../json-io";
 import { isEqual } from "date-fns";
 
@@ -300,12 +300,12 @@ export async function patchRawZucchettiFile(
     // File doesn't exist yet — will create
   }
 
-  const idx = days.findIndex((d) => d.date === date);
+  const idx = days.findIndex((d) => dateToString(d.date) === date);
   if (idx >= 0) {
     days[idx] = day;
   } else {
     days.push(day);
-    days.sort((a, b) => a.date.localeCompare(b.date));
+    days.sort((a, b) => a.date.getTime() - b.date.getTime());
   }
 
   await fs.mkdir(ZUCC_DIR, { recursive: true });
