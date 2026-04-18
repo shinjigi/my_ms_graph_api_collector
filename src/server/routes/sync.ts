@@ -19,7 +19,7 @@ import { collectNibol } from "../../collectors/nibol/index";
 import { aggregateSingleDay } from "../../aggregators/aggregator";
 import { readMeta } from "../../utils";
 import { ZucchettiDay } from "@shared/zucchetti";
-import { getMonday, shiftDateString, currentMonthString } from "@shared/dates";
+import { getMonday, currentMonthString, shiftDate, parseDateString } from "@shared/dates";
 
 export const syncRouter = Router();
 
@@ -29,14 +29,14 @@ const NIBOL_DIR = path.join(RAW_DIR, "nibol");
 
 interface SyncRequest {
   scope: "day" | "week";
-  date: string;
+  date: Date;
   force?: boolean;
 }
 
 interface SyncResponse {
   synced: string[]; // collectors that were actually run
   skipped: string[]; // collectors that were up-to-date
-  aggregated: string[]; // dates successfully re-aggregated
+  aggregated: Date[]; // dates successfully re-aggregated
   errors: string[];
 }
 
@@ -53,11 +53,11 @@ async function loadZucchettiMonth(month: string): Promise<ZucchettiDay[]> {
  * source directory (i.e. lastExtractedDate >= every date in the list and
  * the month file exists).
  */
-async function isUpToDate(dir: string, dates: string[]): Promise<boolean> {
+async function isUpToDate(dir: string, dates: Date[]): Promise<boolean> {
   const meta = await readMeta(dir);
   for (const date of dates) {
     const month = currentMonthString(date);
-    const last = meta[month]?.lastExtractedDate ?? null;
+    const last = parseDateString(meta[month]?.lastExtractedDate ?? "");
     if (last === null || last < date) return false;
   }
   return true;
@@ -73,18 +73,18 @@ syncRouter.post("/", async (req: Request, res: Response) => {
   }
 
   // Build the list of target dates
-  const dates: string[] = [];
+  const dates: Date[] = [];
   if (scope === "day") {
     dates.push(date);
   } else {
     const monday = getMonday(date);
     for (let i = 0; i < 5; i++) {
-      dates.push(shiftDateString(monday, i));
+      dates.push(shiftDate(monday, i));
     }
   }
 
   const rangeStart = dates[0];
-  const rangeEnd = dates[dates.length - 1];
+  const rangeEnd = dates.at(-1)!;
 
   const result: SyncResponse = {
     synced: [],
@@ -99,7 +99,7 @@ syncRouter.post("/", async (req: Request, res: Response) => {
     if (zucUpToDate) {
       result.skipped.push("zucchetti");
     } else {
-      await collectZucchetti(force, { start: rangeStart, end: rangeEnd });
+      await collectZucchetti({ start: rangeStart, end: rangeEnd }, force);
       result.synced.push("zucchetti");
     }
   } catch (err) {
@@ -112,7 +112,7 @@ syncRouter.post("/", async (req: Request, res: Response) => {
     if (nibolUpToDate) {
       result.skipped.push("nibol");
     } else {
-      await collectNibol(force, { start: rangeStart, end: rangeEnd });
+      await collectNibol({ start: rangeStart, end: rangeEnd }, force);
       result.synced.push("nibol");
     }
   } catch (err) {

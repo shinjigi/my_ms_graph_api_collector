@@ -12,9 +12,11 @@ import * as nodeFs from "node:fs/promises";
 import { chromium } from "playwright";
 import { readMeta, writeMeta, shouldSkipMonth, listJsonFiles } from "../../utils";
 import { createLogger } from "../../logger";
-import { dateToString, currentMonthString, getYearMonth } from "@shared/dates";
+import { dateToString, currentMonthString, getYearMonth, DateRange } from "@shared/dates";
 import type { NibolBooking } from "@shared/aggregator";
 import { CONFIG } from "@shared/env-config";
+import { parseISO } from "date-fns";
+import { getJsonRawPath } from "../../json-io";
 
 const log = createLogger("nibol");
 
@@ -291,8 +293,8 @@ export async function nibolCheckIn(date: string): Promise<void> {
 }
 
 export async function nibolFetchCalendarData(range?: {
-  start: string;
-  end: string;
+  start: Date;
+  end: Date;
 }): Promise<NibolBooking[]> {
   const profileDir = getProfileDir();
   const userName = CONFIG.NIBOL_USER_NAME;
@@ -563,10 +565,10 @@ export async function nibolFetchCalendarData(range?: {
 }
 
 export async function collectNibol(
+  range: DateRange,
   force = false,
-  range?: { start: string; end: string },
 ): Promise<string[]> {
-  const NIBOL_DIR = path.join(process.cwd(), "data", "raw", "nibol");
+  const NIBOL_DIR = getJsonRawPath("nibol");
 
   await nodeFs.mkdir(NIBOL_DIR, { recursive: true });
 
@@ -574,8 +576,8 @@ export async function collectNibol(
   const currentMonth = currentMonthString();
 
   const effectiveRange = range ?? {
-    start: `${currentMonth}-01`,
-    end: today,
+    start: parseISO(`${currentMonth}-01`),
+    end: parseISO(today),
   };
 
   // Skip the entire Playwright scrape if current month was already collected today

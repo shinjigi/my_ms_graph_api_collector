@@ -11,6 +11,7 @@ import {
     parseISO,
     startOfDay,
     startOfMonth as startOfMonthFns,
+    endOfMonth as endOfMonthFns,
     startOfWeek,
     subMonths,
 } from "date-fns";
@@ -36,6 +37,11 @@ export const MONTH_IT = [
 ];
 
 export const DAYABB_IT = ["Dom", "Lun", "Mar", "Mer", "Gio", "Ven", "Sab"];
+
+export interface DateRange {
+    start: Date;
+    end: Date;
+}
 
 /**
  * Helper interno per garantire che l'input sia un oggetto Date valido.
@@ -186,6 +192,10 @@ export function startOfMonth(input: Date | string = new Date()): Date {
     return startOfMonthFns(ensureDate(input));
 }
 
+export function endOfMonth(input: Date | string = new Date()): Date {
+    return endOfMonthFns(ensureDate(input));
+}
+
 /**
  * Extracts sequence Array populated entirely with sequentially incrementing "YYYY-MM" month markers.
  *
@@ -260,8 +270,12 @@ export function formatMonthYearLabel(input: Date | string): string {
  * @param {Date | string} input - Target calendar context (if string, format "YYYY-MM" or "YYYY-MM-DD").
  * @returns {string} Strict numerical array representation exactly matching the Month final bounds like "2026-03-31".
  */
-export function lastDayOfMonth(input: Date | string): string {
-    return dateToString(lastDayOfMonthFns(ensureDate(input)));
+export function lastDayOfMonth(input: Date | string): Date {
+    return lastDayOfMonthFns(ensureDate(input));
+}
+
+export function lastDayOfMonthString(input: Date | string): string {
+    return dateToString(lastDayOfMonth(input));
 }
 
 /**

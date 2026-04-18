@@ -12,9 +12,11 @@ import {
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { Page, Locator } from "playwright";
-import { extractMonthStr } from "@shared/dates";
+import { extractMonthStr, parseDateString } from "@shared/dates";
+import { getJsonRawPath } from "../../json-io";
+import { isEqual } from "date-fns";
 
-const ZUCC_DIR = path.join(process.cwd(), "data", "raw", "zucchetti");
+const ZUCC_DIR = getJsonRawPath("zucchetti");
 
 // ── Scraping ─────────────────────────────────────────────────────────────────
 
@@ -121,7 +123,7 @@ async function extractRow(
   const dayOfWeek = dayMatch[2].trim();
   const formattedDate = `${header.period.year}-${header.period.month.padStart(2, "0")}-${dayNumber}`;
 
-  const timbrature = (await cells[3].innerText()).trim().replaceAll(/\n/g, " ");
+  const timbrature = (await cells[3].innerText()).trim().replaceAll('\n', " ");
   const giustificativi = (await parseActivityCell(
     cells[4],
   )) as ZucchettiJustification[];
@@ -131,7 +133,7 @@ async function extractRow(
   const hEcc = (await cells[9].innerText()).trim();
 
   return {
-    date: formattedDate,
+    date: parseDateString(formattedDate),
     dayOfWeek,
     timbrature,
     giustificativi,
@@ -160,13 +162,13 @@ export async function scrapeCartellino(page: Page): Promise<TimesheetData> {
 /** Scrape a single day row from the Cartellino grid by date (YYYY-MM-DD). */
 export async function scrapeSingleDay(
   page: Page,
-  targetDate: string,
+  targetDate: Date,
 ): Promise<ZucchettiDay | null> {
   const header = await extractHeader(page);
   const rows = await page.locator('tr[id*="_Grid1_row"]').all();
 
   // Target day number from the date string (e.g. "18" from "2026-03-18")
-  const targetDayNum = targetDate.slice(8, 10);
+  const targetDayNum = targetDate.getDate().toString().padStart(2, "0");
 
   for (const row of rows) {
     const firstCell = await row.locator("td").first().innerText();
@@ -175,7 +177,7 @@ export async function scrapeSingleDay(
     if (!trimmed.startsWith(targetDayNum.replaceAll(/^0/, ""))) continue;
 
     const day = await extractRow(row, header);
-    if (day && day.date === targetDate) return day;
+    if (day && isEqual(day.date, targetDate)) return day;
   }
 
   return null;

@@ -7,13 +7,13 @@
  *
  * Output: data/raw/ai-responses/YYYY-MM-DD_HHmmss_{provider}_{context}.json
  */
-import { mkdir } from "fs/promises";
-import * as path from "path";
-import { writeJson } from "../json-io";
+import { mkdir } from "node:fs/promises";
+import * as path from "node:path";
+import { getJsonRawPath, writeJson } from "../json-io";
 
 import { getTimestampFilename } from "@shared/dates";
 
-const RAW_DIR = path.join(process.cwd(), "data", "raw", "ai-responses");
+const RAW_DIR = getJsonRawPath("ai-responses");
 
 export interface RawResponseRecord {
   savedAt: string;

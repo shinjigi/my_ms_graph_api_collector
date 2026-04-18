@@ -8,18 +8,20 @@ import {
   dateToString,
   currentMonthString,
   getISOTimestamp,
+  DateRange,
 } from "@shared/dates";
 
 import { createLogger } from "../../logger";
 import { CONFIG } from "@shared/env-config";
+import { getJsonRawPath } from "../../json-io";
 
 // Ora questo funzionerà correttamente
 const _require = createRequire(import.meta.url);
 
 const log = createLogger("browser-history");
 
-const CHROME_DIR = path.join(process.cwd(), "data", "raw", "browser-chrome");
-const FIREFOX_DIR = path.join(process.cwd(), "data", "raw", "browser-firefox");
+const CHROME_DIR = getJsonRawPath("browser-chrome");
+const FIREFOX_DIR = getJsonRawPath("browser-firefox");
 
 // Offset between Windows FILETIME epoch (Jan 1, 1601) and Unix epoch (Jan 1, 1970) in microseconds
 const CHROME_EPOCH_OFFSET_US = BigInt(11_644_473_600) * BigInt(1_000_000);
@@ -64,7 +66,8 @@ async function queryChromeProfile(
   SQL: SqlJsStatic,
   profileDir: string,
   sourceName: string,
-  sinceMs: bigint, // Unix microseconds
+  startMs: bigint, // Unix microseconds
+  endMs: bigint,   // Unix microseconds
 ): Promise<BrowserVisit[]> {
   const historyPath = path.join(profileDir, "History");
   let tmpPath: string | null = null;
@@ -80,13 +83,13 @@ async function queryChromeProfile(
     const fileBuffer = await fs.readFile(tmpPath);
     const db: Database = new SQL.Database(fileBuffer);
 
-    // Chrome epoch offset in Chrome microseconds from its own epoch
-    const chromeSince = sinceMs + CHROME_EPOCH_OFFSET_US;
+    const chromeStart = startMs + CHROME_EPOCH_OFFSET_US;
+    const chromeEnd = endMs + CHROME_EPOCH_OFFSET_US;
 
     const results = db.exec(
       `SELECT v.id, u.url, u.title, v.visit_time
              FROM visits v JOIN urls u ON v.url = u.id
-             WHERE v.visit_time >= ${chromeSince.toString()}`,
+             WHERE v.visit_time >= ${chromeStart.toString()} AND v.visit_time <= ${chromeEnd.toString()}`,
     );
 
     db.close();
@@ -121,7 +124,8 @@ async function queryFirefoxProfile(
   SQL: SqlJsStatic,
   profileDir: string,
   sourceName: string,
-  sinceMs: bigint, // Unix microseconds
+  startMs: bigint, // Unix microseconds
+  endMs: bigint,   // Unix microseconds
 ): Promise<BrowserVisit[]> {
   const dbPath = path.join(profileDir, "places.sqlite");
   let tmpPath: string | null = null;
@@ -141,7 +145,7 @@ async function queryFirefoxProfile(
       `SELECT v.id, p.url, p.title,
                     v.visit_date
              FROM moz_historyvisits v JOIN moz_places p ON v.place_id = p.id
-             WHERE v.visit_date >= ${sinceMs.toString()}`,
+             WHERE v.visit_date >= ${startMs.toString()} AND v.visit_date <= ${endMs.toString()}`,
     );
 
     db.close();
@@ -219,14 +223,20 @@ async function writeByMonth(
   return outPaths;
 }
 
-export async function collectBrowserHistory(force = false): Promise<string[]> {
+export async function collectBrowserHistory(
+  range: DateRange,
+  force = false,
+): Promise<string[]> {
   const chromeProfileDirs = CONFIG.CHROME_PROFILE_DIRS
       .map((p) => p.trim())
       .filter(Boolean);
   const firefoxProfileDir = (CONFIG.FIREFOX_PROFILE_DIR).trim();
 
-  const since = CONFIG.COLLECT_SINCE;
-  const sinceMs = BigInt(Date.parse(since)) * BigInt(1000); // Unix microseconds
+  const start = range?.start || new Date(CONFIG.COLLECT_SINCE);
+  const end = range?.end || new Date();
+  
+  const startMs = BigInt(start.getTime()) * BigInt(1000); // Unix microseconds
+  const endMs = BigInt(end.getTime()) * BigInt(1000); // Unix microseconds
 
   if (chromeProfileDirs.length === 0 && !firefoxProfileDir) {
     log.warn(
@@ -262,7 +272,8 @@ export async function collectBrowserHistory(force = false): Promise<string[]> {
           SQL,
           profileDir,
           sourceName,
-          sinceMs,
+          startMs,
+          endMs,
         );
         allChromeVisits.push(...visits);
         log.info(`  [Browser] Chrome ${sourceName}: ${visits.length} visite`);
@@ -287,7 +298,8 @@ export async function collectBrowserHistory(force = false): Promise<string[]> {
         SQL,
         firefoxProfileDir,
         "firefox",
-        sinceMs,
+        startMs,
+        endMs,
       );
       log.info(`  [Browser] Firefox: ${visits.length} visite`);
       const firefoxPaths = await writeByMonth(

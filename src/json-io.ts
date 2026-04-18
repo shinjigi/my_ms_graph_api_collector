@@ -1,9 +1,21 @@
 /**
  * Centralized JSON I/O utilities for the backend.
  * All functions are async (fs/promises). All writes use 2-space indentation.
- */
+*/
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
+
+// ─── Meta sidecar (.meta.json) ─────────────────────────────────────
+
+export interface MonthMeta {
+    lastExtractedDate: string; // YYYY-MM-DD
+    sources: string[];         // paths/URLs actually scanned for that month
+    activeDays?: string[];     // YYYY-MM-DD — days found inside this file/month
+}
+
+export function getJsonRawPath(whatEver: string) {
+    return path.join(process.cwd(), "data", "raw", whatEver);
+}
 
 // ─── Core read/write ───────────────────────────────────────────────
 
@@ -59,14 +71,6 @@ export async function mergeByKey<T>(
     for (const item of existing) map.set(item[key], item);
     for (const item of newItems) map.set(item[key], item);
     return Array.from(map.values());
-}
-
-// ─── Meta sidecar (.meta.json) ─────────────────────────────────────
-
-export interface MonthMeta {
-    lastExtractedDate: string; // YYYY-MM-DD
-    sources: string[];         // paths/URLs actually scanned for that month
-    activeDays?: string[];     // YYYY-MM-DD — days found inside this file/month
 }
 
 /** Read `.meta.json` sidecar for a directory. */

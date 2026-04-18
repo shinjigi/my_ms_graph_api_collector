@@ -3,10 +3,11 @@ import * as path from "node:path";
 import { Client } from "@microsoft/microsoft-graph-client";
 import { Chat, ChatMessage } from "@microsoft/microsoft-graph-types";
 import { createLogger } from "../../logger";
-import { readJson, writeJson, readMeta, writeMeta } from "../../json-io";
-import { dateToString, extractMonthStr, getApiStartOfDay } from "@shared/dates";
+import { readJson, writeJson, readMeta, writeMeta, getJsonRawPath } from "../../json-io";
+import { DateRange, dateToString } from "@shared/dates";
 import { GraphPage, mapToLeanMessage, TeamsChatDataRaw, TeamsChatMessageRaw } from "@shared/graph";
 import { CONFIG } from "@shared/env-config";
+import { isAfter, parseISO } from "date-fns";
 
 interface ChatProcessParams {
     client: Client;
@@ -14,14 +15,13 @@ interface ChatProcessParams {
     idx: number;
     total: number;
     force: boolean;
-    collectSince: string;
-    targetMonth: string | null;
+    range: DateRange;
     myName: string;
 }
 
 const log = createLogger("graph-teams");
 
-const TEAMS_DIR = path.join(process.cwd(), "data", "raw", "graph-teams");
+const TEAMS_DIR = getJsonRawPath("graph-teams");
 
 // ─── Filename helpers ───────────────────────────────────────────────────────
 
@@ -58,18 +58,22 @@ function buildChatFileName(chatId: string, chatType: string, topic: string): str
 // ─── Graph fetch ────────────────────────────────────────────────────────────
 
 /**
- * Fetch new/modified messages for a single chat using
- * $filter=lastModifiedDateTime gt <since>.
- * Returns messages sorted newest-first and the max lastModifiedDateTime seen.
+ * Fetch messages for a single chat within a specific range.
+ * If 'until' is not provided, fetches all messages after 'since'.
  */
-async function fetchChatMessagesSince(
+async function fetchChatMessagesRange(
     c: Client,
     chatId: string,
-    since: string,
-): Promise<{ messages: ChatMessage[]; maxLastModified: string }> {
+    since: Date,
+    until?: Date,
+): Promise<{ messages: ChatMessage[]; maxLastModified: Date }> {
     const messages: ChatMessage[] = [];
     let maxLastModified = since;
     let nextLink: string | null = null;
+
+    const filter = until
+        ? `lastModifiedDateTime gt ${since.toISOString()} and lastModifiedDateTime lt ${until.toISOString()}`
+        : `lastModifiedDateTime gt ${since.toISOString()}`;
 
     do {
         const res = (
@@ -78,7 +82,7 @@ async function fetchChatMessagesSince(
                 : await c
                       .api(`/me/chats/${chatId}/messages`)
                       .orderby("lastModifiedDateTime desc")
-                      .filter(`lastModifiedDateTime gt ${since}`)
+                      .filter(filter)
                       .top(50)
                       .get()
         ) as GraphPage<ChatMessage>;
@@ -87,8 +91,8 @@ async function fetchChatMessagesSince(
         nextLink = res["@odata.nextLink"] ?? null;
 
         for (const m of page) {
-            if (m.lastModifiedDateTime && m.lastModifiedDateTime > maxLastModified) {
-                maxLastModified = m.lastModifiedDateTime;
+            if (m.lastModifiedDateTime && isAfter(parseISO(m.lastModifiedDateTime), maxLastModified)) {
+                maxLastModified = parseISO(m.lastModifiedDateTime);
             }
         }
 
@@ -152,13 +156,13 @@ function resolveTopic(chat: Chat, rawMessages: ChatMessage[], myName: string): s
 
 function mapAndFilterMessages(
     rawMessages: ChatMessage[],
-    targetMonth: string | null,
+    range: DateRange,
 ): TeamsChatMessageRaw[] {
     const lean: TeamsChatMessageRaw[] = [];
     for (const m of rawMessages) {
         if (!m.createdDateTime) continue;
-        const mMonth = extractMonthStr(m.createdDateTime);
-        if (targetMonth && mMonth !== targetMonth) continue;
+        if (range.start && parseISO(m.createdDateTime) < range.start) continue;
+        if (range.end && parseISO(m.createdDateTime) > range.end) continue;
         lean.push(mapToLeanMessage(m));
     }
     return lean;
@@ -202,8 +206,7 @@ async function processSingleChat({
     idx,
     total,
     force,
-    collectSince,
-    targetMonth,
+    range,
     myName,
 }: ChatProcessParams): Promise<string | null> {
     const chatId = chat.id ?? "0";
@@ -217,18 +220,16 @@ async function processSingleChat({
         chatId,
         chatTopic: null,
         chatType: chat.chatType ?? "unknown",
-        lastModifiedDateTime: collectSince,
+        lastModifiedDateTime: range.end,
         messages: [],
     });
 
-    let since = force ? collectSince : existing.lastModifiedDateTime;
-    if (since.length <= 10) since = getApiStartOfDay(since);
-
     try {
-        const { messages: rawMessages, maxLastModified } = await fetchChatMessagesSince(
+        const { messages: rawMessages, maxLastModified } = await fetchChatMessagesRange(
             client,
             chatId,
-            since,
+            range.start,
+            range.end,
         );
 
         if (rawMessages.length === 0) {
@@ -239,7 +240,7 @@ async function processSingleChat({
         const resolvedTopic = resolveTopic(chat, rawMessages, myName);
         log.info(`    [Chat ${idx}/${total}] ${resolvedTopic}: +${rawMessages.length} messaggi`);
 
-        const newLean = mapAndFilterMessages(rawMessages, targetMonth);
+        const newLean = mapAndFilterMessages(rawMessages, range);
         if (newLean.length === 0) return null;
 
         const merged = mergeChatMessages(existing.messages, newLean);
@@ -271,7 +272,7 @@ async function processSingleChat({
 
 export async function collectGraphTeams(
     client: Client,
-    date?: string,
+    range: DateRange,
     force = false,
 ): Promise<string[]> {
     await mkdir(TEAMS_DIR, { recursive: true });
@@ -283,8 +284,6 @@ export async function collectGraphTeams(
     log.info(`  [Teams] ${allChats.length} chat trovate${limitInfo}`);
 
     const myName = await getCurrentUserName(client);
-    const targetMonth = date ? extractMonthStr(date) : null;
-    const collectSince = CONFIG.COLLECT_SINCE;
 
     const outPathsSet = new Set<string>();
     const meta = await readMeta(TEAMS_DIR);
@@ -296,8 +295,7 @@ export async function collectGraphTeams(
             idx: i + 1,
             total: allChats.length,
             force,
-            collectSince,
-            targetMonth,
+            range,
             myName,
         });
         if (outPath) outPathsSet.add(outPath);

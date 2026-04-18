@@ -27,6 +27,7 @@ import {
   TpAssignmentEntry,
 } from "@shared/targetprocess";
 import { CONFIG } from "@shared/env-config";
+import { getJsonRawPath } from "../json-io";
 
 const logger = createLogger("collector");
 
@@ -92,7 +93,7 @@ function extractJson(text: string): unknown {
 // ─── Paths ───────────────────────────────────────────────────────────────────
 const KB_DIR = path.join(process.cwd(), "data", "kb");
 const KB_FILE = path.join(KB_DIR, "us-summaries.json");
-const ENRICHED_DIR = path.join(process.cwd(), "data", "raw", "targetprocess");
+const ENRICHED_DIR = getJsonRawPath("targetprocess");
 
 // ─── Priority colleagues ──────────────────────────────────────────────────────
 const COLLEAGUES_PRIORITY = nameSet([

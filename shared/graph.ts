@@ -34,7 +34,7 @@ export interface TeamsChatDataRaw {
     chatId: string;
     chatTopic: string | null;
     chatType: string;                // "oneOnOne" | "group" | "meeting"
-    lastModifiedDateTime: string;    // ISO 8601 — Graph API sync cursor
+    lastModifiedDateTime: Date;      // ISO 8601 — Graph API sync cursor
     messages: TeamsChatMessageRaw[];
 }
 

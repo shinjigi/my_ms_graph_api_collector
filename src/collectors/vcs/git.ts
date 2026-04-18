@@ -1,20 +1,22 @@
-import * as fs from "fs/promises";
-import * as path from "path";
-import { execSync } from "child_process";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
+import { execSync } from "node:child_process";
 import { globSync } from "glob";
 import { createLogger } from "../../logger";
 
-const log = createLogger("vcs-git");
 import { mergeByKey, readMeta, writeMeta, shouldSkipMonth } from "../../utils";
 import { GitCommitRaw } from "@shared/aggregator";
 import {
   dateToString,
   currentMonthString,
   extractMonthStr,
+  DateRange,
 } from "@shared/dates";
 import { CONFIG } from "@shared/env-config";
+import { getJsonRawPath } from "../../json-io";
 
-const GIT_DIR = path.join(process.cwd(), "data", "raw", "git");
+const log = createLogger("vcs-git");
+const GIT_DIR = getJsonRawPath("git");
 
 function findGitRepos(root: string): string[] {
   try {
@@ -62,7 +64,10 @@ function getCommitsFromRepo(repoPath: string, since: string): GitCommitRaw[] {
   }
 }
 
-export async function collectGitCommits(force = false): Promise<string[]> {
+export async function collectGitCommits(
+  range: DateRange,
+  force = false,
+): Promise<string[]> {
   const roots = (CONFIG.GIT_ROOTS)
     .map((r) => r.trim())
     .filter(Boolean);
@@ -104,8 +109,32 @@ export async function collectGitCommits(force = false): Promise<string[]> {
   }
 
   const meta = await readMeta(GIT_DIR);
+  // if (range) {
+  //   // Range-aware mode
+  //   const month = currentMonthString(range.start);
+  //   const outPath = path.join(GIT_DIR, `${month}.json`);
+  //   const startStr = range.start.toISOString();
+  //   const endStr = range.end.toISOString();
+
+  //   try {
+  //     const commits = await fetchMonthCommits(
+  //       repos, 
+  //       startStr,
+  //       endStr,
+  //     );
+  //     const merged = await mergeByKey<GitCommitRaw>(outPath, commits, "hash");
+  //     await fs.writeFile(outPath, JSON.stringify(merged, null, 2), "utf-8");
+  //     await writeMeta(GIT_DIR, month, { lastExtractedDate: today, sources: roots });
+  //     return [outPath];
+  //   } catch (err) {
+  //     log.warn(`  [Git] Errore nel range: ${(err as Error).message}`);
+  //     return [];
+  //   }
+  // }
+
+  // let current = startOfMonth(since);
   const outPaths: string[] = [];
-  const months = Array.from(byMonth.keys()).sort();
+  const months = Array.from(byMonth.keys()).sort((a, b) => a.localeCompare(b));
 
   for (const month of months) {
     const isCurrentMonth = month === currentMonthString();

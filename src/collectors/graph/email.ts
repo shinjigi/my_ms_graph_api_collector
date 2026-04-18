@@ -14,11 +14,12 @@ import {
   getApiStartOfDay,
   getApiEndOfDay,
   extractMonthStr,
+  DateRange,
 } from "@shared/dates";
 import { GraphPage, mapToLeanEmail, EmailRaw } from "@shared/graph";
 import { CONFIG } from "@shared/env-config";
 
-const EMAIL_DIR = path.join(process.cwd(), "data", "raw", "graph-email");
+const EMAIL_DIR = getJsonRawPath("graph-email");
 
 async function fetchEmails(
   client: Client,
@@ -114,7 +115,7 @@ async function fetchEmails(
 
 export async function collectGraphEmail(
   client: Client,
-  date?: string,
+  range: DateRange,
   force = false,
 ): Promise<string[]> {
   const since = CONFIG.COLLECT_SINCE;
@@ -127,8 +128,8 @@ export async function collectGraphEmail(
   const meta = await readMeta(EMAIL_DIR);
   const outPaths: string[] = [];
 
-  if (date) {
-    const month = extractMonthStr(date);
+  if (range) {
+    const month = extractMonthStr(range.start.toISOString());
     const isCurrentMonth = month === currentMonthString();
     const outPath = path.join(EMAIL_DIR, `${month}.json`);
     const exclPath = path.join(EMAIL_DIR, `${month}.excluded.json`);
@@ -142,8 +143,11 @@ export async function collectGraphEmail(
       return [outPath];
     }
 
-    const receivedFilter = `receivedDateTime ge ${getApiStartOfDay(date)} and receivedDateTime le ${getApiEndOfDay(date)}`;
-    const sentFilter = `sentDateTime ge ${getApiStartOfDay(date)} and sentDateTime le ${getApiEndOfDay(date)}`;
+    const startStr = range.start.toISOString();
+    const endStr = range.end.toISOString();
+
+    const receivedFilter = `receivedDateTime ge ${startStr} and receivedDateTime le ${endStr}`;
+    const sentFilter = `sentDateTime ge ${startStr} and sentDateTime le ${endStr}`;
     const [
       { results: received, excluded },
       { results: sent },

@@ -12,7 +12,7 @@ export interface ZucchettiRequest {
 }
 
 export interface ZucchettiDay {
-  date: string; // YYYY-MM-DD
+  date: Date;
   dayOfWeek: string;
   timbrature: string;
   hOrd: string; // e.g. "7:42" or "" for holidays/weekends

@@ -22,7 +22,7 @@ import {
     calculateAbsenceHours,
     WorkLocation,
 } from "@shared/zucchetti";
-import { dateToString, extractMonthStr, todayMidnight } from "@shared/dates";
+import { dateToString, extractMonthStr, parseDateString, todayMidnight } from "@shared/dates";
 import { WORKDAY_HOURS } from "@shared/standards";
 import { TpTimeEntry } from "@shared/targetprocess";
 import {
@@ -33,7 +33,7 @@ import {
     NibolBooking,
 } from "@shared/aggregator";
 import { fileURLToPath } from "node:url";
-import { isEqual, isPast } from "date-fns";
+import { isBefore, isEqual, isPast } from "date-fns";
 import { CalendarEventRaw, EmailRaw, TeamsChatDataRaw, TeamsChatMessageRaw } from "@shared/graph";
 
 const isMainModule =
@@ -289,19 +289,19 @@ export async function runAggregation(): Promise<void> {
     log.info("Aggregazione dati raw → aggregated...");
 
     await fs.mkdir(AGG_DIR, { recursive: true });
-    const sinceDate = CONFIG.COLLECT_SINCE;
+    const sinceDate = parseDateString(CONFIG.COLLECT_SINCE);
 
-    const zuccDays    = await loadDirMonthly<ZucchettiDay>(ZUCC_DIR);
-    const calendar    = await loadDirMonthly<CalendarEventRaw>(CAL_DIR);
-    const emails      = await loadDirMonthly<EmailRaw>(EMAIL_DIR);
-    const teams       = await loadDirTeams(TEAMS_DIR);
-    const svn         = await loadDirMonthly<SvnCommitRaw>(SVN_DIR);
-    const git         = await loadDirMonthly<GitCommitRaw>(GIT_DIR);
-    const chromeBrows = await loadDirMonthly<BrowserVisit>(CHROME_DIR);
+    const zuccDays     = await loadDirMonthly<ZucchettiDay>(ZUCC_DIR);
+    const calendar     = await loadDirMonthly<CalendarEventRaw>(CAL_DIR);
+    const emails       = await loadDirMonthly<EmailRaw>(EMAIL_DIR);
+    const teams        = await loadDirTeams(TEAMS_DIR);
+    const svn          = await loadDirMonthly<SvnCommitRaw>(SVN_DIR);
+    const git          = await loadDirMonthly<GitCommitRaw>(GIT_DIR);
+    const chromeBrows  = await loadDirMonthly<BrowserVisit>(CHROME_DIR);
     const firefoxBrows = await loadDirMonthly<BrowserVisit>(FIREFOX_DIR);
-    const nibolAll    = await loadDirMonthly<NibolBooking>(NIBOL_DIR);
-    const browser     = [...chromeBrows, ...firefoxBrows];
-    const tpAll       = await loadDirTp(ZUCC_DIR.replace("zucchetti", "targetprocess"));
+    const nibolAll     = await loadDirMonthly<NibolBooking>(NIBOL_DIR);
+    const browser      = [...chromeBrows, ...firefoxBrows];
+    const tpAll        = await loadDirTp(ZUCC_DIR.replace("zucchetti", "targetprocess"));
 
     log.info(`Zucchetti: ${zuccDays.length} giorni`);
     log.info(`Calendar: ${calendar.length} eventi`);
@@ -326,14 +326,12 @@ export async function runAggregation(): Promise<void> {
 
     let written = 0;
 
-    const since = new Date(sinceDate);
     for (const zDay of zuccDays) {
-        const dateObj = new Date(zDay.date);
-        if (dateObj < since) continue;
+        if (isBefore(zDay.date, sinceDate)) continue;
 
         const dStr = zDay.date;
         const bundle = buildAggregatedDay(
-            dateObj,
+            zDay.date,
             zDay,
             calByDate.get(dStr)     ?? [],
             emailByDate.get(dStr)   ?? [],
