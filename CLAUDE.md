@@ -150,3 +150,12 @@ registry=https://registry.npmjs.org/
 - **Date Manipulation**: Always use `@shared/dates.ts` for any date or date-string manipulation (formatting, offsets, extraction). Never use manual `slice(0, 10)`, `substring`, or `padStart` for ISO dates. Use `dateToString()`, `getMonday()`, `extractMonthStr()`, `getApiStartOfDay()`, etc.
 - **Standards & Constants**: Use `@shared/standards.ts` for shared business logic constants like `WORKDAY_HOURS`.
 - **Personal registry**: Always use the public npm registry (`https://registry.npmjs.org/`).
+
+## graphify
+
+This project has a graphify knowledge graph at graphify-out/.
+
+Rules:
+- Before answering architecture or codebase questions, read graphify-out/GRAPH_REPORT.md for god nodes and community structure
+- If graphify-out/wiki/index.md exists, navigate it instead of reading raw files
+- After modifying code files in this session, run `graphify update .` to keep the graph current (AST-only, no API cost)
