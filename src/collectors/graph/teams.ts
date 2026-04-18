@@ -1,4 +1,4 @@
-import { mkdir } from "node:fs/promises";
+import { mkdir, unlink } from "node:fs/promises";
 import * as path from "node:path";
 import { Client } from "@microsoft/microsoft-graph-client";
 import { Chat, ChatMessage } from "@microsoft/microsoft-graph-types";
@@ -210,24 +210,17 @@ async function processSingleChat({
     const chatId = chat.id ?? "0";
     if (chatId === "0") return null;
 
-    const prelimTopic = chat.topic ?? `(no topic) ${chatId.slice(25, 35)}`;
-    const fileName = buildChatFileName(chatId, chat.chatType ?? "unknown", prelimTopic);
-    const outPath = path.join(TEAMS_DIR, `${fileName}.json`);
+    const chatType = chat.chatType ?? "unknown";
+    const defaultChat: TeamsChatDataRaw = { chatId, chatTopic: null, chatType, lastModifiedDateTime: range.end, messages: [] };
 
-    const existing = await readJson<TeamsChatDataRaw>(outPath, {
-        chatId,
-        chatTopic: null,
-        chatType: chat.chatType ?? "unknown",
-        lastModifiedDateTime: range.end,
-        messages: [],
-    });
+    // Preliminary path — used to migrate old files written before topic was resolved
+    const prelimFileName = buildChatFileName(chatId, chatType, chat.topic ?? `(no topic) ${chatId.slice(25, 35)}`);
+    const prelimPath = path.join(TEAMS_DIR, `${prelimFileName}.json`);
+    const prelimExisting = await readJson<TeamsChatDataRaw>(prelimPath, defaultChat);
 
     try {
         const { messages: rawMessages, maxLastModified } = await fetchChatMessagesRange(
-            client,
-            chatId,
-            range.start,
-            range.end,
+            client, chatId, range.start, range.end,
         );
 
         if (rawMessages.length === 0) {
@@ -241,20 +234,37 @@ async function processSingleChat({
         const newLean = mapAndFilterMessages(rawMessages, range);
         if (newLean.length === 0) return null;
 
-        const merged = mergeChatMessages(existing.messages, newLean);
+        const resolvedFileName = buildChatFileName(chatId, chatType, resolvedTopic);
+        const resolvedPath = path.join(TEAMS_DIR, `${resolvedFileName}.json`);
 
-        await writeJson(outPath, {
+        // If topic resolved to a different filename, also read from the resolved path
+        // (may already contain data from a prior correct run), then merge all three sources
+        const resolvedExisting = resolvedPath !== prelimPath
+            ? await readJson<TeamsChatDataRaw>(resolvedPath, defaultChat)
+            : prelimExisting;
+        const allExisting = resolvedPath !== prelimPath
+            ? mergeChatMessages(prelimExisting.messages, resolvedExisting.messages)
+            : prelimExisting.messages;
+
+        const merged = mergeChatMessages(allExisting, newLean);
+
+        await writeJson(resolvedPath, {
             chatId,
             chatTopic: resolvedTopic,
-            chatType: chat.chatType ?? "unknown",
+            chatType,
             lastModifiedDateTime: maxLastModified,
             messages: merged,
         });
 
-        await updateChatMeta(TEAMS_DIR, fileName, merged);
+        await updateChatMeta(TEAMS_DIR, resolvedFileName, merged);
+
+        // Remove stale preliminary file after successful migration
+        if (resolvedPath !== prelimPath) {
+            try { await unlink(prelimPath); } catch { /* file may not exist */ }
+        }
 
         if (idx % 50 === 0) log.info(`    [Progress] Analizzate ${idx}/${total} chat...`);
-        return outPath;
+        return resolvedPath;
     } catch (err: unknown) {
         const code = (err as { statusCode?: number }).statusCode;
         if (code !== 403 && code !== 404) {
