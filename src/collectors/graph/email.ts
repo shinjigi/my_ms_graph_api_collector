@@ -130,7 +130,7 @@ export async function collectGraphEmail(
   const outPaths: string[] = [];
 
   if (range) {
-    const month = extractMonthStr(range.start.toISOString());
+    const month = extractMonthStr(range.start);
     const isCurrentMonth = month === currentMonthString();
     const outPath = path.join(EMAIL_DIR, `${month}.json`);
     const exclPath = path.join(EMAIL_DIR, `${month}.excluded.json`);

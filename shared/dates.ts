@@ -422,6 +422,6 @@ export function getApiStartOfDay(dateOrMonth: string): string {
  * @returns {string} Terminal elements evaluating strict suffix "T23:59:59Z".
  */
 export function getApiEndOfDay(dateOrMonth: string): string {
-    const d = dateOrMonth.length === 7 ? lastDayOfMonth(dateOrMonth) : dateOrMonth;
+    const d = dateOrMonth.length === 7 ? lastDayOfMonthString(dateOrMonth) : dateOrMonth;
     return `${d}T23:59:59Z`;
 }
