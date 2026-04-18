@@ -12,6 +12,7 @@ import {
   currentMonthString,
   extractMonthStr,
 } from "@shared/dates";
+import { CONFIG } from "@shared/env-config";
 
 const GIT_DIR = path.join(process.cwd(), "data", "raw", "git");
 
@@ -62,15 +63,13 @@ function getCommitsFromRepo(repoPath: string, since: string): GitCommitRaw[] {
 }
 
 export async function collectGitCommits(force = false): Promise<string[]> {
-  const roots = (process.env["GIT_ROOTS"] ?? "")
-    .split(";")
+  const roots = (CONFIG.GIT_ROOTS)
     .map((r) => r.trim())
     .filter(Boolean);
-  const gitEmails = (process.env["GIT_EMAILS"] ?? "")
-    .split(";")
+  const gitEmails = (CONFIG.GIT_EMAILS)
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
-  const since = process.env["COLLECT_SINCE"] ?? "2025-01-01";
+  const since = CONFIG.COLLECT_SINCE;
   const today = dateToString();
 
   if (roots.length === 0) {

@@ -3,13 +3,11 @@
 import type { ZucchettiDay, WorkLocation } from './zucchetti';
 import type {
     NibolBooking,
-    EmailRaw,
-    TeamsChatData,
     SvnCommitRaw,
     GitCommitRaw,
     BrowserVisit,
 } from './aggregator';
-import { CalendarEventRaw } from './graph';
+import { CalendarEventRaw, EmailRaw, TeamsChatDataRaw } from './graph';
 
 
 export interface WeekDayData {
@@ -23,7 +21,7 @@ export interface WeekDayData {
     zucchetti:      ZucchettiDay | null;
     calendar:       CalendarEventRaw[];
     emails:         EmailRaw[];
-    teams:          TeamsChatData[];
+    teams:          TeamsChatDataRaw[];
     svnCommits:     SvnCommitRaw[];
     gitCommits:     GitCommitRaw[];
     browserVisits:  BrowserVisit[];

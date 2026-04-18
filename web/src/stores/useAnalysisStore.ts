@@ -2,8 +2,8 @@ import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { getTimeString, shiftDate, dateToString, getMonday } from "@shared/dates";
 import {
-    analyzeDay,
-    analyzeWeek,
+    analyseDay,
+    analyseWeek,
     pollAnalysisStatus,
     fetchProposal,
     fetchWeekProposals,
@@ -134,7 +134,7 @@ export const useAnalysisStore = defineStore("analysis", () => {
         proposal.value = null;
 
         try {
-            const res = await analyzeDay(date, force);
+            const res = await analyseDay(date, force);
             jobId.value = res.jobId;
             startPolling();
         } catch (err) {
@@ -150,7 +150,7 @@ export const useAnalysisStore = defineStore("analysis", () => {
         proposal.value = null;
 
         try {
-            const res = await analyzeWeek(date, force);
+            const res = await analyseWeek(date, force);
             jobId.value = res.jobId;
             startPolling();
         } catch (err) {

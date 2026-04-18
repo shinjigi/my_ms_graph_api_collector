@@ -2,9 +2,6 @@
  * Main entrypoint for "npm run collect".
  * Runs all collectors sequentially and writes raw data to data/raw/.
  */
-import * as dotenv from "dotenv";
-dotenv.config();
-
 import { createLogger } from "./logger";
 
 const log = createLogger("collect");

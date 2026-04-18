@@ -1,5 +1,5 @@
 /**
- * Claude analyzer provider — local Claude Code CLI (`claude -p`).
+ * Claude analyser provider — local Claude Code CLI (`claude -p`).
  * Uses the Claude Code subscription (no API key required).
  */
 import { spawn } from "node:child_process";
@@ -7,6 +7,7 @@ import { AnalyzerProvider, stripCodeFence, tpmToChars } from "./base";
 import { createLogger } from "../logger";
 import { saveRawResponse } from "./aiRaw";
 import { ProposalEntry } from "@shared/analysis";
+import { CONFIG } from "@shared/env-config";
 
 const log = createLogger("claude-cli");
 
@@ -73,12 +74,12 @@ export class ClaudeCliProvider implements AnalyzerProvider {
     });
   }
 
-  async analyzeBatch(
+  async analyseBatch(
     systemPrompt: string,
     userPromptBatched: string,
     context = "analysis-cli",
   ): Promise<{ date: Date; entries: ProposalEntry[] }[]> {
-    const model = process.env["CLAUDE_MODEL"] ?? "claude-haiku-4-5-20251001";
+    const model = CONFIG.CLAUDE_MODEL;
     const promptChars = systemPrompt.length + userPromptBatched.length;
     log.info(
       `[${this.name}] Invio batch tramite CLI (${model}) — prompt ~${promptChars} chars...`,

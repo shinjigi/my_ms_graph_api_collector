@@ -1,7 +1,7 @@
 /**
  * TargetProcess Knowledge Base collector — unified provider chain.
  *
- * Claude API (primary) → Gemini (fallback).  Mirrors the analyzer.ts pattern.
+ * Claude API (primary) → Gemini (fallback).  Mirrors the analyser.ts pattern.
  *
  * Usage:
  *   tsx src/targetprocess/collector.ts --update-kb
@@ -12,9 +12,6 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import { GoogleGenAI } from "@google/genai";
-import * as dotenv from "dotenv";
-
-dotenv.config();
 
 import { createLogger } from "../logger";
 import { saveRawResponse } from "../analysers/aiRaw";
@@ -29,6 +26,7 @@ import {
   TpTimeEntry,
   TpAssignmentEntry,
 } from "@shared/targetprocess";
+import { CONFIG } from "@shared/env-config";
 
 const logger = createLogger("collector");
 
@@ -326,11 +324,11 @@ class ClaudeKbProvider extends BatchKbProvider {
   readonly name = "claude";
 
   constructor() {
-    super(Number.parseInt(process.env["CLAUDE_MODEL_MAX_TPM"] ?? "200000"));
+    super(CONFIG.CLAUDE_MODEL_MAX_TPM);
   }
 
   isAvailable(): boolean {
-    return !!process.env["CLAUDE_API_KEY"];
+    return !!CONFIG.CLAUDE_API_KEY;
   }
 
   protected async processBatch(
@@ -338,10 +336,9 @@ class ClaudeKbProvider extends BatchKbProvider {
     kbMap: Map<number, KbEntry>,
     batchNum: number,
   ): Promise<void> {
-    const client = new Anthropic({ apiKey: process.env["CLAUDE_API_KEY"]! });
+    const client = new Anthropic({ apiKey: CONFIG.CLAUDE_API_KEY});
     const modelName = (
-      process.env["CLAUDE_MODEL"] ?? "claude-haiku-4-5-20251001"
-    )
+      CONFIG.CLAUDE_MODEL)
       .replaceAll(/['"]/g, "")
       .trim();
     const context = `kb-batch-${batchNum}`;
@@ -406,11 +403,11 @@ class GeminiKbProvider extends BatchKbProvider {
   readonly name = "gemini";
 
   constructor() {
-    super(Number.parseInt(process.env["GEMINI_MODEL_MAX_TPM"] ?? "1000000"));
+    super(CONFIG.GEMINI_MODEL_MAX_TPM);
   }
 
   isAvailable(): boolean {
-    return !!process.env["GEMINI_API_KEY"];
+    return !!CONFIG.GEMINI_API_KEY;
   }
 
   protected async processBatch(
@@ -418,8 +415,8 @@ class GeminiKbProvider extends BatchKbProvider {
     kbMap: Map<number, KbEntry>,
     batchNum: number,
   ): Promise<void> {
-    const genAI = new GoogleGenAI({ apiKey: process.env["GEMINI_API_KEY"]! });
-    const modelName = (process.env["GEMINI_MODEL"] ?? "gemini-2.0-flash")
+    const genAI = new GoogleGenAI({ apiKey: CONFIG.GEMINI_API_KEY});
+    const modelName = (CONFIG.GEMINI_MODEL)
       .replaceAll(/['"]/g, "")
       .trim();
     const context = `kb-batch-${batchNum}`;
@@ -736,14 +733,14 @@ async function run(): Promise<void> {
     `enriched-${dateToString()}.json`,
   );
   const enrichedSource =
-    args.fromEnriched ??
-    (!args.force &&
-    (await fs
-      .access(todayEnrichedPath)
-      .then(() => true)
-      .catch(() => false))
-      ? todayEnrichedPath
-      : undefined);
+      args.fromEnriched ??
+      (!args.force &&
+      (await fs
+          .access(todayEnrichedPath)
+          .then(() => true)
+          .catch(() => false))
+          ? todayEnrichedPath
+          : undefined);
 
   if (enrichedSource) {
     logger.info(`Carico enriched da file: ${enrichedSource}`);

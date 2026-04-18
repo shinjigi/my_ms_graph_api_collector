@@ -1,6 +1,6 @@
 /**
- * Base types and utilities shared by analyzer.ts and all provider implementations.
- * Kept in a separate file to avoid circular imports between analyzer.ts and the providers.
+ * Base types and utilities shared by analyser.ts and all provider implementations.
+ * Kept in a separate file to avoid circular imports between analyser.ts and the providers.
  */
 import type { ProposalEntry } from "@shared/analysis";
 
@@ -26,7 +26,7 @@ export interface AnalyzerProvider {
     /**
      * Max prompt size in characters for a single API call.
      * Computed from the corresponding *_MODEL_MAX_TPM env var (tokens × 4 chars/token).
-     * Used by the batch-building loop in analyzer.ts to size prompts correctly.
+     * Used by the batch-building loop in analyser.ts to size prompts correctly.
      */
     readonly maxInputChars: number;
     /**
@@ -54,7 +54,7 @@ export interface AnalyzerProvider {
      * Analyze a batched prompt (one or more days) and return per-day results.
      * userPromptBatched is the JSON payload built by buildUserPromptBatched().
      */
-    analyzeBatch(
+    analyseBatch(
         systemPrompt: string,
         userPromptBatched: string,
     ): Promise<{ date: Date; entries: ProposalEntry[] }[]>;

@@ -1,18 +1,8 @@
-import * as dotenv from "dotenv";
-
-dotenv.config();
-
-function requireEnv(key: string): string {
-    const val = process.env[key];
-    if (!val) {
-        throw new Error(`Variabile mancante: ${key}. Copia .env.example in .env e valorizzala.`);
-    }
-    return val;
-}
+import { CONFIG } from "@shared/env-config";
 
 export const config = {
-    tenantId: requireEnv("TENANT_ID"),
-    clientId: requireEnv("CLIENT_ID"),
-    top:      Number(process.env["TOP"] ?? 25),
+    tenantId: CONFIG.TENANT_ID,
+    clientId: CONFIG.CLIENT_ID,
+    top:      CONFIG.TOP,
     scopes:   ["Mail.Read", "Calendars.Read", "Chat.Read"] as string[],
 };

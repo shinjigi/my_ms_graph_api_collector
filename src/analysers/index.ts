@@ -1,31 +1,27 @@
 /**
- * Unified analyzer orchestrator.
+ * Unified analyser orchestrator.
  *
  * Provides the AnalyzerProvider interface, shared types, prompt-building logic,
  * and the fallback chain (Claude API → Gemini → Claude CLI).
  *
  * CLI usage:
- *   tsx src/analysis/analyzer.ts                         # process only new days
- *   tsx src/analysis/analyzer.ts --force                 # reprocess all workdays
- *   tsx src/analysis/analyzer.ts --date=2026-03-10       # single day
- *   tsx src/analysis/analyzer.ts --provider=gemini       # force a specific provider
+ *   tsx src/analysis/analyser.ts                         # process only new days
+ *   tsx src/analysis/analyser.ts --force                 # reprocess all workdays
+ *   tsx src/analysis/analyser.ts --date=2026-03-10       # single day
+ *   tsx src/analysis/analyser.ts --provider=gemini       # force a specific provider
  */
 import { access, mkdir } from "node:fs/promises";
 import * as path from "node:path";
-import * as dotenv from "dotenv";
-import { fileURLToPath } from "url";
+import { fileURLToPath } from "node:url";
 
 const isMainModule =
     process.argv[1] &&
     (process.argv[1] === fileURLToPath(import.meta.url) ||
-        process.argv[1].includes("analyzer"));
-
-dotenv.config();
+        process.argv[1].includes("analyser"));
 
 import {
     shiftDate,
     dateToString,
-    getISOTimestamp,
     getWeekBoundsFromStr,
 } from "@shared/dates";
 import type { ProposalEntry, DayProposal } from "@shared/analysis";
@@ -37,11 +33,11 @@ import { OpenAiCompatibleProvider } from "./openAiCompatProvider";
 import { ClaudeCliProvider } from "./claudeCliProvider";
 import { GeminiProvider } from "./geminiProvider";
 import { refreshReportedHours } from "../targetprocess/refreshHours";
-import { readJson, readText, writeJson } from "../json-io";
+import { readJson, readText, writeJson, listJsonFiles } from "../json-io";
 export type { AnalyzerProvider, SignalDetail } from "./base";
 export { stripCodeFence } from "./base";
 
-const log = createLogger("analyzer");
+const log = createLogger("analyser");
 
 // ─── Paths ──────────────────────────────────────────────────────────
 export const AGG_DIR = path.join(process.cwd(), "data", "aggregated");
@@ -80,8 +76,10 @@ export interface DefaultsConfig {
 
 // ─── Shared utilities ───────────────────────────────────────────────
 import { AnalyzerProvider, SignalDetail } from "./base";
-import { AggregatedDay, TeamsChatData } from "@shared/aggregator";
 import { isAfter, isBefore, isEqual } from "date-fns";
+import { CONFIG } from "@shared/env-config";
+import { AggregatedDay } from "@shared/aggregator";
+import { TeamsChatDataRaw } from "@shared/graph";
 
 // ─── Module-level regex constants ───────────────────────────────────
 // Used with .matchAll() only — never .test()/.exec() — to avoid g-flag lastIndex issues.
@@ -219,15 +217,16 @@ function buildSignals(
             subject: e.subject,
             start: e.start?.dateTime?.slice(11, 16),
             end: e.end?.dateTime?.slice(11, 16),
-            attendees: e.attendees?.slice(0, 5).map((a) => a.email ?? "unknown") ?? [],
+            attendees: e.attendees?.slice(0, 5).map((a: { email: string }) => a.email ?? "unknown") ?? [],
+            body: e.bodyMd ? e.bodyMd.slice(0, 400) : undefined,
         })),
-        teamsChats: day.teams.map((c: TeamsChatData) => ({
+        teamsChats: day.teams.map((c: TeamsChatDataRaw) => ({
             topic: c.chatTopic,
             count: c.messages.length,
             messages: c.messages
                 .sort((a, b) => a.createdDateTime.localeCompare(b.createdDateTime))
                 .slice(0, 5)
-                .map(m => [m.from ?? "?", m.body.slice(0, 120)]),
+                .map(m => [m.from ?? "?", (m.bodyMd ?? m.body).slice(0, 120)]),
         })),
         gitCommits: day.gitCommits.map((c) => ({
             repo: c.repo,
@@ -237,12 +236,13 @@ function buildSignals(
             message: c.message,
             paths: c.paths.slice(0, 3),
         })),
-        emailSubjects: day.emails
-            .slice(0, 20)
-            .map(
-                (e) =>
-                    `[${e.direction === "sent" ? "sent" : "rcvd"}] ${e.subject.slice(0, 98)}`,
-            ),
+        emails: day.emails
+            .slice(0, 15)
+            .map((e) => ({
+                subject: e.subject,
+                dir: e.direction,
+                body: e.bodyMd ? e.bodyMd.slice(0, 400) : undefined,
+            })),
         browserTaskIds: browserTaskIds.length > 0 ? browserTaskIds : undefined,
     };
 }
@@ -382,7 +382,7 @@ export function buildProviders(forceProvider?: string): AnalyzerProvider[] {
  */
 function filterKbByPeriod(items: KbEntry[], batchDates: Date[]): KbEntry[] {
     if (batchDates.length === 0) return items;
-    const windowDays = Number(process.env["KB_RELEVANCE_WINDOW_DAYS"] ?? 90);
+    const windowDays = Number(CONFIG.KB_RELEVANCE_WINDOW_DAYS);
     const batchMin = batchDates.reduce((a, b) => (isBefore(a, b) ? a : b));
     const batchMax = batchDates.reduce((a, b) => (isAfter(a, b) ? a : b));
     const windowStart = shiftDate(batchMin, -windowDays);
@@ -410,7 +410,7 @@ function sortKbByRelevance(
 
     const batchSet = new Set(batchDates);
     const batchMin = batchDates.reduce((a, b) => (isBefore(a, b) ? a : b));
-    const windowDays = Number(process.env["KB_RELEVANCE_WINDOW_DAYS"] ?? 90);
+    const windowDays = Number(CONFIG.KB_RELEVANCE_WINDOW_DAYS);
     const windowStart = shiftDate(batchMin, -windowDays);
 
     // Use precise task-ID extraction; fall back to stopword-filtered calendar keywords
@@ -542,7 +542,7 @@ function normalizeEntries(
 }
 
 // ─── Core analysis ──────────────────────────────────────────────────
-export async function analyzeBatch(
+export async function analyseBatch(
     batch: AggregatedDay[],
     kbItems: KbEntry[],
     defaults: DefaultsConfig,
@@ -595,7 +595,7 @@ export async function analyzeBatch(
                 `[${provider.name}] avvio analisi per ${batch.length} giorni...`,
             );
             const t0 = Date.now();
-            const results = await provider.analyzeBatch(system, user);
+            const results = await provider.analyseBatch(system, user);
             const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
 
             const batchDatesSet = new Set(batch.map((d) => dateToString(d.date)));
@@ -699,7 +699,7 @@ async function run(): Promise<void> {
 
     const defaults = await loadDefaults();
     const allProviders = buildProviders(providerArg);
-    const sinceDate = process.env["COLLECT_SINCE"] ?? "2025-01-01";
+    const sinceDate = CONFIG.COLLECT_SINCE;
 
     log.info(
         `Provider configurati: ${allProviders.map((p) => p.name).join(", ")}`,
@@ -730,19 +730,18 @@ async function run(): Promise<void> {
 
     await mkdir(PROPOSALS_DIR, { recursive: true });
 
-    const { readdir } = await import("node:fs/promises");
-    const aggFiles = (await readdir(AGG_DIR).catch(() => [] as string[]))
-        .filter((f) => /^\d{4}-\d{2}-\d{2}\.json$/.test(f))
-        .filter((f) => f.replaceAll(".json", "") >= sinceDate)
-        .filter((f) => {
-            const dateStr = f.replaceAll(".json", "");
-            if (dateArg && dateStr !== dateArg) return false;
-            if (startDateArg && dateStr < startDateArg) return false;
-            if (endDateArg && dateStr > endDateArg) return false;
-            if (weekStart && dateStr < weekStart) return false;
-            if (weekEnd && dateStr > weekEnd) return false;
-            return true;
-        });
+    const aggFiles = (await listJsonFiles(AGG_DIR, {
+        pattern: /^\d{4}-\d{2}-\d{2}\.json$/,
+        sinceDate,
+    })).filter((f) => {
+        const dateStr = f.replaceAll(".json", "");
+        if (dateArg && dateStr !== dateArg) return false;
+        if (startDateArg && dateStr < startDateArg) return false;
+        if (endDateArg && dateStr > endDateArg) return false;
+        if (weekStart && dateStr < weekStart) return false;
+        if (weekEnd && dateStr > weekEnd) return false;
+        return true;
+    });
 
     let processed = 0;
     let skipped = 0;
@@ -762,7 +761,7 @@ async function run(): Promise<void> {
         await refreshReportedHours(currentBatch);
 
         try {
-            const proposals = await analyzeBatch(
+            const proposals = await analyseBatch(
                 currentBatch,
                 kbItems,
                 defaults,
@@ -882,7 +881,7 @@ async function run(): Promise<void> {
 // Only run when executed directly (not when imported)
 if (isMainModule) {
     run().catch((err: Error) => {
-        log.error(`Errore analyzer: ${err.message}`);
+        log.error(`Errore analyser: ${err.message}`);
         process.exit(1);
     });
 }

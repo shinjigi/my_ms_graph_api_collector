@@ -13,6 +13,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { dateToString, getTimeString } from "@shared/dates";
+import { CONFIG } from "@shared/env-config";
 
 // ─── Level ordering ───────────────────────────────────────────────────────────
 export type LogLevel = "debug" | "info" | "warn" | "error";
@@ -37,10 +38,8 @@ const C = {
 const isTTY = process.stdout.isTTY ?? false;
 
 // ─── Configuration ────────────────────────────────────────────────────────────
-const minLevel: number =
-  LEVEL_ORDER[(process.env["LOG_LEVEL"] as LogLevel) ?? "info"] ??
-  LEVEL_ORDER.info;
-const logToFile = process.env["LOG_FILE"] === "true";
+const minLevel: number = LEVEL_ORDER[CONFIG.LOG_LEVEL as LogLevel];
+const logToFile = CONFIG.LOG_FILE === true;
 
 // ─── File sink (lazy init) ────────────────────────────────────────────────────
 let fileStream: fs.WriteStream | null = null;

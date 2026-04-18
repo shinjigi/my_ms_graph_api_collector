@@ -11,6 +11,7 @@ import {
 } from "@shared/dates";
 
 import { createLogger } from "../../logger";
+import { CONFIG } from "@shared/env-config";
 
 // Ora questo funzionerà correttamente
 const _require = createRequire(import.meta.url);
@@ -219,13 +220,12 @@ async function writeByMonth(
 }
 
 export async function collectBrowserHistory(force = false): Promise<string[]> {
-  const chromeProfileDirs = (process.env["CHROME_PROFILE_DIRS"] ?? "")
-    .split(";")
-    .map((p) => p.trim())
-    .filter(Boolean);
-  const firefoxProfileDir = (process.env["FIREFOX_PROFILE_DIR"] ?? "").trim();
+  const chromeProfileDirs = CONFIG.CHROME_PROFILE_DIRS
+      .map((p) => p.trim())
+      .filter(Boolean);
+  const firefoxProfileDir = (CONFIG.FIREFOX_PROFILE_DIR).trim();
 
-  const since = process.env["COLLECT_SINCE"] ?? "2025-01-01";
+  const since = CONFIG.COLLECT_SINCE;
   const sinceMs = BigInt(Date.parse(since)) * BigInt(1000); // Unix microseconds
 
   if (chromeProfileDirs.length === 0 && !firefoxProfileDir) {

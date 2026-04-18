@@ -1,11 +1,11 @@
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { Client } from "@microsoft/microsoft-graph-client";
+import  { Message } from "@microsoft/microsoft-graph-types";
 import { createLogger } from "../../logger";
 
 const log = createLogger("graph-email");
 import { mergeByKey, readMeta, writeMeta, shouldSkipMonth, writeJson } from "../../utils";
-import { EmailRaw } from "@shared/aggregator";
 import {
   dateToString,
   currentMonthString,
@@ -15,26 +15,22 @@ import {
   getApiEndOfDay,
   extractMonthStr,
 } from "@shared/dates";
+import { GraphPage, mapToLeanEmail, EmailRaw } from "@shared/graph";
+import { CONFIG } from "@shared/env-config";
 
 const EMAIL_DIR = path.join(process.cwd(), "data", "raw", "graph-email");
-
-interface GraphPage<T> {
-  value: T[];
-  "@odata.nextLink"?: string;
-}
 
 async function fetchEmails(
   client: Client,
   filter: string,
   direction: "received" | "sent",
   maxItems: number,
-): Promise<{ results: EmailRaw[]; excluded: EmailRaw[] }> {
+): Promise<{ results: EmailRaw[]; excluded: Message[] }> {
   const results: EmailRaw[] = [];
-  const excluded: EmailRaw[] = [];
+  const excluded: Message[] = [];
   let nextLink: string | null = null;
 
-  const excludeList = (process.env["EMAIL_EXCLUDE_ADDRESSES"] ?? "")
-    .split(";")
+  const excludeList = (CONFIG.EMAIL_EXCLUDE_ADDRESSES)
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
 
@@ -45,8 +41,8 @@ async function fetchEmails(
   const dateField = direction === "sent" ? "sentDateTime" : "receivedDateTime";
   const selectFields =
     direction === "sent"
-      ? "id,subject,from,toRecipients,sentDateTime,bodyPreview,webLink"
-      : "id,subject,from,toRecipients,receivedDateTime,bodyPreview,webLink";
+      ? "id,subject,from,toRecipients,sentDateTime,body,bodyPreview,webLink"
+      : "id,subject,from,toRecipients,receivedDateTime,body,bodyPreview,webLink";
 
   let pageNum = 1;
   do {
@@ -60,21 +56,26 @@ async function fetchEmails(
             .orderby(`${dateField} desc`)
             .top(Math.min(maxItems, 50))
             .get()
-    ) as GraphPage<EmailRaw>;
+    ) as GraphPage<Message>;
 
     const page = res.value ?? [];
     let skippedCount = 0;
     for (const m of page) {
-      m.direction = direction;
+      if ((m as { "@odata.type": string })["@odata.type"] === "#microsoft.graph.eventMessageResponse"){
+        continue; // Escludiamo i messaggi di risposta agli inviti calendar (eventMessageResponse)
+      }
+      
       if (direction === "received") {
         const fromAddr = m.from?.emailAddress?.address?.toLowerCase();
         if (fromAddr && excludeList.includes(fromAddr)) {
           excluded.push(m);
           skippedCount++;
           continue;
-        }
-      }
-      results.push(m);
+        }  
+      }  
+      const mapped = mapToLeanEmail(m, direction);
+      
+      results.push(mapped);
     }
 
     log.info(
@@ -92,13 +93,16 @@ async function fetchEmails(
   } while (nextLink);
 
   if (direction === "received") {
-    const allMessages = [...results, ...excluded];
     const uniqueSenders = new Set<string>();
-    allMessages.forEach((m) => {
-      const addr = m.from?.emailAddress?.address?.toLowerCase();
-      if (addr) uniqueSenders.add(addr);
+    results.forEach((m) => {
+      // Per il debug usiamo la stringa 'from' appiattita
+      uniqueSenders.add(m.from.toLowerCase());
     });
-    const sortedSenders = Array.from(uniqueSenders).sort();
+    excluded.forEach((m) => {
+      // Per il debug usiamo la stringa 'from' appiattita
+      uniqueSenders.add(m.from?.emailAddress?.address?.toLowerCase() || "unknown");
+    });
+    const sortedSenders = Array.from(uniqueSenders).sort((a, b) => a.localeCompare(b));
     log.info(
       `    [Debug] Mittenti univoci trovati in questo range (${sortedSenders.length}):`,
     );
@@ -113,8 +117,8 @@ export async function collectGraphEmail(
   date?: string,
   force = false,
 ): Promise<string[]> {
-  const since = process.env["COLLECT_SINCE"] ?? "2025-01-01";
-  const maxPerMonth = Number(process.env["EMAIL_PER_MONTH_MAX"] ?? 200);
+  const since = CONFIG.COLLECT_SINCE;
+  const maxPerMonth = Number(CONFIG.EMAIL_PER_MONTH_MAX);
   const effectiveMax = maxPerMonth === 0 ? Infinity : maxPerMonth;
   const today = dateToString();
 
@@ -153,7 +157,7 @@ export async function collectGraphEmail(
     await fs.writeFile(outPath, JSON.stringify(merged, null, 2), "utf-8");
 
     if (excluded.length > 0) {
-      const mergedExcl = await mergeByKey<EmailRaw>(exclPath, excluded, "id");
+      const mergedExcl = await mergeByKey<Message>(exclPath, excluded, "id");
       await writeJson(exclPath, mergedExcl);
     }
 
@@ -201,7 +205,7 @@ export async function collectGraphEmail(
         await writeJson(outPath, merged);
 
         if (excluded.length > 0) {
-          const mergedExcl = await mergeByKey<EmailRaw>(
+          const mergedExcl = await mergeByKey<Message>(
             exclPath,
             excluded,
             "id",

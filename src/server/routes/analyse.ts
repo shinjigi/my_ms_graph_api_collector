@@ -1,9 +1,9 @@
 /**
  * Async analysis endpoints with job tracking.
  *
- * POST /api/analyze/:date         — analyze a single day (202 + jobId)
- * POST /api/analyze/week/:date    — analyze all workdays in the week (202 + jobId)
- * GET  /api/analyze/status/:jobId — poll job status
+ * POST /api/analyse/:date         — analyse a single day (202 + jobId)
+ * POST /api/analyse/week/:date    — analyse all workdays in the week (202 + jobId)
+ * GET  /api/analyse/status/:jobId — poll job status
  */
 import { Router, Request, Response } from "express";
 import * as crypto from "node:crypto";
@@ -13,19 +13,19 @@ import { readJson, writeJson } from "../../json-io";
 import {
   AGG_DIR,
   PROPOSALS_DIR,
-  analyzeBatch,
+  analyseBatch,
   buildProviders,
   loadKb,
   loadDefaults,
   KB_FILE,
-} from "../../analysers/analyzer";
+} from "../../analysers";
 import { AnalysisJobStatus, DayProposal, ProposalEntry } from "@shared/analysis";
 import { AggregatedDay } from "@shared/aggregator";
 import { createLogger } from "../../logger";
 import { refreshReportedHours } from "../../targetprocess/refreshHours";
-const logger = createLogger("api-analyze");
+const logger = createLogger("api-analyse");
 
-export const analyzeRouter = Router();
+export const analyseRouter = Router();
 
 // ─── In-memory job store ────────────────────────────────────────────
 const jobs = new Map<string, AnalysisJobStatus>();
@@ -98,14 +98,14 @@ async function runAnalysis(job: AnalysisJobStatus & { id: string }, force: boole
 
     if (daysToProcess.length === 0) {
       logger.info(
-        `[analyze-job ${job.id}] Tutti i giorni già analizzati — nessun nuovo proposal da generare (usa force=true per forzare).`,
+        `[analyse-job ${job.id}] Tutti i giorni già analizzati — nessun nuovo proposal da generare (usa force=true per forzare).`,
       );
     } else {
       logger.info(
-        `[analyze-job ${job.id}] Analisi batch per ${daysToProcess.length} giorni...`,
+        `[analyse-job ${job.id}] Analisi batch per ${daysToProcess.length} giorni...`,
       );
       try {
-        const proposals = await analyzeBatch(
+        const proposals = await analyseBatch(
           daysToProcess,
           kbItems,
           defaults,
@@ -146,7 +146,7 @@ async function runAnalysis(job: AnalysisJobStatus & { id: string }, force: boole
         for (const date of daysToProcess.map((d) => dateToString(d.date))) {
           job.errors[date] = (err as Error).message;
           logger.error(
-            `[analyze-job ${job.id}] Errore per ${date}: ${(err as Error).message}`,
+            `[analyse-job ${job.id}] Errore per ${date}: ${(err as Error).message}`,
           );
         }
       }
@@ -163,8 +163,8 @@ async function runAnalysis(job: AnalysisJobStatus & { id: string }, force: boole
   }
 }
 
-// POST /api/analyze/:date — single day
-analyzeRouter.post("/:date", async (req: Request, res: Response) => {
+// POST /api/analyse/:date — single day
+analyseRouter.post("/:date", async (req: Request, res: Response) => {
   const date = req.params["date"] as string;
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -197,8 +197,8 @@ analyzeRouter.post("/:date", async (req: Request, res: Response) => {
   res.status(202).json({ jobId });
 });
 
-// POST /api/analyze/week/:date — all workdays in the week
-analyzeRouter.post("/week/:date", async (req: Request, res: Response) => {
+// POST /api/analyse/week/:date — all workdays in the week
+analyseRouter.post("/week/:date", async (req: Request, res: Response) => {
   const date = req.params["date"] as string;
 
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -231,8 +231,8 @@ analyzeRouter.post("/week/:date", async (req: Request, res: Response) => {
   res.status(202).json({ jobId, dates });
 });
 
-// GET /api/analyze/status/:jobId — poll
-analyzeRouter.get("/status/:jobId", (req: Request, res: Response) => {
+// GET /api/analyse/status/:jobId — poll
+analyseRouter.get("/status/:jobId", (req: Request, res: Response) => {
   const jobId = req.params["jobId"] as string;
   const job = jobs.get(jobId);
 

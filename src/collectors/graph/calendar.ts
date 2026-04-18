@@ -17,7 +17,8 @@ import {
   getApiEndOfDay,
   extractMonthStr,
 } from "@shared/dates";
-import { GraphResponse } from "@shared/graph";
+import { GraphPage } from "@shared/graph";
+import { CONFIG } from "@shared/env-config";
 
 const CAL_DIR = path.join(process.cwd(), "data", "raw", "graph-calendar");
 
@@ -41,7 +42,7 @@ async function fetchCalendarEvents(
       )
       .orderby("start/dateTime")
       .top(100) // Page size
-      .get()) as GraphResponse<Event>;
+      .get()) as GraphPage<Event>;
 
     const page = response.value ?? [];
     events.push(...page);
@@ -74,7 +75,7 @@ export async function collectGraphCalendar(
   date?: string,
   force = false,
 ): Promise<string[]> {
-  const since = process.env["COLLECT_SINCE"] ?? "2025-01-01";
+  const since = CONFIG.COLLECT_SINCE;
   const today = dateToString();
 
   await fs.mkdir(CAL_DIR, { recursive: true });

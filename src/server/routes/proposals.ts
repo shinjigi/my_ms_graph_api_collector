@@ -5,9 +5,8 @@
  */
 import { DayProposal } from "@shared/analysis";
 import { Router, Request, Response } from "express";
-import { readdir } from "node:fs/promises";
 import * as path from "node:path";
-import { readJson, writeJson } from "../../json-io";
+import { readJson, writeJson, listJsonFiles } from "../../json-io";
 
 export const proposalsRouter = Router();
 
@@ -15,12 +14,11 @@ const PROPOSALS_DIR = path.join(process.cwd(), "data", "proposals");
 const AGG_DIR = path.join(process.cwd(), "data", "aggregated");
 
 async function listDates(): Promise<string[]> {
-  const files = await readdir(PROPOSALS_DIR).catch(() => [] as string[]);
-  return files
-    .filter((f) => /^\d{4}-\d{2}-\d{2}\.json$/.test(f))
-    .map((f) => f.replaceAll(".json", ""))
-    .sort((a, b) => a.localeCompare(b))
-    .reverse();
+  return listJsonFiles(PROPOSALS_DIR, {
+    pattern: /^\d{4}-\d{2}-\d{2}\.json$/,
+    stripExtension: true,
+    sortDir: "desc",
+  });
 }
 
 proposalsRouter.get("/", async (_req: Request, res: Response) => {

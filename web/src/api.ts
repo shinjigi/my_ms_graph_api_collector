@@ -67,28 +67,28 @@ export async function submitZucchettiRequest(
 
 // --- Analysis API ---
 
-export async function analyzeDay(date: string, force = false): Promise<AnalyzeStartResponse> {
-    const url = `/api/analyze/${date}${force ? "?force=true" : ""}`;
+export async function analyseDay(date: string, force = false): Promise<AnalyzeStartResponse> {
+    const url = `/api/analyse/${date}${force ? "?force=true" : ""}`;
     const res = await fetch(url, { method: "POST" });
     if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? `analyzeDay: ${res.status}`);
+        throw new Error(body.error ?? `analyseDay: ${res.status}`);
     }
     return res.json();
 }
 
-export async function analyzeWeek(date: string, force = false): Promise<AnalyzeStartResponse> {
-    const url = `/api/analyze/week/${date}${force ? "?force=true" : ""}`;
+export async function analyseWeek(date: string, force = false): Promise<AnalyzeStartResponse> {
+    const url = `/api/analyse/week/${date}${force ? "?force=true" : ""}`;
     const res = await fetch(url, { method: "POST" });
     if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        throw new Error(body.error ?? `analyzeWeek: ${res.status}`);
+        throw new Error(body.error ?? `analyseWeek: ${res.status}`);
     }
     return res.json();
 }
 
 export async function pollAnalysisStatus(jobId: string): Promise<AnalysisJobStatus> {
-    const res = await fetch(`/api/analyze/status/${jobId}`);
+    const res = await fetch(`/api/analyse/status/${jobId}`);
     if (!res.ok) {
         throw new Error(`pollAnalysisStatus: ${res.status}`);
     }

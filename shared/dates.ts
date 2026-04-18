@@ -370,7 +370,7 @@ export function hoursToHhmm(h: number): string {
  * @returns {number} Standard float decimal formatting equivalents matching the given standard syntax.
  */
 export function hhmmToHours(hhmm: string): number {
-    if (!hhmm || !hhmm.includes(":")) return 0;
+    if (!hhmm?.includes(":")) return 0;
     const [h, m] = hhmm.split(":").map(Number);
     return h + (m ?? 0) / 60;
 }

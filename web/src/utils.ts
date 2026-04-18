@@ -35,7 +35,7 @@ export function locationEmoji(location: Day["location"]): string {
     case "external":
       return "🚗";
     case "mixed":
-      return "🏠"; // legacy value → treat as smart
+      return "🌓"; // legacy value → treat as smart
     default:
       return "❓";
   }

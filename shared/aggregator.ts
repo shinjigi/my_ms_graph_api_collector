@@ -1,4 +1,4 @@
-import { CalendarEventRaw } from "./graph";
+import { CalendarEventRaw, EmailRaw, TeamsChatDataRaw } from "./graph";
 import { ZucchettiDay, WorkLocation } from "./zucchetti";
 
 export interface NibolBooking {
@@ -16,43 +16,6 @@ export interface BrowserVisit {
   date: Date;
 }
 
-
-interface EmailAddress {
-  name: string;
-  address: string;
-}
-
-
-export interface EmailRaw {
-  id: string;
-  subject: string;
-  from: { emailAddress: EmailAddress } | null;
-  toRecipients: [{ emailAddress: EmailAddress }] | null;
-  direction: "received" | "sent";
-  receivedDateTime?: string;
-  sentDateTime?: string;
-  bodyPreview: string;
-  webLink: string;
-}
-
-/** Single Teams message — only fields actually consumed downstream. */
-export interface TeamsChatMessage {
-    id: string;
-    createdDateTime: string;         // ISO 8601 (string: JSON serialization boundary)
-    from: string | null;             // displayName only — flattened
-    body: string;                    // plain text, HTML stripped at collection time
-    webUrl: string | null;
-    messageType: string;             // "message" | "systemEventMessage" | etc.
-}
-
-/** A chat with its messages. Single source of truth — also the per-chat raw file shape. */
-export interface TeamsChatData {
-    chatId: string;
-    chatTopic: string | null;
-    chatType: string;                // "oneOnOne" | "group" | "meeting"
-    lastModifiedDateTime: string;    // ISO 8601 — Graph API sync cursor
-    messages: TeamsChatMessage[];
-}
 
 export interface GitCommitRaw {
   hash: string;
@@ -81,7 +44,7 @@ export interface AggregatedDay {
   zucchetti: ZucchettiDay | null;
   calendar: CalendarEventRaw[];
   emails: EmailRaw[];
-  teams: TeamsChatData[];
+  teams: TeamsChatDataRaw[];
   svnCommits: SvnCommitRaw[];
   gitCommits: GitCommitRaw[];
   browserVisits: BrowserVisit[];

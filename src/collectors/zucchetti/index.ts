@@ -3,7 +3,16 @@ import * as path from "node:path";
 import { spawn } from "node:child_process";
 import { readMeta, writeMeta, shouldSkipMonth } from "../../utils";
 import { createLogger } from "../../logger";
-import { fileURLToPath } from "url";
+import { fileURLToPath } from "node:url";
+
+import {
+  currentMonthString,
+  dateToString,
+  getYearMonth,
+  parseDateString,
+  addMonths,
+} from "@shared/dates";
+import { CONFIG } from "@shared/env-config";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -89,20 +98,13 @@ function extractJson(output: string): MonthData[] {
   return parsed as MonthData[];
 }
 
-import {
-  currentMonthString,
-  dateToString,
-  getYearMonth,
-  parseDateString,
-  addMonths,
-} from "@shared/dates";
 
 export async function collectZucchetti(
   force = false,
   range?: { start: string; end: string },
   date?: string,
 ): Promise<string[]> {
-  let sinceStr = range?.start || process.env["COLLECT_SINCE"] || "2025-01-01";
+  let sinceStr = range?.start || CONFIG.COLLECT_SINCE;
   let endStr = range?.end || currentMonthString(); // Default to current month YYYY-MM
 
   if (date) {

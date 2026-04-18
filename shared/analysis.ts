@@ -1,4 +1,4 @@
-// Shared analysis types — used by the analyzer backend and the Vue frontend.
+// Shared analysis types — used by the analyser backend and the Vue frontend.
 
 export interface ProposalEntry {
     taskId:        number | null;

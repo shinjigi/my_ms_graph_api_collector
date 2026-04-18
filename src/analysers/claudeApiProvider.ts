@@ -1,11 +1,12 @@
 /**
- * Claude analyzer provider — Anthropic API (direct SDK).
+ * Claude analyser provider — Anthropic API (direct SDK).
  */
 import Anthropic from "@anthropic-ai/sdk";
 import { AnalyzerProvider, stripCodeFence, tpmToChars } from "./base";
 import { createLogger } from "../logger";
 import { saveRawResponse } from "./aiRaw";
 import { ProposalEntry } from "@shared/analysis";
+import { CONFIG } from "@shared/env-config";
 
 const log = createLogger("claude");
 
@@ -17,13 +18,13 @@ export class ClaudeApiProvider implements AnalyzerProvider {
   }
 
   async isAvailable(): Promise<boolean> {
-    if (!process.env["CLAUDE_API_KEY"]) {
+    if (!CONFIG.CLAUDE_API_KEY) {
       log.debug(`[${this.name}] CLAUDE_API_KEY non impostata`);
       return false;
     }
     try {
       const anthropic = new Anthropic({
-        apiKey: process.env["CLAUDE_API_KEY"],
+        apiKey: CONFIG.CLAUDE_API_KEY,
       });
       log.debug(`[${this.name}] probe in corso (models.list)...`);
       await anthropic.models.list({ limit: 1 });
@@ -42,13 +43,13 @@ export class ClaudeApiProvider implements AnalyzerProvider {
     }
   }
 
-  async analyzeBatch(
+  async analyseBatch(
     systemPrompt: string,
     userPromptBatched: string,
     context = "analysis",
   ): Promise<{ date: Date; entries: ProposalEntry[] }[]> {
-    const model = process.env["CLAUDE_MODEL"] ?? "claude-haiku-4-5-20251001";
-    const anthropic = new Anthropic({ apiKey: process.env["CLAUDE_API_KEY"] });
+    const model = CONFIG.CLAUDE_MODEL;
+    const anthropic = new Anthropic({ apiKey: CONFIG.CLAUDE_API_KEY });
 
     const promptChars = systemPrompt.length + userPromptBatched.length;
     log.info(

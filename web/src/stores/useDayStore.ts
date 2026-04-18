@@ -32,13 +32,16 @@ export const useDayStore = defineStore("day", () => {
         return dayData.value.emails.map((e) => {
             const isSent = e.direction === "sent";
             const dt = isSent ? e.sentDateTime : e.receivedDateTime;
+            
+            // e.from is now a string "Name (Address)" or "Address"
+            // e.toRecipients is string[]
             return {
                 dir: isSent ? "out" : "in",
-                from: isSent ? "me" : (e.from?.emailAddress?.address ?? ""),
-                to: isSent ? (e.toRecipients?.[0]?.emailAddress?.address ?? "") : "me",
+                from: isSent ? "me" : e.from,
+                to: isSent ? (e.toRecipients?.[0] ?? "") : "me",
                 subject: e.subject,
                 time: dt ? getTimeStringNoSeconds(dt) : "--:--",
-                body: e.bodyPreview,
+                body: e.bodyMd || e.bodyPreview || "",
             };
         });
     });

@@ -10,19 +10,20 @@
 import path from "node:path";
 import * as nodeFs from "node:fs/promises";
 import { chromium } from "playwright";
-import { dateToString, currentMonthString, getYearMonth } from "@shared/dates";
-import { readMeta, writeMeta, shouldSkipMonth } from "../../utils";
-import type { NibolBooking } from "@shared/aggregator";
+import { readMeta, writeMeta, shouldSkipMonth, listJsonFiles } from "../../utils";
 import { createLogger } from "../../logger";
+import { dateToString, currentMonthString, getYearMonth } from "@shared/dates";
+import type { NibolBooking } from "@shared/aggregator";
+import { CONFIG } from "@shared/env-config";
 
 const log = createLogger("nibol");
 
 export type { NibolBooking };
 
-const NIBOL_URL = process.env["NIBOL_URL"] ?? "https://app.nibol.com";
+const NIBOL_URL = CONFIG.NIBOL_URL;
 
 function getProfileDir(): string {
-  const dir = process.env["NIBOL_PROFILE_DIR"];
+  const dir = CONFIG.NIBOL_PROFILE_DIR;
   if (!dir) {
     throw new Error("NIBOL_PROFILE_DIR non configurato in .env");
   }
@@ -294,7 +295,7 @@ export async function nibolFetchCalendarData(range?: {
   end: string;
 }): Promise<NibolBooking[]> {
   const profileDir = getProfileDir();
-  const userName = process.env["NIBOL_USER_NAME"] || "Luigi De Pinto";
+  const userName = CONFIG.NIBOL_USER_NAME;
 
   const context = await chromium.launchPersistentContext(profileDir, {
     headless: false,
@@ -582,12 +583,8 @@ export async function collectNibol(
     const meta = await readMeta(NIBOL_DIR);
     if (shouldSkipMonth(meta[currentMonth], currentMonth, ["nibol"])) {
       log.info("[Nibol] dati già raccolti — skip");
-      const entries = await nodeFs
-        .readdir(NIBOL_DIR)
-        .catch(() => [] as string[]);
-      return entries
-        .filter((f) => /^\d{4}-\d{2}\.json$/.test(f))
-        .map((f) => path.join(NIBOL_DIR, f));
+      const entries = await listJsonFiles(NIBOL_DIR, { pattern: /^\d{4}-\d{2}\.json$/ });
+      return entries.map((f) => path.join(NIBOL_DIR, f));
     }
   }
 

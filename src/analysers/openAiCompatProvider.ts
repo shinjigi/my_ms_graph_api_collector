@@ -1,5 +1,5 @@
 /**
- * OpenAI-compatible analyzer provider (Ollama, Open WebUI, LM Studio, OpenRouter, etc.).
+ * OpenAI-compatible analyser provider (Ollama, Open WebUI, LM Studio, OpenRouter, etc.).
  *
  * Uses SSE streaming to keep the TCP connection alive during long CPU-bound inference,
  * preventing OS/router/proxy timeouts on silent long-running requests.
@@ -22,6 +22,7 @@ import {
 import { createLogger } from "../logger";
 import { saveRawResponse } from "./aiRaw";
 import { ProposalEntry } from "@shared/analysis";
+import { CONFIG } from "@shared/env-config";
 
 const log = createLogger("ollama");
 
@@ -34,16 +35,16 @@ async function callOpenAiCompatible(
   userPrompt: string,
   model: string,
 ): Promise<string> {
-  const baseUrl = process.env["OPENAI_BASE_URL"]!;
-  const apiKey = process.env["OPENAI_API_KEY"] ?? "ollama";
-  const timeoutMs = Number(process.env["OPENAI_REQUEST_TIMEOUT_MS"] ?? 900_000);
+  const baseUrl = CONFIG.OPENAI_BASE_URL;
+  const apiKey = CONFIG.OPENAI_API_KEY;
+  const timeoutMs = Number(CONFIG.OPENAI_REQUEST_TIMEOUT_MS);
   // num_ctx: Ollama context window in tokens. Defaults to OPENAI_MODEL_MAX_TPM for backwards
   // compatibility, but should be set independently via OPENAI_NUM_CTX so that the input budget
   // (OPENAI_MODEL_MAX_TPM) can be a safe fraction of the context (e.g. 25%) without shrinking
   // the actual model window.
   const numCtx = Number(
-    process.env["OPENAI_NUM_CTX"] ??
-      process.env["OPENAI_MODEL_MAX_TPM"] ??
+    CONFIG.OPENAI_NUM_CTX ??
+      CONFIG.OPENAI_MODEL_MAX_TPM ??
       5000,
   );
 
@@ -129,7 +130,7 @@ export class OpenAiCompatibleProvider implements AnalyzerProvider {
    * Configurable via OPENAI_KB_ITEM_CAP; default 20.
    */
   get kbItemCap(): number {
-    return Number(process.env["OPENAI_KB_ITEM_CAP"] ?? 20);
+    return CONFIG.OPENAI_KB_ITEM_CAP;
   }
 
   /**
@@ -137,18 +138,18 @@ export class OpenAiCompatibleProvider implements AnalyzerProvider {
    * Override via OPENAI_SIGNAL_DETAIL=full|compact|minimal.
    */
   get signalDetail(): SignalDetail {
-    const val = process.env["OPENAI_SIGNAL_DETAIL"] ?? "compact";
+    const val = CONFIG.OPENAI_SIGNAL_DETAIL;
     if (val === "full" || val === "compact" || val === "minimal") return val;
     return "compact";
   }
 
   async isAvailable(): Promise<boolean> {
-    const baseUrl = process.env["OPENAI_BASE_URL"];
+    const baseUrl = CONFIG.OPENAI_BASE_URL;
     if (!baseUrl) {
       log.debug(`[${this.name}] OPENAI_BASE_URL non impostata`);
       return false;
     }
-    const apiKey = process.env["OPENAI_API_KEY"] ?? "ollama";
+    const apiKey = CONFIG.OPENAI_API_KEY;
     try {
       log.debug(`[${this.name}] probe in corso (GET ${baseUrl}/models)...`);
       const res = await fetch(`${baseUrl}/models`, {
@@ -173,14 +174,14 @@ export class OpenAiCompatibleProvider implements AnalyzerProvider {
     }
   }
 
-  async analyzeBatch(
+  async analyseBatch(
     systemPrompt: string,
     userPromptBatched: string,
   ): Promise<{ date: Date; entries: ProposalEntry[] }[]> {
-    const model = process.env["OPENAI_MODEL"] ?? "qwen2.5-coder:3b";
+    const model = CONFIG.OPENAI_MODEL;
     const promptChars = systemPrompt.length + userPromptBatched.length;
     const timeoutSec = Math.round(
-      Number(process.env["OPENAI_REQUEST_TIMEOUT_MS"] ?? 900_000) / 1000,
+      Number(CONFIG.OPENAI_REQUEST_TIMEOUT_MS) / 1000,
     );
     log.info(
       `[${this.name}] Invio batch a endpoint OpenAI-compat (${model}) — prompt ~${promptChars} chars, timeout ${timeoutSec}s...`,

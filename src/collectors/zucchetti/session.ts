@@ -1,6 +1,6 @@
-import "dotenv/config";
 import { chromium, Browser, BrowserContext, Page } from "playwright";
 import { createLogger } from "../../logger";
+import { CONFIG } from "@shared/env-config";
 
 const log = createLogger("zucchetti-session");
 
@@ -25,9 +25,7 @@ export interface ZucchettiSession {
  */
 function resolveHeadless(explicit?: boolean): boolean {
   if (explicit !== undefined) return explicit;
-  const env = process.env.ZUCCHETTI_HEADLESS;
-  if (env !== undefined) return env === "true" || env === "1";
-  return true;
+  return CONFIG.ZUCCHETTI_HEADLESS;
 }
 
 export async function startZucchettiSession(
@@ -35,8 +33,8 @@ export async function startZucchettiSession(
 ): Promise<ZucchettiSession> {
   headless = resolveHeadless(headless);
   const baseUrl = "https://saas.hrzucchetti.it";
-  const username = process.env.ZUCCHETTI_USERNAME;
-  const password = process.env.ZUCCHETTI_PASSWORD;
+  const username = CONFIG.ZUCCHETTI_USERNAME;
+  const password = CONFIG.ZUCCHETTI_PASSWORD;
 
   log.info(`headless=${headless}`);
   log.info(

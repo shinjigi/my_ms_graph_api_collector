@@ -1,5 +1,4 @@
 import "isomorphic-fetch";
-import * as dotenv from "dotenv";
 import type {
   TpProject,
   TpEntityRef,
@@ -19,10 +18,9 @@ import type {
 import { parseTpDate, normalizeName } from "./format";
 import { dateToString } from "../../shared/dates";
 import { createLogger } from "../logger";
+import { CONFIG } from "@shared/env-config";
 
 const log = createLogger("tp-client");
-
-dotenv.config();
 
 function toAssignmentEntries(raw: TpAssignment[]): TpAssignmentEntry[] {
   return raw.map((a) => ({
@@ -36,8 +34,8 @@ export class TargetprocessClient {
   private readonly token: string;
 
   constructor() {
-    const url = process.env["TP_BASE_URL"];
-    const token = process.env["TP_TOKEN"];
+    const url = CONFIG.TP_BASE_URL;
+    const token = CONFIG.TP_TOKEN;
 
     if (!url || !token) {
       throw new Error("TP_BASE_URL o TP_TOKEN non trovati in .env");

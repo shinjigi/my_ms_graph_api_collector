@@ -12,6 +12,7 @@ export {
     mergeByKey,
     readMeta,
     writeMeta,
+    listJsonFiles,
     type MonthMeta,
 } from "./json-io";
 

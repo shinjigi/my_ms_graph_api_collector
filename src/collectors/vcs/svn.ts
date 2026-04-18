@@ -14,6 +14,7 @@ import {
   startOfMonth,
   addMonths,
 } from "@shared/dates";
+import { CONFIG } from "@shared/env-config";
 
 function parseXml(xml: string): Promise<unknown> {
   return new Promise((resolve, reject) =>
@@ -106,11 +107,11 @@ async function fetchMonthCommits(
 }
 
 export async function collectSvnCommits(force = false): Promise<string[]> {
-  const svnUrl = process.env["SVN_URL"];
-  const svnBin = process.env["SVN_BIN"] ?? "svn";
-  const since = process.env["COLLECT_SINCE"] ?? "2025-01-01";
-  const user = process.env["SVN_USERNAME"];
-  const pass = process.env["SVN_PASSWORD"];
+  const svnUrl = CONFIG.SVN_URL;
+  const svnBin = CONFIG.SVN_BIN;
+  const since = CONFIG.COLLECT_SINCE;
+  const user = CONFIG.SVN_USERNAME;
+  const pass = CONFIG.SVN_PASSWORD;
   const today = dateToString();
 
   if (!svnUrl) {

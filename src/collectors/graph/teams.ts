@@ -4,8 +4,20 @@ import { Client } from "@microsoft/microsoft-graph-client";
 import { Chat, ChatMessage } from "@microsoft/microsoft-graph-types";
 import { createLogger } from "../../logger";
 import { readJson, writeJson, readMeta, writeMeta } from "../../json-io";
-import { TeamsChatData, TeamsChatMessage } from "@shared/aggregator";
 import { dateToString, extractMonthStr, getApiStartOfDay } from "@shared/dates";
+import { GraphPage, mapToLeanMessage, TeamsChatDataRaw, TeamsChatMessageRaw } from "@shared/graph";
+import { CONFIG } from "@shared/env-config";
+
+interface ChatProcessParams {
+    client: Client;
+    chat: Chat;
+    idx: number;
+    total: number;
+    force: boolean;
+    collectSince: string;
+    targetMonth: string | null;
+    myName: string;
+}
 
 const log = createLogger("graph-teams");
 
@@ -16,17 +28,17 @@ const TEAMS_DIR = path.join(process.cwd(), "data", "raw", "graph-teams");
 function sanitizeFilename(name: string): string {
     return name
         .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")        // Remove accents
-        .replace(/[^a-zA-Z0-9\s-_]/g, "")       // Remove symbols like #, @, (, ), etc.
+        .replaceAll(/[\u0300-\u036f]/g, "") // Remove accents
+        .replaceAll(/[^a-zA-Z0-9\s-_]/g, "") // Remove symbols like #, @, (, ), etc.
         .trim()
-        .replace(/\s+/g, "_")
-        .replace(/_+/g, "_");                    // Collapse double underscores
+        .replaceAll(/\s+/g, "_")
+        .replaceAll(/_+/g, "_"); // Collapse double underscores
 }
 
 function getChatPrefix(chatType: string): string {
     if (chatType === "oneOnOne") return "O2O";
-    if (chatType === "group")    return "GRP";
-    if (chatType === "meeting")  return "MET";
+    if (chatType === "group") return "GRP";
+    if (chatType === "meeting") return "MET";
     return chatType.substring(0, 3).toUpperCase();
 }
 
@@ -34,43 +46,14 @@ function getChatPrefix(chatType: string): string {
  * Builds the stable filename stem for a single chat.
  * Pattern: <PREFIX>__<sanitized topic>__<last 6 chars of chat id>
  */
-function buildChatFileName(
-    chatId: string,
-    chatType: string,
-    topic: string,
-): string {
-    const safeName  = sanitizeFilename(topic);
-    const prefix    = getChatPrefix(chatType);
+function buildChatFileName(chatId: string, chatType: string, topic: string): string {
+    const safeName = sanitizeFilename(topic);
+    const prefix = getChatPrefix(chatType);
     const uniquePart = chatId.split("@")[0] || chatId;
-    const hash      = uniquePart.substring(uniquePart.length - 6);
+    const hash = uniquePart.substring(uniquePart.length - 6);
     return `${prefix}__${safeName}__${hash}`;
 }
 
-// ─── HTML stripping ─────────────────────────────────────────────────────────
-
-function stripHtml(html: string): string {
-    return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-}
-
-// ─── Graph API types ────────────────────────────────────────────────────────
-
-interface GraphPage<T> {
-    value: T[];
-    "@odata.nextLink"?: string;
-}
-
-// ─── Message mapping ────────────────────────────────────────────────────────
-
-function mapToLeanMessage(m: ChatMessage): TeamsChatMessage {
-    return {
-        id:                  m.id!,
-        createdDateTime:     m.createdDateTime!,
-        from:                (m.from as { user?: { displayName?: string } })?.user?.displayName ?? null,
-        body:                stripHtml(m.body?.content ?? ""),
-        webUrl:              (m as { webUrl?: string }).webUrl ?? null,
-        messageType:         m.messageType ?? "message",
-    };
-}
 
 // ─── Graph fetch ────────────────────────────────────────────────────────────
 
@@ -93,11 +76,11 @@ async function fetchChatMessagesSince(
             nextLink
                 ? await c.api(nextLink).get()
                 : await c
-                    .api(`/me/chats/${chatId}/messages`)
-                    .orderby("lastModifiedDateTime desc")
-                    .filter(`lastModifiedDateTime gt ${since}`)
-                    .top(50)
-                    .get()
+                      .api(`/me/chats/${chatId}/messages`)
+                      .orderby("lastModifiedDateTime desc")
+                      .filter(`lastModifiedDateTime gt ${since}`)
+                      .top(50)
+                      .get()
         ) as GraphPage<ChatMessage>;
 
         const page: ChatMessage[] = res.value ?? [];
@@ -115,22 +98,9 @@ async function fetchChatMessagesSince(
     return { messages, maxLastModified };
 }
 
-// ─── Main collector ─────────────────────────────────────────────────────────
+// ─── Sub-collection helpers ──────────────────────────────────────────────────
 
-export async function collectGraphTeams(
-    client: Client,
-    date?: string,
-    force = false,
-): Promise<string[]> {
-    const today = dateToString();
-
-    await mkdir(TEAMS_DIR, { recursive: true });
-
-    // TEAMS_CHAT_LIMIT: max chats to enumerate (Graph returns newest-first).
-    // Set to 0 for unlimited. Default 200.
-    const chatLimit = Number(process.env["TEAMS_CHAT_LIMIT"] ?? 200);
-
-    // ── Enumerate all chats ──────────────────────────────────────────────────
+async function listAllChats(client: Client, chatLimit: number): Promise<Chat[]> {
     const allChats: Chat[] = [];
     let chatsNextLink: string | null = null;
 
@@ -139,10 +109,10 @@ export async function collectGraphTeams(
             chatsNextLink
                 ? await client.api(chatsNextLink).get()
                 : await client
-                    .api("/me/chats")
-                    .select("id,topic,chatType,lastUpdatedDateTime")
-                    .top(50)
-                    .get()
+                      .api("/me/chats")
+                      .select("id,topic,chatType,lastUpdatedDateTime")
+                      .top(50)
+                      .get()
         ) as GraphPage<Chat>;
 
         allChats.push(...(res.value ?? []));
@@ -154,150 +124,185 @@ export async function collectGraphTeams(
 
     // Apply hard cap after pagination
     if (chatLimit > 0 && allChats.length > chatLimit) allChats.splice(chatLimit);
+    return allChats;
+}
 
-    log.info(
-        `  [Teams] ${allChats.length} chat trovate${chatLimit > 0 ? ` (limite: ${chatLimit})` : ""}`,
-    );
-
-    // ── Resolve current user display name ────────────────────────────────────
-    let myName = "";
+async function getCurrentUserName(client: Client): Promise<string> {
     try {
         const me = await client.api("/me").select("displayName").get();
-        myName = me.displayName;
+        return me.displayName || "";
     } catch {
-        // Silently ignore — only used to skip self in 1-on-1 topic resolution
+        return "";
     }
+}
 
-    // In single-day mode, restrict writes to the relevant month only
-    const targetMonth = date ? extractMonthStr(date) : null;
+function resolveTopic(chat: Chat, rawMessages: ChatMessage[], myName: string): string {
+    let resolvedTopic = chat.topic;
+    if (!resolvedTopic) {
+        for (const m of rawMessages) {
+            const u = (m.from as { user?: { displayName?: string } })?.user?.displayName;
+            if (u && u !== myName) {
+                resolvedTopic = u;
+                break;
+            }
+        }
+    }
+    return resolvedTopic || "Unknown";
+}
 
-    const collectSince =
-        process.env["TEAMS_COLLECT_SINCE"] ??
-        process.env["COLLECT_SINCE"] ??
-        "2025-01-01";
+function mapAndFilterMessages(
+    rawMessages: ChatMessage[],
+    targetMonth: string | null,
+): TeamsChatMessageRaw[] {
+    const lean: TeamsChatMessageRaw[] = [];
+    for (const m of rawMessages) {
+        if (!m.createdDateTime) continue;
+        const mMonth = extractMonthStr(m.createdDateTime);
+        if (targetMonth && mMonth !== targetMonth) continue;
+        lean.push(mapToLeanMessage(m));
+    }
+    return lean;
+}
 
-    const outPathsSet = new Set<string>();
-    const meta        = await readMeta(TEAMS_DIR);
-    let chatIdx       = 0;
+function mergeChatMessages(
+    existing: TeamsChatMessageRaw[],
+    newItems: TeamsChatMessageRaw[],
+): TeamsChatMessageRaw[] {
+    const msgMap = new Map<string, TeamsChatMessageRaw>();
+    for (const m of existing ?? []) msgMap.set(m.id, m);
+    for (const m of newItems) msgMap.set(m.id, m);
+    return Array.from(msgMap.values()).sort((a, b) => {
+        try {
+            return new Date(b?.createdDateTime).getTime() - new Date(a?.createdDateTime).getTime();
+        } catch {
+            log.warn(
+                `    [Warning] Invalid date format in messages ${a.id} '${b?.createdDateTime}' or ${b.id} '${a?.createdDateTime}', defaulting to no order.`,
+            );
+            return 0;
+        }
+    });
+}
 
-    // ── Process each chat ────────────────────────────────────────────────────
-    for (const chat of allChats) {
-        const chatId = chat.id ?? "0";
+async function updateChatMeta(TEAMS_DIR: string, fileName: string, merged: TeamsChatMessageRaw[]) {
+    const activeDays = new Set<string>();
+    for (const m of merged) {
+        const cd = m.createdDateTime?.substring(0, 10);
+        if (cd) activeDays.add(cd);
+    }
+    await writeMeta(TEAMS_DIR, fileName, {
+        lastExtractedDate: dateToString(),
+        sources: ["graph"],
+        activeDays: Array.from(activeDays),
+    });
+}
 
-        if (chatId === "0") {
-            console.warn("Chat ID is 0, skipping", chat);
-            continue;
+async function processSingleChat({
+    client,
+    chat,
+    idx,
+    total,
+    force,
+    collectSince,
+    targetMonth,
+    myName,
+}: ChatProcessParams): Promise<string | null> {
+    const chatId = chat.id ?? "0";
+    if (chatId === "0") return null;
+
+    const prelimTopic = chat.topic ?? `(no topic) ${chatId.slice(25, 35)}`;
+    const fileName = buildChatFileName(chatId, chat.chatType ?? "unknown", prelimTopic);
+    const outPath = path.join(TEAMS_DIR, `${fileName}.json`);
+
+    const existing = await readJson<TeamsChatDataRaw>(outPath, {
+        chatId,
+        chatTopic: null,
+        chatType: chat.chatType ?? "unknown",
+        lastModifiedDateTime: collectSince,
+        messages: [],
+    });
+
+    let since = force ? collectSince : existing.lastModifiedDateTime;
+    if (since.length <= 10) since = getApiStartOfDay(since);
+
+    try {
+        const { messages: rawMessages, maxLastModified } = await fetchChatMessagesSince(
+            client,
+            chatId,
+            since,
+        );
+
+        if (rawMessages.length === 0) {
+            if (idx % 50 === 0) log.info(`    [Progress] Analizzate ${idx}/${total} chat...`);
+            return null;
         }
 
-        chatIdx++;
+        const resolvedTopic = resolveTopic(chat, rawMessages, myName);
+        log.info(`    [Chat ${idx}/${total}] ${resolvedTopic}: +${rawMessages.length} messaggi`);
 
-        // Derive the filename for this chat's per-chat data file.
-        // We need a preliminary topic to construct the filename; the real topic
-        // may be refined below after fetching messages.
-        const prelimTopic = chat.topic ?? `(no topic) ${chatId.slice(25, 35)}`;
-        const fileName    = buildChatFileName(chatId, chat.chatType ?? "unknown", prelimTopic);
-        const outPath     = path.join(TEAMS_DIR, `${fileName}.json`);
+        const newLean = mapAndFilterMessages(rawMessages, targetMonth);
+        if (newLean.length === 0) return null;
 
-        // Read the existing per-chat file (contains sync cursor + previous messages).
-        const existing = await readJson<TeamsChatData>(outPath, {
+        const merged = mergeChatMessages(existing.messages, newLean);
+
+        await writeJson(outPath, {
             chatId,
-            chatTopic:             null,
-            chatType:              chat.chatType ?? "unknown",
-            lastModifiedDateTime:  collectSince,
-            messages:              [],
+            chatTopic: resolvedTopic,
+            chatType: chat.chatType ?? "unknown",
+            lastModifiedDateTime: maxLastModified,
+            messages: merged,
         });
 
-        // Determine the incremental since threshold.
-        let since = force ? collectSince : existing.lastModifiedDateTime;
-        if (since.length <= 10) {
-            since = getApiStartOfDay(since);
+        await updateChatMeta(TEAMS_DIR, fileName, merged);
+
+        if (idx % 50 === 0) log.info(`    [Progress] Analizzate ${idx}/${total} chat...`);
+        return outPath;
+    } catch (err: unknown) {
+        const code = (err as { statusCode?: number }).statusCode;
+        if (code !== 403 && code !== 404) {
+            log.warn(`    [Notice] Errore su chat ${chatId}: ${(err as Error).message}`);
+        } else {
+            log.error(`    [Error] Impossibile accedere alla chat ${chatId} (status ${code}). Potrebbe essere stata eliminata o potresti non avere più accesso. Se il problema persiste, considerando di escludere questa chat o di rimuovere il limite di chat per continuare a raccogliere le altre. Errore: ${(err as Error).message}`);
         }
+        return null;
+    }
+}
 
-        try {
-            const { messages: rawMessages, maxLastModified } =
-                await fetchChatMessagesSince(client, chatId, since);
+// ─── Main collector ─────────────────────────────────────────────────────────
 
-            if (rawMessages.length === 0) {
-                if (chatIdx % 50 === 0) {
-                    log.info(`    [Progress] Analizzate ${chatIdx}/${allChats.length} chat...`);
-                }
-                continue;
-            }
+export async function collectGraphTeams(
+    client: Client,
+    date?: string,
+    force = false,
+): Promise<string[]> {
+    await mkdir(TEAMS_DIR, { recursive: true });
 
-            // Resolve the display topic (use peer name for 1-on-1 chats with no topic).
-            let resolvedTopic = chat.topic;
-            if (!resolvedTopic) {
-                for (const m of rawMessages) {
-                    const u = (m.from as { user?: { displayName?: string } })?.user?.displayName;
-                    if (u && u !== myName) {
-                        resolvedTopic = u;
-                        break;
-                    }
-                }
-            }
-            if (!resolvedTopic) resolvedTopic = "Unknown";
+    const chatLimit = CONFIG.TEAMS_CHAT_LIMIT;
+    const allChats = await listAllChats(client, chatLimit);
 
-            log.info(
-                `    [Chat ${chatIdx}/${allChats.length}] ${resolvedTopic}: +${rawMessages.length} messaggi`,
-            );
+    const limitInfo = chatLimit > 0 ? ` (limite: ${chatLimit})` : "";
+    log.info(`  [Teams] ${allChats.length} chat trovate${limitInfo}`);
 
-            // Map to lean messages, filtering by month in single-day mode.
-            const newLean: TeamsChatMessage[] = [];
-            for (const m of rawMessages) {
-                if (!m.createdDateTime) continue;
-                const month = extractMonthStr(m.createdDateTime);
-                if (targetMonth && month !== targetMonth) continue;
-                newLean.push(mapToLeanMessage(m));
-            }
+    const myName = await getCurrentUserName(client);
+    const targetMonth = date ? extractMonthStr(date) : null;
+    const collectSince = CONFIG.COLLECT_SINCE;
 
-            if (newLean.length === 0) continue;
+    const outPathsSet = new Set<string>();
+    const meta = await readMeta(TEAMS_DIR);
 
-            // Merge with existing in-memory messages (dedup by id).
-            const msgMap = new Map<string, TeamsChatMessage>();
-            for (const m of existing.messages) msgMap.set(m.id, m);
-            for (const m of newLean)            msgMap.set(m.id, m);
-            const merged = Array.from(msgMap.values());
-
-            // Build the updated TeamsChatData and write back.
-            const updated: TeamsChatData = {
-                chatId,
-                chatTopic:            resolvedTopic,
-                chatType:             chat.chatType ?? "unknown",
-                lastModifiedDateTime: maxLastModified,
-                messages:             merged,
-            };
-
-            await writeJson(outPath, updated);
-
-            // Update the .meta.json sidecar.
-            const activeDays = new Set<string>();
-            for (const m of merged) {
-                const cd = m.createdDateTime?.substring(0, 10);
-                if (cd) activeDays.add(cd);
-            }
-            await writeMeta(TEAMS_DIR, fileName, {
-                lastExtractedDate: today,
-                sources:           ["graph"],
-                activeDays:        Array.from(activeDays),
-            });
-
-            outPathsSet.add(outPath);
-
-            if (chatIdx % 50 === 0) {
-                log.info(`    [Progress] Analizzate ${chatIdx}/${allChats.length} chat...`);
-            }
-        } catch (err: unknown) {
-            // Inaccessible chats (403/404): skip silently
-            const code = (err as { statusCode?: number }).statusCode;
-            if (code !== 403 && code !== 404) {
-                log.warn(
-                    `    [Notice] Errore su chat ${chatId}: ${(err as Error).message}`,
-                );
-            }
-        }
+    for (let i = 0; i < allChats.length; i++) {
+        const outPath = await processSingleChat({
+            client,
+            chat: allChats[i],
+            idx: i + 1,
+            total: allChats.length,
+            force,
+            collectSince,
+            targetMonth,
+            myName,
+        });
+        if (outPath) outPathsSet.add(outPath);
     }
 
-    // ── Include previously collected files that had no new messages ──────────
     const outPathsArr = Array.from(outPathsSet);
     for (const [key] of Object.entries(meta)) {
         if (key === ".meta") continue;

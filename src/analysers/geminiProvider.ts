@@ -1,11 +1,12 @@
 /**
- * Gemini analyzer provider using the @google/genai SDK.
+ * Gemini analyser provider using the @google/genai SDK.
  */
 import { GoogleGenAI, Type, Schema } from "@google/genai";
 import { AnalyzerProvider, tpmToChars } from "./base";
 import { createLogger } from "../logger";
 import { saveRawResponse } from "./aiRaw";
 import { ProposalEntry } from "@shared/analysis";
+import { CONFIG } from "@shared/env-config";
 
 const log = createLogger("gemini");
 
@@ -53,7 +54,7 @@ export class GeminiProvider implements AnalyzerProvider {
   private readonly modelName: string;
 
   constructor() {
-    this.modelName = process.env["GEMINI_MODEL"] ?? "gemini-2.0-flash";
+    this.modelName = CONFIG.GEMINI_MODEL;
     this.name = `gemini:${this.modelName}`;
   }
 
@@ -62,7 +63,7 @@ export class GeminiProvider implements AnalyzerProvider {
   }
 
   async isAvailable(): Promise<boolean> {
-    const apiKey = process.env["GEMINI_API_KEY"];
+    const apiKey = CONFIG.GEMINI_API_KEY;
     if (!apiKey) {
       log.debug(`[${this.name}] GEMINI_API_KEY non impostata`);
       return false;
@@ -90,11 +91,11 @@ export class GeminiProvider implements AnalyzerProvider {
     }
   }
 
-  async analyzeBatch(
+  async analyseBatch(
     systemPrompt: string,
     userPromptBatched: string,
   ): Promise<{ date: Date; entries: ProposalEntry[] }[]> {
-    const apiKey = process.env["GEMINI_API_KEY"]!;
+    const apiKey = CONFIG.GEMINI_API_KEY!;
     const promptChars = systemPrompt.length + userPromptBatched.length;
     log.info(
       `[${this.name}] Invio batch a Gemini (${this.modelName}) — prompt ~${promptChars} chars...`,

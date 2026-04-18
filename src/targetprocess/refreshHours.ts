@@ -2,8 +2,8 @@
  * Shared utility: refresh reportedHours on AggregatedDay objects
  * by querying the TargetProcess API for the latest time entries.
  *
- * Called by both the server analyze route and the CLI analyzer
- * before analyzeBatch() to ensure fresh data.
+ * Called by both the server analyse route and the CLI analyser
+ * before analyseBatch() to ensure fresh data.
  *
  * On TP API failure: logs a warning and falls back to cached values
  * already present in the AggregatedDay objects (graceful degradation).

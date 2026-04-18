@@ -1,5 +1,5 @@
 /**
- * Prompt templates for the unified analyzer.
+ * Prompt templates for the unified analyser.
  * All static text lives here; functions accept only the dynamic variables
  * they need for interpolation.
  */

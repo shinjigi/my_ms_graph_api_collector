@@ -6,8 +6,7 @@
  */
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import * as dotenv from "dotenv";
-dotenv.config();
+import { CONFIG } from "@shared/env-config";
 
 import {
     hhmmToHours,
@@ -15,7 +14,7 @@ import {
     parseTpDate,
 } from "../targetprocess/format";
 import { createLogger } from "../logger";
-import { readJson, readJsonArray, writeJson, readMeta } from "../json-io";
+import { readJson, readJsonArray, writeJson, readMeta, listJsonFiles } from "../json-io";
 import {
     ZucchettiDay,
     isWorkday,
@@ -28,17 +27,14 @@ import { WORKDAY_HOURS } from "@shared/standards";
 import { TpTimeEntry } from "@shared/targetprocess";
 import {
     AggregatedDay,
-    EmailRaw,
     SvnCommitRaw,
     GitCommitRaw,
     BrowserVisit,
     NibolBooking,
-    TeamsChatData,
-    TeamsChatMessage,
 } from "@shared/aggregator";
-import { fileURLToPath } from "url";
+import { fileURLToPath } from "node:url";
 import { isEqual, isPast } from "date-fns";
-import { CalendarEventRaw } from "@shared/graph";
+import { CalendarEventRaw, EmailRaw, TeamsChatDataRaw, TeamsChatMessageRaw } from "@shared/graph";
 
 const isMainModule =
     process.argv[1] &&
@@ -62,15 +58,7 @@ const NIBOL_DIR  = path.join(RAW_DIR, "nibol");
 
 /** Reads all YYYY-MM.json files from a directory and concatenates their arrays. */
 async function loadDirMonthly<T>(dir: string): Promise<T[]> {
-    let entries: string[];
-    try {
-        entries = await fs.readdir(dir);
-    } catch {
-        log.error(`Failed to read directory: ${dir}`);
-        return [];
-    }
-
-    const files = entries.filter((f) => /^\d{4}-\d{2}\.json$/.test(f));
+    const files = await listJsonFiles(dir, { pattern: /^\d{4}-\d{2}\.json$/ });
     const all: T[] = [];
 
     for (const file of files) {
@@ -98,14 +86,14 @@ function groupByDate<T>(
 }
 
 /**
- * Groups TeamsChatData[] by date: for each chat, splits messages by day and
- * produces one TeamsChatData entry per (chat × date) combination.
+ * Groups TeamsChatDataRaw[] by date: for each chat, splits messages by day and
+ * produces one TeamsChatDataRaw entry per (chat × date) combination.
  */
-function groupTeamsByDate(chats: TeamsChatData[]): Map<string, TeamsChatData[]> {
-    const map = new Map<string, TeamsChatData[]>();
+function groupTeamsByDate(chats: TeamsChatDataRaw[]): Map<string, TeamsChatDataRaw[]> {
+    const map = new Map<string, TeamsChatDataRaw[]>();
     for (const chat of chats) {
         // Group messages within this chat by date
-        const msgByDate = new Map<string, TeamsChatMessage[]>();
+        const msgByDate = new Map<string, TeamsChatMessageRaw[]>();
         for (const m of chat.messages) {
             const d = m.createdDateTime?.slice(0, 10);
             if (d) {
@@ -113,7 +101,7 @@ function groupTeamsByDate(chats: TeamsChatData[]): Map<string, TeamsChatData[]> 
                 msgByDate.get(d)!.push(m);
             }
         }
-        // Emit a TeamsChatData slice per date
+        // Emit a TeamsChatDataRaw slice per date
         for (const [date, msgs] of msgByDate) {
             if (!map.has(date)) map.set(date, []);
             map.get(date)!.push({
@@ -134,7 +122,7 @@ export function buildAggregatedDay(
     zDay:      ZucchettiDay,
     calendar:  CalendarEventRaw[],
     emails:    EmailRaw[],
-    teams:     TeamsChatData[],
+    teams:     TeamsChatDataRaw[],
     svn:       SvnCommitRaw[],
     git:       GitCommitRaw[],
     browser:   BrowserVisit[],
@@ -185,7 +173,7 @@ async function loadMonthFile<T>(dir: string, monthStr: string): Promise<T[]> {
 async function loadTeamsForDate(
     dir: string,
     date: Date | string,
-): Promise<TeamsChatData[]> {
+): Promise<TeamsChatDataRaw[]> {
     const dStr = dateToString(date);
     const meta = await readMeta(dir);
     const matchedFiles: string[] = [];
@@ -196,9 +184,9 @@ async function loadTeamsForDate(
         }
     }
 
-    const result: TeamsChatData[] = [];
+    const result: TeamsChatDataRaw[] = [];
     for (const file of matchedFiles) {
-        const data = await readJson<TeamsChatData>(
+        const data = await readJson<TeamsChatDataRaw>(
             path.join(dir, file),
             // Fallback: empty chat shape
             { chatId: "", chatTopic: "", chatType: "", lastModifiedDateTime: "", messages: [] },
@@ -214,22 +202,14 @@ async function loadTeamsForDate(
 }
 
 /** Load all Teams chat files from a directory. */
-async function loadDirTeams(dir: string): Promise<TeamsChatData[]> {
-    let entries: string[];
-    try {
-        entries = await fs.readdir(dir);
-    } catch {
-        return [];
-    }
-
-    // Support for both legacy monthly files and newer per-chat files
-    const files = entries.filter(
-        (f) => /^\d{4}-\d{2}\.json$/.test(f) || /^(O2O|GRP|MET)__.*\.json$/.test(f),
-    );
-    const all: TeamsChatData[] = [];
+async function loadDirTeams(dir: string): Promise<TeamsChatDataRaw[]> {
+    const files = await listJsonFiles(dir, {
+        pattern: /^(O2O|GRP|MET)__.*__[a-z0-9]{6}\.json$/,
+    });
+    const all: TeamsChatDataRaw[] = [];
 
     for (const file of files) {
-        const data = await readJson<TeamsChatData>(
+        const data = await readJson<TeamsChatDataRaw>(
             path.join(dir, file),
             { chatId: "", chatTopic: "", chatType: "", lastModifiedDateTime: "", messages: [] },
         );
@@ -241,13 +221,7 @@ async function loadDirTeams(dir: string): Promise<TeamsChatData[]> {
 
 /** Load TP time entries from enriched day files. */
 async function loadDirTp(dir: string): Promise<TpTimeEntry[]> {
-    let entries: string[];
-    try {
-        entries = await fs.readdir(dir);
-    } catch {
-        return [];
-    }
-    const files = entries.filter((f) => /^enriched-.*\.json$/.test(f));
+    const files = await listJsonFiles(dir, { pattern: /^enriched-.*\.json$/ });
     const all: TpTimeEntry[] = [];
     for (const file of files) {
         const items = await readJsonArray<TpTimeEntry>(path.join(dir, file));
@@ -315,7 +289,7 @@ export async function runAggregation(): Promise<void> {
     log.info("Aggregazione dati raw → aggregated...");
 
     await fs.mkdir(AGG_DIR, { recursive: true });
-    const sinceDate = process.env["COLLECT_SINCE"] ?? "2025-01-01";
+    const sinceDate = CONFIG.COLLECT_SINCE;
 
     const zuccDays    = await loadDirMonthly<ZucchettiDay>(ZUCC_DIR);
     const calendar    = await loadDirMonthly<CalendarEventRaw>(CAL_DIR);

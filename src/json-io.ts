@@ -86,3 +86,49 @@ export async function writeMeta(
     existing[key] = meta;
     await writeJson(path.join(dir, ".meta.json"), existing);
 }
+
+// ─── Directory exploration ───────────────────────────────────────
+
+/** 
+ * Lists JSON files in a directory, applying an optional regex filter on the filename 
+ * and an optional date filter (compared against the filename without .json).
+ * Returns ONLY the filenames (optionally stripped of .json extension).
+ */
+export async function listJsonFiles(
+    dir: string,
+    options: {
+        pattern?: RegExp;
+        sinceDate?: string;
+        stripExtension?: boolean;
+        sortDir?: "asc" | "desc";
+    } = {},
+): Promise<string[]> {
+    try {
+        const files = await fs.readdir(dir);
+        let filtered = files.filter((f) => f.endsWith(".json"));
+
+        if (options.pattern) {
+            filtered = filtered.filter((f) => options.pattern!.test(f));
+        }
+
+        if (options.sinceDate) {
+            filtered = filtered.filter((f) => {
+                const datePart = f.replace(".json", "");
+                return datePart >= options.sinceDate!;
+            });
+        }
+
+        if (options.stripExtension) {
+            filtered = filtered.map((f) => f.replace(".json", ""));
+        }
+
+        filtered.sort((a, b) => a.localeCompare(b));
+        if (options.sortDir === "desc") {
+            filtered.reverse();
+        }
+
+        return filtered;
+    } catch {
+        return [];
+    }
+}

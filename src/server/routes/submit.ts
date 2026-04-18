@@ -11,6 +11,7 @@ import { TargetprocessClient } from "../../targetprocess/client";
 import { DayProposal, ProposalEntry } from "@shared/analysis";
 import { refreshReportedHours } from "../../targetprocess/refreshHours";
 import { AggregatedDay } from "@shared/aggregator";
+import { CONFIG } from "@shared/env-config";
 
 export const submitRouter = Router();
 
@@ -42,7 +43,7 @@ submitRouter.post("/:date", async (req: Request, res: Response) => {
   for (const entry of approvedEntries) {
     // Skip recurring activities without a taskId (e.g. standup)
     if (entry.taskId == null) {
-      const miscId = Number(process.env["MISC_TASK_ID"] ?? "0");
+      const miscId = Number(CONFIG.MISC_TASK_ID);
       if (!miscId) {
         errors.push({
           entry: entry.taskName,

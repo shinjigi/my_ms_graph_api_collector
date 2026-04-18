@@ -1,5 +1,5 @@
 // Shared knowledge-base types — canonical definition used by the TP collector
-// (writer) and the analyzer (reader).
+// (writer) and the analyser (reader).
 
 export interface KbEntry {
     id:                   number;
