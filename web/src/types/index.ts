@@ -15,7 +15,8 @@ import type {
   TpWeekResponse as ApiTpWeekResponse,
 } from "@shared/targetprocess";
 import type { ZucchettiDay, WorkLocation } from "@shared/zucchetti";
-import type { NibolBooking, BrowserVisit, TeamsChatData, TeamsChatMessage } from "@shared/aggregator";
+import type { NibolBooking, BrowserVisit } from "@shared/aggregator";
+import type { TeamsChatDataRaw as TeamsChatData, TeamsChatMessageRaw as TeamsChatMessage } from "@shared/graph";
 
 export type {
   ProposalEntry,
