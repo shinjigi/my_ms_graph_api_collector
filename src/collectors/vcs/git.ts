@@ -65,7 +65,7 @@ function getCommitsFromRepo(repoPath: string, since: string): GitCommitRaw[] {
 }
 
 export async function collectGitCommits(
-  range: DateRange,
+  range: DateRange | undefined,
   force = false,
 ): Promise<string[]> {
   const roots = (CONFIG.GIT_ROOTS)

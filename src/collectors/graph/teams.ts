@@ -280,10 +280,15 @@ async function processSingleChat({
 
 export async function collectGraphTeams(
     client: Client,
-    range: DateRange,
+    range: DateRange | undefined,
     _force = false,
 ): Promise<string[]> {
     await mkdir(TEAMS_DIR, { recursive: true });
+
+    const effectiveRange: DateRange = range ?? {
+        start: new Date(CONFIG.COLLECT_SINCE),
+        end: new Date(),
+    };
 
     const chatLimit = CONFIG.TEAMS_CHAT_LIMIT;
     const allChats = await listAllChats(client, chatLimit);
@@ -302,7 +307,7 @@ export async function collectGraphTeams(
             chat: allChats[i],
             idx: i + 1,
             total: allChats.length,
-            range,
+            range: effectiveRange,
             myName,
         });
         if (outPath) outPathsSet.add(outPath);

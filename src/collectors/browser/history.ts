@@ -224,7 +224,7 @@ async function writeByMonth(
 }
 
 export async function collectBrowserHistory(
-  range: DateRange,
+  range: DateRange | undefined,
   force = false,
 ): Promise<string[]> {
   const chromeProfileDirs = CONFIG.CHROME_PROFILE_DIRS
@@ -232,8 +232,8 @@ export async function collectBrowserHistory(
       .filter(Boolean);
   const firefoxProfileDir = (CONFIG.FIREFOX_PROFILE_DIR).trim();
 
-  const start = range?.start || new Date(CONFIG.COLLECT_SINCE);
-  const end = range?.end || new Date();
+  const start = range?.start ?? new Date(CONFIG.COLLECT_SINCE);
+  const end = range?.end ?? new Date();
   
   const startMs = BigInt(start.getTime()) * BigInt(1000); // Unix microseconds
   const endMs = BigInt(end.getTime()) * BigInt(1000); // Unix microseconds

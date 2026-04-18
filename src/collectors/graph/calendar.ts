@@ -70,7 +70,7 @@ async function fetchMonthEvents(client: Client, month: string): Promise<Calendar
 
 export async function collectGraphCalendar(
     client: Client,
-    range: DateRange,
+    range: DateRange | undefined,
     force = false,
 ): Promise<string[]> {
     const since = CONFIG.COLLECT_SINCE;

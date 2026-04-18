@@ -101,15 +101,20 @@ function extractJson(output: string): MonthData[] {
     return parsed as MonthData[];
 }
 
-export async function collectZucchetti(range: DateRange, force = false): Promise<string[]> {
+export async function collectZucchetti(range: DateRange | undefined, force = false): Promise<string[]> {
     const today = dateToString();
     await fs.mkdir(ZUCC_DIR, { recursive: true });
+
+    const effectiveRange: DateRange = range ?? {
+        start: parseDateString(CONFIG.COLLECT_SINCE),
+        end: new Date(),
+    };
 
     // Optimization: find the first month that needs collection
     const meta = await readMeta(ZUCC_DIR);
 
-    let startMonthDate = startOfMonth(range.start);
-    const endMonthDate = endOfMonth(range.end);
+    let startMonthDate = startOfMonth(effectiveRange.start);
+    const endMonthDate = endOfMonth(effectiveRange.end);
 
     if (!force) {
         // Skip already collected months from the beginning

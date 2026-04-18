@@ -17,45 +17,39 @@ import { collectZucchetti } from "./collectors/zucchetti/index";
 import { collectNibol } from "./collectors/nibol/index";
 import { collectBrowserHistory } from "./collectors/browser/history";
 import { runAggregation } from "./aggregators/aggregator";
-import { getApiStartOfDay, getApiEndOfDay, DateRange, lastDayOfMonth, parseDateString } from "@shared/dates";
-import { parseISO } from "date-fns";
+import { DateRange, lastDayOfMonth, parseDateString } from "@shared/dates";
+import { endOfDay } from "date-fns";
 import { CONFIG } from "@shared/env-config";
 
 async function run(): Promise<void> {
-    const forceFlag = process.argv.includes("--force");
+    const forceFlag   = process.argv.includes("--force");
     const aggregateFlag = process.argv.includes("--aggregate");
-    const dateArg = process.argv.find((a) => a.startsWith("--date="))?.split("=")[1];
-    const startArg = process.argv.find((a) => a.startsWith("--start="))?.split("=")[1];
-    const endArg = process.argv.find((a) => a.startsWith("--end="))?.split("=")[1];
-    const sourceArg = process.argv
-        .find((a) => a.startsWith("--source="))
-        ?.split("=")[1]
-        ?.toLowerCase();
-    const yearArg = process.argv.find((a) => a.startsWith("--year="))?.split("=")[1];
-    const monthArg = process.argv.find((a) => a.startsWith("--month="))?.split("=")[1];
+    const dateArg   = process.argv.find((a) => a.startsWith("--date="))?.split("=")[1];
+    const startArg  = process.argv.find((a) => a.startsWith("--start="))?.split("=")[1];
+    const endArg    = process.argv.find((a) => a.startsWith("--end="))?.split("=")[1];
+    const sourceArg = process.argv.find((a) => a.startsWith("--source="))?.split("=")[1]?.toLowerCase();
+    const yearArg   = process.argv.find((a) => a.startsWith("--year="))?.split("=")[1];
+    const monthArg  = process.argv.find((a) => a.startsWith("--month="))?.split("=")[1];
 
-    
-    // Costruiamo il range unico (oggetti Date) da passare ai collector
-    const range: DateRange ={start: parseDateString(CONFIG.COLLECT_SINCE), end: new Date()};
+    // range is defined only when explicit args are provided.
+    // Without args, collectors use their own full-range mode (COLLECT_SINCE → today, per-month files).
+    let range: DateRange | undefined;
 
-    if (!dateArg && yearArg && monthArg) {
-        range.start = parseISO(`${yearArg}-${monthArg}-01`);
-        range.end = lastDayOfMonth(range.start);
-    }
-    
     if (startArg && endArg) {
-        range.start = parseISO(startArg);
-        range.end = parseISO(endArg);
+        range = { start: parseDateString(startArg), end: parseDateString(endArg) };
     } else if (dateArg) {
-        range.start = parseISO(getApiStartOfDay(dateArg));
-        range.end = parseISO(getApiEndOfDay(dateArg));
+        const d = parseDateString(dateArg);
+        range = { start: d, end: endOfDay(d) };
+    } else if (yearArg && monthArg) {
+        const start = parseDateString(`${yearArg}-${monthArg.padStart(2, "0")}-01`);
+        range = { start, end: lastDayOfMonth(start) };
     }
 
     const shouldRun = (name: string) => !sourceArg || sourceArg === name;
 
     log.info(
         "Avvio raccolta dati" +
-            (range ? ` (Range: ${range.start} -> ${range.end})` : " (Standard/Since)") +
+            (range ? ` (Range: ${range.start.toLocaleDateString()} → ${range.end.toLocaleDateString()})` : ` (Full: ${CONFIG.COLLECT_SINCE} → oggi)`) +
             (sourceArg ? ` [Sorgente: ${sourceArg}]` : "") +
             (forceFlag ? " [--force]" : ""),
     );
@@ -82,14 +76,12 @@ async function run(): Promise<void> {
         }
     }
 
-    // SVN commits
     if (shouldRun("svn")) {
         log.info("[SVN] Raccolta commit...");
         const svnPaths = await collectSvnCommits(range, forceFlag);
         svnPaths.forEach((p) => log.info(`[SVN] Commit → ${p}`));
     }
 
-    // Git commits
     if (shouldRun("git")) {
         log.info("[Git] Raccolta commit...");
         const gitPaths = await collectGitCommits(range, forceFlag);
@@ -102,14 +94,12 @@ async function run(): Promise<void> {
         zuccPaths.forEach((p) => log.info(`[Zucchetti] → ${p}`));
     }
 
-    // Nibol calendar
     if (shouldRun("nibol")) {
         log.info("[Nibol] Raccolta calendario...");
         const nibolPaths = await collectNibol(range, forceFlag);
         nibolPaths.forEach((p) => log.info(`[Nibol] → ${p}`));
     }
 
-    // Browser history (Chrome + Firefox)
     if (shouldRun("browser")) {
         log.info("[Browser] Raccolta cronologia...");
         const browserPaths = await collectBrowserHistory(range, forceFlag);

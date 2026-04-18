@@ -116,7 +116,7 @@ async function fetchEmails(
 
 export async function collectGraphEmail(
   client: Client,
-  range: DateRange,
+  range: DateRange | undefined,
   force = false,
 ): Promise<string[]> {
   const since = CONFIG.COLLECT_SINCE;

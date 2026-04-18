@@ -565,7 +565,7 @@ export async function nibolFetchCalendarData(range?: {
 }
 
 export async function collectNibol(
-  range: DateRange,
+  range: DateRange | undefined,
   force = false,
 ): Promise<string[]> {
   const NIBOL_DIR = getJsonRawPath("nibol");

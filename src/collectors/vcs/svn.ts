@@ -6,7 +6,14 @@ import { createLogger } from "../../logger";
 
 import { mergeByKey, writeMeta, writeJson } from "../../utils";
 import { SvnCommitRaw } from "@shared/aggregator";
-import { dateToString, currentMonthString, DateRange } from "@shared/dates";
+import {
+    dateToString,
+    currentMonthString,
+    startOfMonth,
+    addMonths,
+    lastDayOfMonthString,
+    DateRange,
+} from "@shared/dates";
 import { CONFIG } from "@shared/env-config";
 import { getJsonRawPath } from "../../json-io";
 
@@ -65,12 +72,35 @@ function parseCommits(entries: SvnLogEntry[], authorFilter?: string): SvnCommitR
     return authorFilter ? commits.filter((c) => c.author === authorFilter) : commits;
 }
 
-export async function collectSvnCommits(range: DateRange, _force = false): Promise<string[]> {
+async function fetchAndWrite(
+    svnUrl: string,
+    svnBin: string,
+    user: string,
+    pass: string,
+    startStr: string,
+    endStr: string,
+    outPath: string,
+    month: string,
+): Promise<string> {
+    const args = ["log", "--xml", "--with-all-revprops", "-r", `{${startStr}}:{${endStr}}`];
+    if (user && pass) args.push("--username", user, "--password", pass, "--no-auth-cache");
+    args.push(svnUrl);
+
+    const xmlOutput = await runSvn(args, svnBin);
+    const parsed    = (await parseXml(xmlOutput)) as SvnXmlParsed;
+    const commits   = parseCommits(parsed?.log?.logentry ?? [], user);
+
+    const merged = await mergeByKey<SvnCommitRaw>(outPath, commits, "revision");
+    await writeJson(outPath, merged);
+    await writeMeta(SVN_DIR, month, { lastExtractedDate: dateToString(), sources: [svnUrl] });
+    return outPath;
+}
+
+export async function collectSvnCommits(range: DateRange | undefined, _force = false): Promise<string[]> {
     const svnUrl = CONFIG.SVN_URL;
     const svnBin = CONFIG.SVN_BIN;
     const user   = CONFIG.SVN_USERNAME;
     const pass   = CONFIG.SVN_PASSWORD;
-    const today  = dateToString();
 
     if (!svnUrl) {
         log.warn("SVN_URL non configurato — collector SVN saltato.");
@@ -80,30 +110,39 @@ export async function collectSvnCommits(range: DateRange, _force = false): Promi
     await fs.mkdir(SVN_DIR, { recursive: true });
 
     if (range) {
-        const month    = currentMonthString(range.start);
-        const outPath  = path.join(SVN_DIR, `${month}.json`);
+        const month   = currentMonthString(range.start);
+        const outPath = path.join(SVN_DIR, `${month}.json`);
         const startStr = dateToString(range.start);
         const endStr   = dateToString(range.end);
-
+        log.info(`  [SVN] Range ${startStr} → ${endStr}...`);
         try {
-            const args = ["log", "--xml", "--with-all-revprops", "-r", `{${startStr}}:{${endStr}}`];
-            if (user && pass) args.push("--username", user, "--password", pass, "--no-auth-cache");
-            args.push(svnUrl);
-
-            log.info(`  [SVN] Estrazione range ${startStr} -> ${endStr}...`);
-            const xmlOutput = await runSvn(args, svnBin);
-            const parsed    = (await parseXml(xmlOutput)) as SvnXmlParsed;
-            const commits   = parseCommits(parsed?.log?.logentry ?? [], user);
-
-            const merged = await mergeByKey<SvnCommitRaw>(outPath, commits, "revision");
-            await writeJson(outPath, merged);
-            await writeMeta(SVN_DIR, month, { lastExtractedDate: today, sources: [svnUrl] });
-            return [outPath];
+            return [await fetchAndWrite(svnUrl, svnBin, user, pass, startStr, endStr, outPath, month)];
         } catch (err) {
             log.warn(`  [SVN] Errore nel range: ${(err as Error).message}`);
             return [];
         }
     }
 
-    return [];
+    // Full-range mode: iterate months from COLLECT_SINCE to today
+    const outPaths: string[] = [];
+    let current = startOfMonth(CONFIG.COLLECT_SINCE);
+    const now = new Date();
+
+    while (current <= now) {
+        const month    = currentMonthString(current);
+        const outPath  = path.join(SVN_DIR, `${month}.json`);
+        const startStr = dateToString(current);
+        const endStr   = lastDayOfMonthString(current);
+
+        log.info(`  [SVN] ${month}...`);
+        try {
+            outPaths.push(await fetchAndWrite(svnUrl, svnBin, user, pass, startStr, endStr, outPath, month));
+        } catch (err) {
+            log.warn(`  [SVN] ${month}: ${(err as Error).message}`);
+        }
+
+        current = addMonths(current, 1);
+    }
+
+    return outPaths;
 }
