@@ -200,7 +200,8 @@ function minutesToStr(totalMinutes: number): string {
 /** Cross-check hOrd vs richieste/giustificativi and add warnings. */
 export function validateDay(day: ZucchettiDay): ZucchettiDay {
   const hOrdMinutes = timeToMinutes(day.hOrd);
-  const EXCLUDED_FROM_HORD = ABSENCE_KEYWORDS;
+  const isAbsence = (text: string) =>
+    ABSENCE_KEYWORDS.some((kw) => text.toUpperCase().includes(kw));
 
   const approvedReqs = (day.richieste ?? []).filter(
     (r: ZucchettiRequest) => r.status === "Approvata",
@@ -215,7 +216,7 @@ export function validateDay(day: ZucchettiDay): ZucchettiDay {
       );
       if (match) qta = timeToMinutes(match.qta);
     }
-    if (!EXCLUDED_FROM_HORD.includes(r.text ?? "")) {
+    if (!isAbsence(r.text ?? "")) {
       sumReqHOrd += qta;
     }
   });
@@ -223,7 +224,7 @@ export function validateDay(day: ZucchettiDay): ZucchettiDay {
   let sumGiuHOrd = 0;
   (day.giustificativi ?? []).forEach((g: ZucchettiJustification) => {
     const qta = timeToMinutes(g.qta);
-    if (!EXCLUDED_FROM_HORD.includes(g.text)) {
+    if (!isAbsence(g.text)) {
       sumGiuHOrd += qta;
     }
   });
