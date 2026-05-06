@@ -22,21 +22,21 @@ flowchart TD
         TEAMS[Teams]
         GIT[Git repos]
         SVN[SVN]
-        ZUCC[Zucchetti\ntimesheet]
-        BROW[Browser\nhistory]
+        ZUCC[Zucchetti<br />timesheet]
+        BROW[Browser<br />history]
     end
 
     subgraph Pipeline["Local Pipeline"]
-        COLLECT["npm run collect\ndata/raw/&lt;source&gt;/YYYY-MM.json"]
-        AGG["npm run aggregate\ndata/aggregated/YYYY-MM-DD.json"]
-        ANALYZE["npm run analyze\ndata/proposals/YYYY-MM-DD.json"]
-        UI["Web UI\nlocalhost:5173"]
+        COLLECT["npm run collect<br />data/raw/&lt;source&gt;/YYYY-MM.json"]
+        AGG["npm run aggregate<br />data/aggregated/YYYY-MM-DD.json"]
+        ANALYZE["npm run analyze<br />data/proposals/YYYY-MM-DD.json"]
+        UI["Web UI<br />localhost:5173"]
     end
 
     subgraph Outputs["External systems"]
         TP[TargetProcess]
-        ZOUT[Zucchetti\nupdate]
-        NIBOL[Nibol\ndesk booking]
+        ZOUT[Zucchetti<br />update]
+        NIBOL[Nibol<br />desk booking]
     end
 
     Sources --> COLLECT
@@ -132,10 +132,10 @@ classDiagram
 ```mermaid
 flowchart LR
     AGG[AggregatedDay]
-    KB[TP open items\nKB]
-    DEF[config/defaults.json\nrecurring activities]
-    CLAUDE[Claude AI\nhaiku-4-5]
-    PROP[DayProposal\ndata/proposals/]
+    KB[TP open items<br />KB]
+    DEF[config/defaults.json<br />recurring activities]
+    CLAUDE[Claude AI<br />haiku-4-5]
+    PROP[DayProposal<br />data/proposals/]
 
     AGG --> CLAUDE
     KB --> CLAUDE
@@ -188,11 +188,11 @@ All state is reactive and persisted to `localStorage`; no page reload is needed 
 
 ```mermaid
 flowchart LR
-    SIDEBAR[AppSidebar\n5 view links]
-    HEADER[DayPickerHeader\nmonth ◀ ▶ · day buttons]
-    PICKER[usePickerStore\npickerSelected\npickerMonth]
-    DASH[Dashboard\nupdates live]
-    TS[Timesheet\nupdates live]
+    SIDEBAR[AppSidebar<br />5 view links]
+    HEADER[DayPickerHeader<br />month ◀ ▶ · day buttons]
+    PICKER[usePickerStore<br />pickerSelected<br />pickerMonth]
+    DASH[Dashboard<br />updates live]
+    TS[Timesheet<br />updates live]
 
     SIDEBAR -->|setView| DASH
     SIDEBAR -->|setView| TS
@@ -295,23 +295,23 @@ Triggered from the UI via `POST /api/hooks/nibol`.
 flowchart TD
     DATA[data/]
     RAW[raw/]
-    AGG2[aggregated/\nYYYY-MM-DD.json]
-    PROP2[proposals/\nYYYY-MM-DD.json]
-    KB2[kb/\nus-summaries.json]
+    AGG2[aggregated/<br />YYYY-MM-DD.json]
+    PROP2[proposals/<br />YYYY-MM-DD.json]
+    KB2[kb/<br />us-summaries.json]
 
     DATA --> RAW
     DATA --> AGG2
     DATA --> PROP2
     DATA --> KB2
 
-    RAW --> GCal[graph-calendar/\nYYYY-MM.json + .meta.json]
-    RAW --> GMail[graph-email/\nYYYY-MM.json + .meta.json]
-    RAW --> GTeams[graph-teams/\nYYYY-MM.json + .meta.json\nchat-states.json]
-    RAW --> RGIT[git/\nYYYY-MM.json + .meta.json]
-    RAW --> RSVN[svn/\nYYYY-MM.json + .meta.json]
-    RAW --> RZ[zucchetti/\nYYYY-MM.json + .meta.json]
-    RAW --> RBC[browser-chrome/\nYYYY-MM.json + .meta.json]
-    RAW --> RBF[browser-firefox/\nYYYY-MM.json + .meta.json]
+    RAW --> GCal[graph-calendar/<br />YYYY-MM.json + .meta.json]
+    RAW --> GMail[graph-email/<br />YYYY-MM.json + .meta.json]
+    RAW --> GTeams[graph-teams/<br />YYYY-MM.json + .meta.json<br />chat-states.json]
+    RAW --> RGIT[git/<br />YYYY-MM.json + .meta.json]
+    RAW --> RSVN[svn/<br />YYYY-MM.json + .meta.json]
+    RAW --> RZ[zucchetti/<br />YYYY-MM.json + .meta.json]
+    RAW --> RBC[browser-chrome/<br />YYYY-MM.json + .meta.json]
+    RAW --> RBF[browser-firefox/<br />YYYY-MM.json + .meta.json]
 ```
 
 Each source directory has a `.meta.json` sidecar recording the last extraction date and sources scanned per month — enabling smart skip: completed past months are never re-fetched unless sources change or `--force` is passed.

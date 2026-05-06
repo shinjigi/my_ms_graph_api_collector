@@ -19,7 +19,7 @@ import { collectNibol } from "../../collectors/nibol/index";
 import { aggregateSingleDay } from "../../aggregators/aggregator";
 import { readMeta } from "../../utils";
 import { ZucchettiDay } from "@shared/zucchetti";
-import { getMonday, currentMonthString, shiftDate, parseDateString } from "@shared/dates";
+import { getMonday, currentMonthString, shiftDate, parseDateString, isSameDay } from "@shared/dates";
 
 export const syncRouter = Router();
 
@@ -124,7 +124,7 @@ syncRouter.post("/", async (req: Request, res: Response) => {
     try {
       const month = currentMonthString(d);
       const zDays = await loadZucchettiMonth(month);
-      const zDay = zDays.find((z) => z.date === d);
+      const zDay = zDays.find((z) => isSameDay(new Date(String(z.date)), new Date(String(d))));
       if (!zDay) {
         result.errors.push(`aggregation: no Zucchetti data for ${d}`);
         continue;

@@ -609,6 +609,15 @@ export async function collectNibol(
     grouped[monthStr].push(b);
   }
 
+  // Ensure every month in the effective range has an entry (even if empty)
+  const cur = new Date(effectiveRange.start.getFullYear(), effectiveRange.start.getMonth(), 1);
+  const rangeEnd = new Date(effectiveRange.end.getFullYear(), effectiveRange.end.getMonth(), 1);
+  while (cur <= rangeEnd) {
+    const mStr = currentMonthString(cur);
+    if (!grouped[mStr]) grouped[mStr] = [];
+    cur.setMonth(cur.getMonth() + 1);
+  }
+
   const meta = await readMeta(NIBOL_DIR);
   const outPaths: string[] = [];
   for (const [monthStr, monthBookings] of Object.entries(grouped)) {

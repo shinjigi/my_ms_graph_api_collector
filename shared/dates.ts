@@ -5,6 +5,8 @@ import {
     format,
     getDaysInMonth as getDaysInMonthFns,
     getYear,
+    isBefore as isBeforeFns,
+    isFuture as isFutureFns,
     isWeekend as isWeekendFns,
     isSameDay as isSameDayFns,
     isEqual as isEqualFns,
@@ -92,6 +94,16 @@ export function isSameDay(d1: Date, d2: Date): boolean {
 /** Returns true if the two dates represent the exact same time. */
 export function isEqual(d1: Date, d2: Date): boolean {
     return isEqualFns(d1, d2);
+}
+
+/** Returns true if d1 is strictly before d2. */
+export function isBefore(d1: Date, d2: Date): boolean {
+    return isBeforeFns(d1, d2);
+}
+
+/** Returns true if the date is in the future relative to now. */
+export function isFuture(d: Date): boolean {
+    return isFutureFns(d);
 }
 
 /**

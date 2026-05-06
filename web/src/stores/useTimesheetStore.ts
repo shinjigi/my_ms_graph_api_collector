@@ -4,8 +4,7 @@ import { fetchWeek, fetchTpWeekHours, submitWeekHours as submitWeekHoursApi } fr
 import type { Day, TsRow, ApiWeekResponse, SubmitEdit, WeekDayResponse } from "../types";
 import { useAnalysisStore } from "./useAnalysisStore";
 import { usePickerStore } from "./usePickerStore";
-import { getDayOfWeek, shiftDate, formatShortDateLabel, getMonday, isEqual, isSameDay } from "@shared/dates";
-import { isFuture } from "date-fns";
+import { getDayOfWeek, shiftDate, formatShortDateLabel, getMonday, isEqual, isSameDay, isFuture } from "@shared/dates";
 
 export const useTimesheetStore = defineStore(
     "timesheet",
@@ -349,10 +348,7 @@ export const useTimesheetStore = defineStore(
 
                 // 3. Temporal highlighting
                 const dayDate = weekData.value?.days[i]?.date;
-                if (
-                    dayDate &&
-                    new Date(dayDate).toDateString() === picker.pickerToday.toDateString()
-                ) {
+                if (dayDate && isSameDay(new Date(dayDate), picker.pickerToday)) {
                     cls.push("today-col");
                 }
                 if (i === picker.selectedDayIdx) {

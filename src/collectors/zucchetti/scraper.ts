@@ -12,9 +12,8 @@ import {
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import type { Frame, Page, Locator } from "playwright";
-import { extractMonthStr, parseDateString, dateToString } from "@shared/dates";
+import { extractMonthStr, parseDateString, dateToString, isSameDay } from "@shared/dates";
 import { getJsonRawPath } from "../../json-io";
-import { isEqual } from "date-fns";
 
 const ZUCC_DIR = getJsonRawPath("zucchetti");
 
@@ -176,10 +175,10 @@ export async function scrapeSingleDay(
     const firstCell = await row.locator("td").first().innerText();
     const trimmed = firstCell.trim();
     // Quick check: row starts with the target day number
-    if (!trimmed.startsWith(targetDayNum.replaceAll(/^0/, ""))) continue;
+    if (!trimmed.startsWith(targetDayNum.replace(/^0/, ""))) continue;
 
     const day = await extractRow(row, header);
-    if (day && isEqual(day.date, targetDate)) return day;
+    if (day && isSameDay(day.date, targetDate)) return day;
   }
 
   return null;

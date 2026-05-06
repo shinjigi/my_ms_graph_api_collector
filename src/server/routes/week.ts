@@ -39,8 +39,11 @@ import {
     shiftDate,
     isWeekend,
     shiftDateString,
+    isBefore,
+    isEqual,
+    isSameDay,
+    parseDateString,
 } from "../../../shared/dates";
-import { isBefore, isEqual, isSameDay } from "date-fns";
 
 async function readAggregatedDay(date: Date): Promise<AggregatedDay | null> {
     const filePath = path.join(AGG_DIR, `${dateToString(date)}.json`);
@@ -110,7 +113,7 @@ weekRouter.get("/:date", async (req: Request, res: Response) => {
         const nibolLastScraped = nibolMeta[monthStr]?.lastExtractedDate ?? null;
         const nibolDayScraped =
             nibolLastScraped !== null &&
-            (isBefore(d, nibolLastScraped) || isEqual(d, nibolLastScraped));
+            (isBefore(d, parseDateString(nibolLastScraped)) || isEqual(d, parseDateString(nibolLastScraped)));
         const nibolBooking = nibolByDate.get(d) ?? (nibolDayScraped ? (agg?.nibol ?? null) : null);
 
         let location: WeekDayData["location"] = WorkLocation.unknown;

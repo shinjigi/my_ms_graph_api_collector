@@ -145,7 +145,11 @@ export function parseZucchettiLocation(day: ZucchettiDay): WorkLocation {
       if (allSignals.some(s => s.includes(kw))) return loc;
   }
 
-  if (giust.length === 0 && reqs.length === 0) return WorkLocation.office;
+  if (giust.length === 0 && reqs.length === 0) {
+    // If no explicit signals, only assume office if there's evidence of presence (stamps or hours)
+    if (day.timbrature || day.hOrd || day.hEcc) return WorkLocation.office;
+    return WorkLocation.unknown;
+  }
   return WorkLocation.unknown;
 }
 
