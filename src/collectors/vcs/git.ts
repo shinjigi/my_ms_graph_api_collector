@@ -11,6 +11,7 @@ import {
   currentMonthString,
   extractMonthStr,
   DateRange,
+  parseDateString,
 } from "@shared/dates";
 import { CONFIG } from "@shared/env-config";
 import { getJsonRawPath } from "../../json-io";
@@ -33,14 +34,14 @@ function findGitRepos(root: string): string[] {
   }
 }
 
-function getCommitsFromRepo(repoPath: string, since: string): GitCommitRaw[] {
+function getCommitsFromRepo(repoPath: string, since: Date): GitCommitRaw[] {
   const SEP = "\x1F";
   const REC = "\x1E";
   const fmt = `--format=%H${SEP}%an${SEP}%ae${SEP}%ad${SEP}%B${REC}`;
 
   try {
     const out = execSync(
-      `git log ${fmt} --date=short --since="${since}" --all`,
+      `git log ${fmt} --date=short --since="${dateToString(since)}" --all`,
       { cwd: repoPath, encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] },
     );
 
@@ -54,7 +55,7 @@ function getCommitsFromRepo(repoPath: string, since: string): GitCommitRaw[] {
           hash: hash ?? "",
           author: author ?? "",
           email: email ?? "",
-          date: date ?? "",
+          date: parseDateString(date),
           message: msgParts.join(SEP).trim(),
           repo: path.basename(repoPath),
         };

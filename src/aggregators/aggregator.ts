@@ -8,11 +8,7 @@ import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import { CONFIG } from "@shared/env-config";
 
-import {
-    hhmmToHours,
-    groupTpEntriesByTask,
-    parseTpDate,
-} from "../targetprocess/format";
+import { hhmmToHours, groupTpEntriesByTask, parseTpDate } from "../targetprocess/format";
 import { createLogger } from "../logger";
 import { readJson, readJsonArray, writeJson, readMeta, listJsonFiles } from "../json-io";
 import {
@@ -38,28 +34,22 @@ import { CalendarEventRaw, EmailRaw, TeamsChatDataRaw, TeamsChatMessageRaw } fro
 
 const isMainModule =
     process.argv[1] &&
-    (process.argv[1] === fileURLToPath(import.meta.url) ||
-        process.argv[1].includes("aggregator"));
+    (process.argv[1] === fileURLToPath(import.meta.url) || process.argv[1].includes("aggregator"));
 
 const log = createLogger("aggregator");
 
 const RAW_DIR = path.join(process.cwd(), "data", "raw");
 const AGG_DIR = path.join(process.cwd(), "data", "aggregated");
 
-const ZUCC_DIR   = path.join(RAW_DIR, "zucchetti");
-const CAL_DIR    = path.join(RAW_DIR, "graph-calendar");
-const EMAIL_DIR  = path.join(RAW_DIR, "graph-email");
-const TEAMS_DIR  = path.join(RAW_DIR, "graph-teams");
-const GIT_DIR    = path.join(RAW_DIR, "git");
-const SVN_DIR    = path.join(RAW_DIR, "svn");
+const ZUCC_DIR = path.join(RAW_DIR, "zucchetti");
+const CAL_DIR = path.join(RAW_DIR, "graph-calendar");
+const EMAIL_DIR = path.join(RAW_DIR, "graph-email");
+const TEAMS_DIR = path.join(RAW_DIR, "graph-teams");
+const GIT_DIR = path.join(RAW_DIR, "git");
+const SVN_DIR = path.join(RAW_DIR, "svn");
 const CHROME_DIR = path.join(RAW_DIR, "browser-chrome");
 const FIREFOX_DIR = path.join(RAW_DIR, "browser-firefox");
-const NIBOL_DIR  = path.join(RAW_DIR, "nibol");
-
-/** Coerces a value that may be a Date or an ISO string into a Date object. */
-function coerceDate(d: Date | string): Date {
-    return d instanceof Date ? d : parseDateString(d as string);
-}
+const NIBOL_DIR = path.join(RAW_DIR, "nibol");
 
 /** Reads all YYYY-MM.json files from a directory and concatenates their arrays. */
 async function loadDirMonthly<T>(dir: string): Promise<T[]> {
@@ -83,9 +73,9 @@ function groupByDate<T>(
     for (const item of items) {
         const val = getDate(item);
         if (!val) continue;
-        const d = dateToString(val);
-        if (!map.has(d)) map.set(d, []);
-        map.get(d)!.push(item);
+        const keyDate = dateToString(val);
+        if (!map.has(keyDate)) map.set(keyDate, []);
+        map.get(keyDate)!.push(item);
     }
     return map;
 }
@@ -100,7 +90,7 @@ function groupTeamsByDate(chats: TeamsChatDataRaw[]): Map<string, TeamsChatDataR
         // Group messages within this chat by date
         const msgByDate = new Map<string, TeamsChatMessageRaw[]>();
         for (const m of chat.messages) {
-            const d = m.createdDateTime?.slice(0, 10);
+            const d = dateToString(m.createdDateTime);
             if (d) {
                 if (!msgByDate.has(d)) msgByDate.set(d, []);
                 msgByDate.get(d)!.push(m);
@@ -110,11 +100,11 @@ function groupTeamsByDate(chats: TeamsChatDataRaw[]): Map<string, TeamsChatDataR
         for (const [date, msgs] of msgByDate) {
             if (!map.has(date)) map.set(date, []);
             map.get(date)!.push({
-                chatId:              chat.chatId,
-                chatTopic:           chat.chatTopic,
-                chatType:            chat.chatType,
-                lastModifiedDateTime: chat.lastModifiedDateTime,
-                messages:            msgs,
+                chatId: chat.chatId,
+                chatTopic: chat.chatTopic,
+                chatType: chat.chatType,
+                lastModifiedDateTime: parseDateString(chat.lastModifiedDateTime),
+                messages: msgs,
             });
         }
     }
@@ -123,15 +113,15 @@ function groupTeamsByDate(chats: TeamsChatDataRaw[]): Map<string, TeamsChatDataR
 
 /** Unified construction of the AggregatedDay object from various raw signals. */
 export function buildAggregatedDay(
-    date:      Date,
-    zDay:      ZucchettiDay,
-    calendar:  CalendarEventRaw[],
-    emails:    EmailRaw[],
-    teams:     TeamsChatDataRaw[],
-    svn:       SvnCommitRaw[],
-    git:       GitCommitRaw[],
-    browser:   BrowserVisit[],
-    nibol:     NibolBooking | null,
+    date: Date,
+    zDay: ZucchettiDay,
+    calendar: CalendarEventRaw[],
+    emails: EmailRaw[],
+    teams: TeamsChatDataRaw[],
+    svn: SvnCommitRaw[],
+    git: GitCommitRaw[],
+    browser: BrowserVisit[],
+    nibol: NibolBooking | null,
     tpEntries: TpTimeEntry[],
 ): AggregatedDay {
     const workday = isWorkday(zDay);
@@ -141,19 +131,16 @@ export function buildAggregatedDay(
 
     // Se Zucchetti ha valorizzato hOrd (es. 3:51), è il target reale di lavoro per quel giorno.
     // Se hOrd è vuoto ma è un giorno lavorativo, fall-back a 7.7 meno eventuali assenze.
-    const oreTarget =
-        rawOre ?? (workday
-              ? Math.max(0, WORKDAY_HOURS - assenze)
-              : 0);
+    const oreTarget = rawOre ?? (workday ? Math.max(0, WORKDAY_HOURS - assenze) : 0);
 
     return {
         date,
-        isWorkday:  workday,
+        isWorkday: workday,
         isComplete,
         oreTarget,
-        location:   workday ? parseZucchettiLocation(zDay) : WorkLocation.unknown,
+        location: workday ? parseZucchettiLocation(zDay) : WorkLocation.unknown,
         nibol,
-        zucchetti:  zDay,
+        zucchetti: zDay,
         calendar,
         emails,
         teams,
@@ -175,10 +162,7 @@ async function loadMonthFile<T>(dir: string, monthStr: string): Promise<T[]> {
 }
 
 /** Load Teams chat files matching a date via .meta.json activeDays, filtering messages to that date. */
-async function loadTeamsForDate(
-    dir: string,
-    date: Date | string,
-): Promise<TeamsChatDataRaw[]> {
+async function loadTeamsForDate(dir: string, date: Date | string): Promise<TeamsChatDataRaw[]> {
     const dStr = dateToString(date);
     const meta = await readMeta(dir);
     const matchedFiles: string[] = [];
@@ -194,11 +178,15 @@ async function loadTeamsForDate(
         const data = await readJson<TeamsChatDataRaw>(
             path.join(dir, file),
             // Fallback: empty chat shape
-            { chatId: "", chatTopic: "", chatType: "", lastModifiedDateTime: new Date(0), messages: [] },
+            {
+                chatId: "",
+                chatTopic: "",
+                chatType: "",
+                lastModifiedDateTime: new Date(0),
+                messages: [],
+            },
         );
-        const msgs = data.messages.filter(
-            (m) => m.createdDateTime?.slice(0, 10) === dStr,
-        );
+        const msgs = data.messages.filter((m) => dateToString(m.createdDateTime) === dStr);
         if (msgs.length > 0) {
             result.push({ ...data, messages: msgs });
         }
@@ -214,10 +202,13 @@ async function loadDirTeams(dir: string): Promise<TeamsChatDataRaw[]> {
     const all: TeamsChatDataRaw[] = [];
 
     for (const file of files) {
-        const data = await readJson<TeamsChatDataRaw>(
-            path.join(dir, file),
-            { chatId: "", chatTopic: "", chatType: "", lastModifiedDateTime: new Date(0), messages: [] },
-        );
+        const data = await readJson<TeamsChatDataRaw>(path.join(dir, file), {
+            chatId: "",
+            chatTopic: "",
+            chatType: "",
+            lastModifiedDateTime: new Date(0),
+            messages: [],
+        });
         all.push({ ...data, messages: data.messages ?? [] });
     }
 
@@ -239,48 +230,40 @@ async function loadDirTp(dir: string): Promise<TpTimeEntry[]> {
  * Aggregate a single day: reads raw source files for the target month,
  * filters by date, builds and writes AggregatedDay, and returns it.
  */
-export async function aggregateSingleDay(
-    date: Date,
-    zDay: ZucchettiDay,
-): Promise<AggregatedDay> {
-    const monthStr =  extractMonthStr(date);
+export async function aggregateSingleDay(date: Date, zDay: ZucchettiDay): Promise<AggregatedDay> {
+    const monthStr = extractMonthStr(date);
 
-    const [
-        calendar,
-        emails,
-        teams,
-        svn,
-        git,
-        chrome,
-        firefox,
-        nibolMonth,
-        tpEnriched,
-    ] = await Promise.all([
-        loadMonthFile<CalendarEventRaw>(CAL_DIR, monthStr),
-        loadMonthFile<EmailRaw>(EMAIL_DIR, monthStr),
-        loadTeamsForDate(TEAMS_DIR, date),
-        loadMonthFile<SvnCommitRaw>(SVN_DIR, monthStr),
-        loadMonthFile<GitCommitRaw>(GIT_DIR, monthStr),
-        loadMonthFile<BrowserVisit>(CHROME_DIR, monthStr),
-        loadMonthFile<BrowserVisit>(FIREFOX_DIR, monthStr),
-        loadMonthFile<NibolBooking>(NIBOL_DIR, monthStr),
-        loadDirTp(ZUCC_DIR.replace("zucchetti", "targetprocess")),
-    ]);
+    const [calendar, emails, teams, svn, git, chrome, firefox, nibolMonth, tpEnriched] =
+        await Promise.all([
+            loadMonthFile<CalendarEventRaw>(CAL_DIR, monthStr),
+            loadMonthFile<EmailRaw>(EMAIL_DIR, monthStr),
+            loadTeamsForDate(TEAMS_DIR, date),
+            loadMonthFile<SvnCommitRaw>(SVN_DIR, monthStr),
+            loadMonthFile<GitCommitRaw>(GIT_DIR, monthStr),
+            loadMonthFile<BrowserVisit>(CHROME_DIR, monthStr),
+            loadMonthFile<BrowserVisit>(FIREFOX_DIR, monthStr),
+            loadMonthFile<NibolBooking>(NIBOL_DIR, monthStr),
+            loadDirTp(ZUCC_DIR.replace("zucchetti", "targetprocess")),
+        ]);
 
-    const nibol = nibolMonth.find((b) => isEqual(b.date, date)) ?? null;
     const bundle = buildAggregatedDay(
         date,
         zDay,
-        calendar.filter((e) => e.start?.dateTime && isEqual(new Date(e.start.dateTime.slice(0, 10)), date)),
+        calendar.filter(
+            (e) => e.start?.dateTime && isEqual(new Date(e.start.dateTime.slice(0, 10)), date),
+        ),
         emails.filter((e) => {
-            const dStr = (e.direction === "sent" ? e.sentDateTime : e.receivedDateTime)?.slice(0, 10);
+            const dStr = (e.direction === "sent" ? e.sentDateTime : e.receivedDateTime)?.slice(
+                0,
+                10,
+            );
             return dStr && isEqual(new Date(dStr), date);
         }),
         teams,
-        svn.filter((c) => c.date && isEqual(new Date(c.date.slice(0, 10)), date)),
-        git.filter((c) => c.date && isEqual(new Date(c.date.slice(0, 10)), date)),
+        svn.filter((c) => c.date && isEqual(c.date, date)),
+        git.filter((c) => c.date && isEqual(c.date, date)),
         [...chrome, ...firefox].filter((v) => isEqual(v.date, date)),
-        nibol,
+        nibolMonth?.find((c) => c.date && isEqual(c.date, date)) ?? null,
         tpEnriched,
     );
 
@@ -294,23 +277,28 @@ export async function runAggregation(): Promise<void> {
     log.info("Aggregazione dati raw → aggregated...");
 
     await fs.mkdir(AGG_DIR, { recursive: true });
-    const sinceDate = parseDateString(CONFIG.COLLECT_SINCE);
+    const sinceDate = CONFIG.COLLECT_SINCE;
 
-    const zuccDays     = (await loadDirMonthly<ZucchettiDay>(ZUCC_DIR))
-                            .map(d => ({ ...d, date: coerceDate(d.date) }));
-    const calendar     = await loadDirMonthly<CalendarEventRaw>(CAL_DIR);
-    const emails       = await loadDirMonthly<EmailRaw>(EMAIL_DIR);
-    const teams        = await loadDirTeams(TEAMS_DIR);
-    const svn          = await loadDirMonthly<SvnCommitRaw>(SVN_DIR);
-    const git          = await loadDirMonthly<GitCommitRaw>(GIT_DIR);
-    const chromeBrows  = (await loadDirMonthly<BrowserVisit>(CHROME_DIR))
-                            .map(v => ({ ...v, date: coerceDate(v.date) }));
-    const firefoxBrows = (await loadDirMonthly<BrowserVisit>(FIREFOX_DIR))
-                            .map(v => ({ ...v, date: coerceDate(v.date) }));
-    const nibolAll     = (await loadDirMonthly<NibolBooking>(NIBOL_DIR))
-                            .map(b => ({ ...b, date: coerceDate(b.date) }));
-    const browser      = [...chromeBrows, ...firefoxBrows];
-    const tpAll        = await loadDirTp(ZUCC_DIR.replace("zucchetti", "targetprocess"));
+    const zuccDays = (await loadDirMonthly<ZucchettiDay>(ZUCC_DIR)).map((d) => ({
+        ...d,
+        date: parseDateString(d.date),
+    }));
+    const calendar = await loadDirMonthly<CalendarEventRaw>(CAL_DIR);
+    const emails = await loadDirMonthly<EmailRaw>(EMAIL_DIR);
+    const teams = await loadDirTeams(TEAMS_DIR);
+    const svn = await loadDirMonthly<SvnCommitRaw>(SVN_DIR);
+    const git = await loadDirMonthly<GitCommitRaw>(GIT_DIR);
+    const chromeBrows = (await loadDirMonthly<BrowserVisit>(CHROME_DIR)).map(
+        (v) => ({ ...v, date: parseDateString(v.date) }) as BrowserVisit,
+    );
+    const firefoxBrows = (await loadDirMonthly<BrowserVisit>(FIREFOX_DIR)).map(
+        (v) => ({ ...v, date: parseDateString(v.date) }) as BrowserVisit,
+    );
+    const nibolAll = (await loadDirMonthly<NibolBooking>(NIBOL_DIR)).map(
+        (b) => ({ ...b, date: parseDateString(b.date) }) as NibolBooking,
+    );
+    const browser = [...chromeBrows, ...firefoxBrows];
+    const tpAll = await loadDirTp(ZUCC_DIR.replace("zucchetti", "targetprocess"));
 
     log.info(`Zucchetti: ${zuccDays.length} giorni`);
     log.info(`Calendar: ${calendar.length} eventi`);
@@ -323,15 +311,15 @@ export async function runAggregation(): Promise<void> {
     log.info(`Nibol: ${nibolAll.length} prenotazioni`);
 
     // Build date-indexed maps for fast lookup
-    const calByDate     = groupByDate(calendar, (e) => e.start?.dateTime);
-    const emailByDate   = groupByDate(emails, (e) =>
+    const calByDate = groupByDate(calendar, (e) => e.start?.dateTime);
+    const emailByDate = groupByDate(emails, (e) =>
         e.direction === "sent" ? e.sentDateTime : e.receivedDateTime,
     );
-    const teamsByDate   = groupTeamsByDate(teams);
-    const svnByDate     = groupByDate(svn, (e) => e.date);
-    const gitByDate     = groupByDate(git, (e) => e.date);
+    const teamsByDate = groupTeamsByDate(teams);
+    const svnByDate = groupByDate(svn, (e) => e.date);
+    const gitByDate = groupByDate(git, (e) => e.date);
     const browserByDate = groupByDate(browser, (v) => v.date);
-    const nibolByDate   = new Map(nibolAll.map((b) => [dateToString(b.date), b]));
+    const nibolByDate = groupByDate(nibolAll, (n) => n.date);
 
     let written = 0;
 
@@ -342,13 +330,13 @@ export async function runAggregation(): Promise<void> {
         const bundle = buildAggregatedDay(
             zDay.date,
             zDay,
-            calByDate.get(dStr)     ?? [],
-            emailByDate.get(dStr)   ?? [],
-            teamsByDate.get(dStr)   ?? [],
-            svnByDate.get(dStr)     ?? [],
-            gitByDate.get(dStr)     ?? [],
+            calByDate.get(dStr) ?? [],
+            emailByDate.get(dStr) ?? [],
+            teamsByDate.get(dStr) ?? [],
+            svnByDate.get(dStr) ?? [],
+            gitByDate.get(dStr) ?? [],
             browserByDate.get(dStr) ?? [],
-            nibolByDate.get(dStr)   ?? null,
+            nibolByDate.get(dStr)?.[0] ?? null,
             tpAll,
         );
 

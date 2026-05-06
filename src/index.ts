@@ -17,7 +17,7 @@ import { collectZucchetti } from "./collectors/zucchetti/index";
 import { collectNibol } from "./collectors/nibol/index";
 import { collectBrowserHistory } from "./collectors/browser/history";
 import { runAggregation } from "./aggregators/aggregator";
-import { DateRange, lastDayOfMonth, parseDateString } from "@shared/dates";
+import { DateRange, dateToString, lastDayOfMonth, parseDateString } from "@shared/dates";
 import { endOfDay } from "date-fns";
 import { CONFIG } from "@shared/env-config";
 
@@ -49,7 +49,7 @@ async function run(): Promise<void> {
 
     log.info(
         "Avvio raccolta dati" +
-            (range ? ` (Range: ${range.start.toLocaleDateString()} → ${range.end.toLocaleDateString()})` : ` (Full: ${CONFIG.COLLECT_SINCE} → oggi)`) +
+            (range ? ` (Range: ${range.start.toLocaleDateString()} → ${range.end.toLocaleDateString()})` : ` (Full: ${dateToString(CONFIG.COLLECT_SINCE)} → oggi)`) +
             (sourceArg ? ` [Sorgente: ${sourceArg}]` : "") +
             (forceFlag ? " [--force]" : ""),
     );

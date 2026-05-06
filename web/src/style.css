@@ -178,17 +178,17 @@ input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { appearance:
     background: var(--color-primary); margin-top: 1px;
 }
 
-/* Selected: filled pill, no ring (fill gives the shape) */
-.day-btn-selected                { background: var(--color-primary); border-color: transparent; }
-.day-btn-selected .day-num       { color: var(--color-primary-content); }
-.day-btn-selected .day-abbr      { color: var(--color-primary-content); opacity: 0.75; }
-.day-btn-selected:hover          { background: color-mix(in oklch, var(--color-primary) 85%, transparent); }
+/* Selected: themed border + subtle background (matches grid .selected-col) */
+.day-btn-selected                { background: color-mix(in oklch, var(--color-primary) 15%, transparent); border-color: var(--color-primary); }
+.day-btn-selected .day-num       { color: var(--color-base-content); }
+.day-btn-selected .day-abbr      { color: var(--color-base-content); opacity: 0.85; }
+.day-btn-selected:hover          { background: color-mix(in oklch, var(--color-primary) 22%, transparent); }
 
-/* Today + selected: filled pill, dot in primary-content */
-.day-btn-today.day-btn-selected                { border-color: transparent; }
-.day-btn-today.day-btn-selected .day-num       { color: var(--color-primary-content); }
-.day-btn-today.day-btn-selected .day-abbr      { color: var(--color-primary-content); opacity: 0.75; }
-.day-btn-today.day-btn-selected::after         { background: color-mix(in oklch, var(--color-primary-content) 70%, transparent); }
+/* Today + selected: themed border, subtle background, and today's dot */
+.day-btn-today.day-btn-selected                { border-color: var(--color-primary); background: color-mix(in oklch, var(--color-primary) 25%, transparent); }
+.day-btn-today.day-btn-selected .day-num       { color: var(--color-primary); }
+.day-btn-today.day-btn-selected .day-abbr      { color: var(--color-primary); opacity: 0.9; }
+.day-btn-today.day-btn-selected::after         { background: var(--color-primary); }
 
 /* ── Timeline ── */
 .timeline-hour { height: 60px; border-top: 1px solid color-mix(in oklch, var(--color-base-300) 50%, transparent); position: relative; }

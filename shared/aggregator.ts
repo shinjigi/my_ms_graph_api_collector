@@ -21,7 +21,7 @@ export interface GitCommitRaw {
   hash: string;
   author: string;
   email: string;
-  date: string; // YYYY-MM-DD
+  date: Date;
   message: string;
   repo: string;
 }
@@ -29,7 +29,7 @@ export interface GitCommitRaw {
 export interface SvnCommitRaw {
   revision: string;
   author: string;
-  date: string; // YYYY-MM-DD
+  date: Date;
   message: string;
   paths: string[];
 }

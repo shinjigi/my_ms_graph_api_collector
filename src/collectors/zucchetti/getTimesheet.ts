@@ -1,3 +1,4 @@
+import { Page, Frame } from "playwright";
 import { parseArgs } from "node:util";
 import { createLogger } from "../../logger";
 import { startZucchettiSession } from "./session";
@@ -37,13 +38,13 @@ void (async () => {
   const session = await startZucchettiSession();
   const { browser, page: newPage } = session;
 
-  const waitStable = async () => {
+  const waitStable = async (target: Page | Frame) => {
     await newPage.waitForLoadState("networkidle");
-    await newPage.waitForSelector('select[id$="_TxtAnno"]:not([disabled])', {
+    await target.waitForSelector('select[id$="_TxtAnno"]:not([disabled])', {
       state: "visible",
       timeout: 15000,
     });
-    await newPage.waitForSelector('select[id$="_TxtMese"]:not([disabled])', {
+    await target.waitForSelector('select[id$="_TxtMese"]:not([disabled])', {
       state: "visible",
       timeout: 15000,
     });
@@ -70,6 +71,18 @@ void (async () => {
 
   const allResults: MonthData[] = [];
 
+  // Find the grid frame
+  const frames = newPage.frames();
+  let gridFrame: Page | Frame = newPage;
+  log.info("Ricerca del frame contenente la griglia del cartellino...");
+  for (const frame of frames) {
+    if ((await frame.locator('tr[id*="_Grid1_row"]').count()) > 0) {
+      gridFrame = frame;
+      log.info(`Griglia trovata nel frame: ${frame.name() || frame.url()}`);
+      break;
+    }
+  }
+
   for (let i = 0; i < monthsToScrape.length; i++) {
     const { month, year } = monthsToScrape[i];
     log.info(`Processing ${month}/${year}...`);
@@ -77,19 +90,19 @@ void (async () => {
     if (i === 0) {
       // First month: use dropdowns
       log.info(`Setting target period to ${month}/${year} via dropdowns...`);
-      const yearSelect = newPage
+      const yearSelect = gridFrame
         .locator('select[id$="_TxtAnno"]')
         .filter({ visible: true })
         .first();
       await yearSelect.selectOption(year.toString());
-      await waitStable();
+      await waitStable(gridFrame);
 
-      const monthSelect = newPage
+      const monthSelect = gridFrame
         .locator('select[id$="_TxtMese"]')
         .filter({ visible: true })
         .first();
       await monthSelect.selectOption(month.toString());
-      await waitStable();
+      await waitStable(gridFrame);
     } else {
       // Subsequent months: use navigation buttons (requested)
       // But we need to know if we are going forward or backward.
@@ -100,12 +113,12 @@ void (async () => {
         .filter({ visible: true })
         .first();
       await nextBtn.click();
-      await waitStable();
+      await waitStable(gridFrame);
       await newPage.waitForTimeout(3000); // Added safety wait
     }
 
     log.info("Extracting timesheet data...");
-    const { header, days } = await scrapeCartellino(newPage);
+    const { header, days } = await scrapeCartellino(gridFrame);
     const validatedData = days.map((d) => validateDay(d));
     allResults.push({ month, year, header, days: validatedData });
   }

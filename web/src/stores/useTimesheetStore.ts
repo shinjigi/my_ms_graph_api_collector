@@ -4,8 +4,8 @@ import { fetchWeek, fetchTpWeekHours, submitWeekHours as submitWeekHoursApi } fr
 import type { Day, TsRow, ApiWeekResponse, SubmitEdit, WeekDayResponse } from "../types";
 import { useAnalysisStore } from "./useAnalysisStore";
 import { usePickerStore } from "./usePickerStore";
-import { getDayOfWeek, shiftDate, formatShortDateLabel, getMonday } from "@shared/dates";
-import { isEqual, isFuture } from "date-fns";
+import { getDayOfWeek, shiftDate, formatShortDateLabel, getMonday, isEqual, isSameDay } from "@shared/dates";
+import { isFuture } from "date-fns";
 
 export const useTimesheetStore = defineStore(
     "timesheet",
@@ -150,7 +150,7 @@ export const useTimesheetStore = defineStore(
                     fetchWeek(date),
                     fetchTpWeekHours(date),
                 ]);
-                if (currentMonday.value && currentMonday.value !== weekRes.monday) clearEdits();
+                if (currentMonday.value && !isEqual(currentMonday.value, weekRes.monday)) clearEdits();
                 currentMonday.value = weekRes.monday;
 
                 days.value = weekRes.days.map((d, i) => ({

@@ -26,7 +26,10 @@ const ConfigSchema = z.object({
 
     SERVER_PORT: z.coerce.number().optional(),
 
-    COLLECT_SINCE: z.string().default("2026-01-01"),
+    COLLECT_SINCE: z.iso
+        .date() // Valida la stringa YYYY-MM-DD
+        .pipe(z.coerce.date()) // La trasforma in oggetto Date
+        .default(new Date("2026-01-01")),
 
     // --- AZURE / MICROSOFT GRAPH ---
     TENANT_ID: z.string().min(1, "TENANT_ID mancante"),

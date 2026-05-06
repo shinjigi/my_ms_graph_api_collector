@@ -11,7 +11,7 @@ import {
 } from "@shared/zucchetti";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import type { Page, Locator } from "playwright";
+import type { Frame, Page, Locator } from "playwright";
 import { extractMonthStr, parseDateString, dateToString } from "@shared/dates";
 import { getJsonRawPath } from "../../json-io";
 import { isEqual } from "date-fns";
@@ -78,7 +78,7 @@ async function parseActivityCell(cell: Locator): Promise<ActivityEntry[]> {
 }
 
 /** Extract header info (company, employee, current period) from the Cartellino page. */
-async function extractHeader(page: Page): Promise<TimesheetHeader> {
+async function extractHeader(page: Page | Frame): Promise<TimesheetHeader> {
   const companyInfo = await page
     .locator('[id$="_LblXCompanytbl"]')
     .filter({ visible: true })
@@ -146,7 +146,9 @@ async function extractRow(
 }
 
 /** Scrape the entire visible Cartellino grid. Page must already be on it. */
-export async function scrapeCartellino(page: Page): Promise<TimesheetData> {
+export async function scrapeCartellino(
+  page: Page | Frame,
+): Promise<TimesheetData> {
   const header = await extractHeader(page);
   const rows = await page.locator('tr[id*="_Grid1_row"]').all();
   const days: ZucchettiDay[] = [];
@@ -161,7 +163,7 @@ export async function scrapeCartellino(page: Page): Promise<TimesheetData> {
 
 /** Scrape a single day row from the Cartellino grid by date (YYYY-MM-DD). */
 export async function scrapeSingleDay(
-  page: Page,
+  page: Page | Frame,
   targetDate: Date,
 ): Promise<ZucchettiDay | null> {
   const header = await extractHeader(page);

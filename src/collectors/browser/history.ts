@@ -232,7 +232,7 @@ export async function collectBrowserHistory(
       .filter(Boolean);
   const firefoxProfileDir = (CONFIG.FIREFOX_PROFILE_DIR).trim();
 
-  const start = range?.start ?? new Date(CONFIG.COLLECT_SINCE);
+  const start = range?.start ?? CONFIG.COLLECT_SINCE;
   const end = range?.end ?? new Date();
   
   const startMs = BigInt(start.getTime()) * BigInt(1000); // Unix microseconds

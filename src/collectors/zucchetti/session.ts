@@ -1,4 +1,4 @@
-import { chromium, Browser, BrowserContext, Page } from "playwright";
+import { chromium, Browser, BrowserContext, Page, Frame } from "playwright";
 import { createLogger } from "../../logger";
 import { CONFIG } from "@shared/env-config";
 
@@ -229,15 +229,62 @@ export async function startZucchettiSession(
   log.debug("WINDOW VARS:", debugData);
 
   // ── 9. Estrazione token ──────────────────────────────────────────────────
-  log.info("Estrazione variabili globali JS dalla pagina...");
-  const rawCtx = (await timesheetPage.evaluate(() => {
-    return (globalThis as Record<string, unknown>).m_Ctx || {};
-  })) as Record<string, unknown>;
+  log.info("Estrazione variabili globali JS dalla pagina (e frames)...");
 
-  const str = (v: unknown) => (v != null ? String(v) : "");
-  const idCompany = str(rawCtx.idAzienda || rawCtx.IDCOMPANY || rawCtx.company);
-  const idEmploy = str(rawCtx.idDipendente || rawCtx.IDEMPLOY || rawCtx.employ);
-  const m_cCheck = str(rawCtx.check || rawCtx.m_cCheck);
+  async function getContextFromFrame(f: Page | Frame) {
+    return (await f.evaluate(() => {
+      const win = globalThis as Record<string, unknown>;
+      const ctx = (win.m_Ctx as Record<string, unknown>) || {};
+      const str = (v: unknown) => (v != null ? String(v) : "");
+
+      // Prova vari nomi possibili (Zucchetti cambia spesso tra versioni)
+      const co =
+        str(ctx.idAzienda || ctx.IDCOMPANY || ctx.company) ||
+        str(win.gCodSoc || win.gCodAzUC || win.pIDCOMPANY || win.IDCOMPANY);
+      const em =
+        str(ctx.idDipendente || ctx.IDEMPLOY || ctx.employ) ||
+        str(
+          win.gCodDip || win.gCodDipUC || win.pIDEMPLOY || win.IDEMPLOY || win.idEmploy,
+        );
+      const ch = str(ctx.check || win.m_cCheck || win.CheckNum);
+
+      return { idCompany: co, idEmploy: em, m_cCheck: ch };
+    })) as { idCompany: string; idEmploy: string; m_cCheck: string };
+  }
+
+  let idCompany = "";
+  let idEmploy = "";
+  let m_cCheck = "";
+
+  try {
+    const res = await getContextFromFrame(timesheetPage);
+    idCompany = res.idCompany;
+    idEmploy = res.idEmploy;
+    m_cCheck = res.m_cCheck;
+  } catch (e) {
+    log.warn(
+      `Impossibile leggere variabili dal frame principale: ${(e as Error).message}`,
+    );
+  }
+
+  // Se vuoti, prova in tutti i frame
+  if (!idCompany || !idEmploy) {
+    const frames = timesheetPage.frames();
+    for (const frame of frames) {
+      try {
+        const res = await getContextFromFrame(frame);
+        if (res.idCompany && res.idEmploy) {
+          log.info(`Trovati ID nel frame: ${frame.name() || frame.url()}`);
+          idCompany = res.idCompany;
+          idEmploy = res.idEmploy;
+          if (res.m_cCheck) m_cCheck = res.m_cCheck;
+          break;
+        }
+      } catch (e) {
+        log.debug(`Impossibile leggere il frame ${frame.url()}: ${(e as Error).message}`);
+      }
+    }
+  }
 
   log.info(`idCompany="${idCompany}" ${idCompany ? "✅" : "⚠️  VUOTO"}`);
   log.info(`idEmploy="${idEmploy}" ${idEmploy ? "✅" : "⚠️  VUOTO"}`);
@@ -253,11 +300,13 @@ export async function startZucchettiSession(
           k.startsWith("m_") ||
           k.toLowerCase().includes("company") ||
           k.toLowerCase().includes("employ") ||
+          k.toLowerCase().includes("soc") ||
+          k.toLowerCase().includes("dip") ||
           k.toLowerCase().includes("check"),
       );
     });
     log.warn(
-      `⚠️  Variabili window rilevanti trovate: ${JSON.stringify(windowVars)}`,
+      `⚠️  Variabili window rilevanti trovate (main frame): ${JSON.stringify(windowVars)}`,
     );
   }
 

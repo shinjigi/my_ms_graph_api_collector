@@ -26,8 +26,8 @@ import {
     getYearMonth,
     getDaysInMonth,
     addMonths,
+    isSameDay,
 } from "@shared/dates";
-import { isSameDay } from "date-fns";
 
 export const usePickerStore = defineStore(
     "picker",
@@ -54,8 +54,8 @@ export const usePickerStore = defineStore(
                     date,
                     num: d,
                     abbr: getDayOfWeek(date),
-                    isToday: date === pickerToday.value,
-                    isSelected: date === pickerSelected.value,
+                    isToday: isSameDay(date, pickerToday.value),
+                    isSelected: isSameDay(date, pickerSelected.value),
                     isWeekend: dow === 0 || dow === 6,
                     isHoliday: !!holiday,
                     holidayName: holiday?.name ?? "",

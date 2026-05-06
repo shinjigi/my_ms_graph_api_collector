@@ -303,7 +303,7 @@ function applyResults(
       tags: result.tags ?? [],
       userActivities: result.userActivities ?? {},
       stakeholders: (result.stakeholders || result.stakeholder) ?? [],
-      cachedAt: getISOTimestamp(),
+      cachedAt: new Date(),
       createDate: original.item.createDate,
       currentState: original.item.stateName,
       isFinalState: original.item.isFinalState,

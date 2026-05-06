@@ -13,6 +13,7 @@ import {
     addMonths,
     lastDayOfMonthString,
     DateRange,
+    parseDateString,
 } from "@shared/dates";
 import { CONFIG } from "@shared/env-config";
 import { getJsonRawPath } from "../../json-io";
@@ -59,12 +60,12 @@ interface SvnXmlParsed {
 
 function parseCommits(entries: SvnLogEntry[], authorFilter?: string): SvnCommitRaw[] {
     const commits = entries.flatMap((e) => {
-        const rawDate = (e.date ?? [])[0] ?? "";
-        if (Number.isNaN(new Date(rawDate).getTime())) return [];
+        const rawDate = parseDateString((e.date ?? [])[0]);
+        if (Number.isNaN(rawDate.getTime())) return [];
         return [{
             revision: e.$.revision,
             author:   (e.author ?? [""])[0],
-            date:     dateToString(rawDate),
+            date:     rawDate,
             message:  ((e.msg ?? [""])[0] ?? "").trim(),
             paths:    (e.paths?.[0]?.path ?? []).map((p) => p._),
         }];

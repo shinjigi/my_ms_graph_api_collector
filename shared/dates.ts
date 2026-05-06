@@ -6,6 +6,8 @@ import {
     getDaysInMonth as getDaysInMonthFns,
     getYear,
     isWeekend as isWeekendFns,
+    isSameDay as isSameDayFns,
+    isEqual as isEqualFns,
     lastDayOfMonth as lastDayOfMonthFns,
     parse,
     parseISO,
@@ -48,9 +50,13 @@ export interface DateRange {
  * Gestisce i formati YYYY-MM e YYYY-MM-DD.
  */
 function ensureDate(d: Date | string): Date {
-    if (d instanceof Date) return d;
+    if (d instanceof Date || Object.prototype.toString.call(d) === "[object Date]") {
+        const dd = d as Date;
+        if (!Number.isNaN(dd.getTime())) return dd;
+    }
+
     // Gestisce YYYY-MM aggiungendo il primo giorno per il parsing ISO
-    const normalized = d.length === 7 ? `${d}-01` : d;
+    const normalized = (d as string)?.length === 7 ? `${d}-01` : (d as string);
     return parseISO(normalized);
 }
 
@@ -76,6 +82,16 @@ export function todayMidnight(): Date {
 /** Returns true for Saturday (6) and Sunday (0). */
 export function isWeekend(d: Date): boolean {
     return isWeekendFns(d);
+}
+
+/** Returns true if the two dates represent the same calendar day. */
+export function isSameDay(d1: Date, d2: Date): boolean {
+    return isSameDayFns(d1, d2);
+}
+
+/** Returns true if the two dates represent the exact same time. */
+export function isEqual(d1: Date, d2: Date): boolean {
+    return isEqualFns(d1, d2);
 }
 
 /**
@@ -139,7 +155,7 @@ export function getMonday(input: Date | string = new Date()): Date {
  * @param {string} dateStr - Date string, explicitly accepts "YYYY-MM-DD" or "YYYY-MM" (which defaults to the 1st of the month).
  * @returns {Date} Native instantiated local Date boundary matching exactly the parsed values at 00:00.
  */
-export function parseDateString(dateStr: string): Date {
+export function parseDateString(dateStr: string | Date): Date {
     return ensureDate(dateStr);
 }
 
@@ -358,8 +374,7 @@ export function parseTpDate(tpDate: string | null | undefined): Date | null {
     if (!match) return null;
     const ms = Number.parseInt(match[1], 10);
     const sign = match[2] === "+" ? 1 : -1;
-    const tzMinutes =
-        sign * (Number.parseInt(match[3], 10) * 60 + Number.parseInt(match[4], 10));
+    const tzMinutes = sign * (Number.parseInt(match[3], 10) * 60 + Number.parseInt(match[4], 10));
     // Aggiungiamo l'offset in millisecondi
     return new Date(ms + tzMinutes * 60_000);
 }

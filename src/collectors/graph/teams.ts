@@ -53,7 +53,6 @@ function buildChatFileName(chatId: string, chatType: string, topic: string): str
     return `${prefix}__${safeName}__${hash}`;
 }
 
-
 // ─── Graph fetch ────────────────────────────────────────────────────────────
 
 /**
@@ -90,7 +89,10 @@ async function fetchChatMessagesRange(
         nextLink = res["@odata.nextLink"] ?? null;
 
         for (const m of page) {
-            if (m.lastModifiedDateTime && isAfter(parseISO(m.lastModifiedDateTime), maxLastModified)) {
+            if (
+                m.lastModifiedDateTime &&
+                isAfter(parseISO(m.lastModifiedDateTime), maxLastModified)
+            ) {
                 maxLastModified = parseISO(m.lastModifiedDateTime);
             }
         }
@@ -153,10 +155,7 @@ function resolveTopic(chat: Chat, rawMessages: ChatMessage[], myName: string): s
     return resolvedTopic || "Unknown";
 }
 
-function mapAndFilterMessages(
-    rawMessages: ChatMessage[],
-    range: DateRange,
-): TeamsChatMessageRaw[] {
+function mapAndFilterMessages(rawMessages: ChatMessage[], range: DateRange): TeamsChatMessageRaw[] {
     const lean: TeamsChatMessageRaw[] = [];
     for (const m of rawMessages) {
         if (!m.createdDateTime) continue;
@@ -176,7 +175,9 @@ function mergeChatMessages(
     for (const m of newItems) msgMap.set(m.id, m);
     return Array.from(msgMap.values()).sort((a, b) => {
         try {
-            return new Date(b?.createdDateTime).getTime() - new Date(a?.createdDateTime).getTime();
+            return b?.createdDateTime
+                ? b.createdDateTime.getTime()
+                : 0 - (a?.createdDateTime ? a.createdDateTime.getTime() : 0);
         } catch {
             log.warn(
                 `    [Warning] Invalid date format in messages ${a.id} '${b?.createdDateTime}' or ${b.id} '${a?.createdDateTime}', defaulting to no order.`,
@@ -189,7 +190,7 @@ function mergeChatMessages(
 async function updateChatMeta(TEAMS_DIR: string, fileName: string, merged: TeamsChatMessageRaw[]) {
     const activeDays = new Set<string>();
     for (const m of merged) {
-        const cd = m.createdDateTime?.substring(0, 10);
+        const cd = dateToString(m.createdDateTime);
         if (cd) activeDays.add(cd);
     }
     await writeMeta(TEAMS_DIR, fileName, {
@@ -211,16 +212,29 @@ async function processSingleChat({
     if (chatId === "0") return null;
 
     const chatType = chat.chatType ?? "unknown";
-    const defaultChat: TeamsChatDataRaw = { chatId, chatTopic: null, chatType, lastModifiedDateTime: range.end, messages: [] };
+    const defaultChat: TeamsChatDataRaw = {
+        chatId,
+        chatTopic: null,
+        chatType,
+        lastModifiedDateTime: range.end,
+        messages: [],
+    };
 
     // Preliminary path — used to migrate old files written before topic was resolved
-    const prelimFileName = buildChatFileName(chatId, chatType, chat.topic ?? `(no topic) ${chatId.slice(25, 35)}`);
+    const prelimFileName = buildChatFileName(
+        chatId,
+        chatType,
+        chat.topic ?? `(no topic) ${chatId.slice(25, 35)}`,
+    );
     const prelimPath = path.join(TEAMS_DIR, `${prelimFileName}.json`);
     const prelimExisting = await readJson<TeamsChatDataRaw>(prelimPath, defaultChat);
 
     try {
         const { messages: rawMessages, maxLastModified } = await fetchChatMessagesRange(
-            client, chatId, range.start, range.end,
+            client,
+            chatId,
+            range.start,
+            range.end,
         );
 
         if (rawMessages.length === 0) {
@@ -239,12 +253,14 @@ async function processSingleChat({
 
         // If topic resolved to a different filename, also read from the resolved path
         // (may already contain data from a prior correct run), then merge all three sources
-        const resolvedExisting = resolvedPath !== prelimPath
-            ? await readJson<TeamsChatDataRaw>(resolvedPath, defaultChat)
-            : prelimExisting;
-        const allExisting = resolvedPath !== prelimPath
-            ? mergeChatMessages(prelimExisting.messages, resolvedExisting.messages)
-            : prelimExisting.messages;
+        const resolvedExisting =
+            resolvedPath !== prelimPath
+                ? await readJson<TeamsChatDataRaw>(resolvedPath, defaultChat)
+                : prelimExisting;
+        const allExisting =
+            resolvedPath !== prelimPath
+                ? mergeChatMessages(prelimExisting.messages, resolvedExisting.messages)
+                : prelimExisting.messages;
 
         const merged = mergeChatMessages(allExisting, newLean);
 
@@ -260,7 +276,11 @@ async function processSingleChat({
 
         // Remove stale preliminary file after successful migration
         if (resolvedPath !== prelimPath) {
-            try { await unlink(prelimPath); } catch { /* file may not exist */ }
+            try {
+                await unlink(prelimPath);
+            } catch {
+                /* file may not exist */
+            }
         }
 
         if (idx % 50 === 0) log.info(`    [Progress] Analizzate ${idx}/${total} chat...`);
@@ -270,7 +290,9 @@ async function processSingleChat({
         if (code !== 403 && code !== 404) {
             log.warn(`    [Notice] Errore su chat ${chatId}: ${(err as Error).message}`);
         } else {
-            log.error(`    [Error] Impossibile accedere alla chat ${chatId} (status ${code}). Potrebbe essere stata eliminata o potresti non avere più accesso. Se il problema persiste, considerando di escludere questa chat o di rimuovere il limite di chat per continuare a raccogliere le altre. Errore: ${(err as Error).message}`);
+            log.error(
+                `    [Error] Impossibile accedere alla chat ${chatId} (status ${code}). Potrebbe essere stata eliminata o potresti non avere più accesso. Se il problema persiste, considerando di escludere questa chat o di rimuovere il limite di chat per continuare a raccogliere le altre. Errore: ${(err as Error).message}`,
+            );
         }
         return null;
     }
@@ -286,7 +308,7 @@ export async function collectGraphTeams(
     await mkdir(TEAMS_DIR, { recursive: true });
 
     const effectiveRange: DateRange = range ?? {
-        start: new Date(CONFIG.COLLECT_SINCE),
+        start: CONFIG.COLLECT_SINCE,
         end: new Date(),
     };
 

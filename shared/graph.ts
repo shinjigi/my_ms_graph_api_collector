@@ -9,6 +9,7 @@ import {
 } from "@microsoft/microsoft-graph-types";
 import { turndownService, cleanTeamsGarbage } from "./turndown";
 import { createLogger } from "../src/logger";
+import { parseDateString } from "./dates";
 
 const log = createLogger("graph-shared");
 
@@ -21,7 +22,7 @@ export interface GraphPage<T> {
 /** Single Teams message — only fields actually consumed downstream. */
 export interface TeamsChatMessageRaw {
     id: string;
-    createdDateTime: string;         // ISO 8601 (string: JSON serialization boundary)
+    createdDateTime: Date;         // ISO 8601 (string: JSON serialization boundary)
     from: string | null;             // displayName only — flattened
     body: string;                    // plain text OR cleaned HTML
     bodyMd?: string | null;          // Markdown (Turndown)
@@ -169,7 +170,7 @@ export function mapToLeanMessage(m: ChatMessage): TeamsChatMessageRaw {
 
     return {
         id: m.id!,
-        createdDateTime: m.createdDateTime!,
+        createdDateTime: parseDateString(m.createdDateTime ?? "1970-01-01T00:00:00Z"), // fallback per sicurezza
         from: (m.from as { user?: { displayName?: string } })?.user?.displayName ?? null,
         body: cleaned, // Originale pulito (HTML se presente)
         bodyMd,        // Markdown strutturato per l'IA

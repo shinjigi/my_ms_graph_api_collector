@@ -24,7 +24,7 @@ const isMainModule =
  * patch the raw Zucchetti file, re-aggregate the day, and return WeekDayData.
  */
 async function postSubmitScrape(
-  page: Page,
+  page: Page | Frame,
   targetDate: string,
 ): Promise<WeekDayData> {
   log.info(`Post-submit scrape for ${targetDate}...`);
@@ -94,12 +94,67 @@ export async function submitZucchettiRequest(
   const session = await startZucchettiSession(headless);
   const { browser, page: newPage } = session;
 
+  const waitStable = async (target: Page | Frame) => {
+    await newPage.waitForLoadState("networkidle");
+    await target.waitForSelector('select[id$="_TxtAnno"]:not([disabled])', {
+      state: "visible",
+      timeout: 15000,
+    });
+    await target.waitForSelector('select[id$="_TxtMese"]:not([disabled])', {
+      state: "visible",
+      timeout: 15000,
+    });
+  };
+
   try {
-    // Check if activity already exists (and is NOT cancelled)
+    // 1. Identifica il frame che contiene il cartellino (può essere la pagina principale o un iframe)
+    const frames = newPage.frames();
+    let gridFrame: Page | Frame = newPage;
+    let foundGrid = false;
+
+    log.info("Ricerca del frame contenente la griglia del cartellino...");
+    for (const frame of frames) {
+      const rows = await frame.locator('tr[id*="_Grid1_row"]').count();
+      if (rows > 0) {
+        gridFrame = frame;
+        foundGrid = true;
+        log.info(`Griglia trovata nel frame: ${frame.name() || frame.url()}`);
+        break;
+      }
+    }
+
+    if (!foundGrid) {
+      log.warn(
+        "Griglia non trovata nei frames, procedo con la pagina principale.",
+      );
+    }
+
+    // 1.5 Imposta il periodo corretto (Mese/Anno) se necessario
+    const [y, m] = targetDate.split("-");
+    const targetYear = y;
+    const targetMonth = Number.parseInt(m, 10).toString();
+
+    log.info(`Setting target period to ${targetMonth}/${targetYear}...`);
+    const yearSelect = gridFrame
+      .locator('select[id$="_TxtAnno"]')
+      .filter({ visible: true })
+      .first();
+    await yearSelect.selectOption(targetYear);
+    await waitStable(gridFrame);
+
+    const monthSelect = gridFrame
+      .locator('select[id$="_TxtMese"]')
+      .filter({ visible: true })
+      .first();
+    await monthSelect.selectOption(targetMonth);
+    await waitStable(gridFrame);
+    await newPage.waitForTimeout(2000); // Safety wait for grid to refresh
+
+    // 2. Check if existing activities
     log.info(`Checking existing activities for ${targetDate}...`);
-    const dayCell = newPage
+    const dayCell = gridFrame
       .locator("td.richieste")
-      .filter({ has: newPage.locator(`span[onclick*="${targetDate}"]`) })
+      .filter({ has: gridFrame.locator(`span[onclick*="${targetDate}"]`) })
       .first();
 
     if ((await dayCell.count()) > 0) {
@@ -121,7 +176,7 @@ export async function submitZucchettiRequest(
             // Still scrape to refresh day data even when skipping
             if (scrapeAfterSubmit) {
               try {
-                result.dayUpdate = await postSubmitScrape(newPage, targetDate);
+                result.dayUpdate = await postSubmitScrape(gridFrame, targetDate);
               } catch (err) {
                 result.scrapeError = (err as Error).message;
               }
@@ -132,11 +187,26 @@ export async function submitZucchettiRequest(
       }
     }
 
-    // Click "Nuova richiesta" for target date
+    // 3. Click "Nuova richiesta" for target date
     log.info(`Submitting "${matchedActivity}" for ${targetDate}...`);
-    await newPage
-      .locator(`span[title="Nuova richiesta"][onclick*="${targetDate}"]`)
-      .click();
+    try {
+      const nuevaBtn = gridFrame.locator(
+        `span[title="Nuova richiesta"][onclick*="${targetDate}"]`,
+      );
+      await nuevaBtn.waitFor({ state: "visible", timeout: 10000 });
+      await nuevaBtn.click();
+    } catch (clickErr) {
+      await newPage.screenshot({
+        path: "click_error_debug.png",
+        fullPage: true,
+      });
+      throw new Error(
+        `Failed to click "Nuova richiesta" for ${targetDate}: ${
+          (clickErr as Error).message
+        }`,
+        { cause: clickErr },
+      );
+    }
 
     // Wait for modal and select activity
     await newPage.waitForTimeout(4000);
@@ -277,7 +347,7 @@ export async function submitZucchettiRequest(
     // Post-submit scrape: reuse the same page to read updated day data
     if (scrapeAfterSubmit) {
       try {
-        result.dayUpdate = await postSubmitScrape(newPage, targetDate);
+        result.dayUpdate = await postSubmitScrape(gridFrame, targetDate);
       } catch (err) {
         result.scrapeError = (err as Error).message;
         log.warn(`Post-submit scrape failed: ${result.scrapeError}`);
@@ -328,7 +398,8 @@ if (isMainModule) {
       process.exit(result.success ? 0 : 1);
     })
     .catch((err) => {
-      log.error("Fatal:", err);
+      log.error("Fatal error during Zucchetti update:");
+      log.error(err instanceof Error ? err.stack || err.message : String(err));
       process.exit(1);
     });
 }

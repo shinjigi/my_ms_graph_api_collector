@@ -10,7 +10,7 @@ export interface KbEntry {
     tags:                 string[];
     userActivities:       Record<string, string>;
     stakeholders:         string[];
-    cachedAt:             string | Date;
+    cachedAt:             Date;
     createDate?:          Date | null;   // item creation date from TP
     currentState?:        string;   // EntityState.Name (e.g. "In Progress")
     isFinalState?:        boolean;  // EntityState.IsFinal from TP

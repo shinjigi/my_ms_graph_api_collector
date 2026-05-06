@@ -16,14 +16,9 @@ import { fileURLToPath } from "node:url";
 
 const isMainModule =
     process.argv[1] &&
-    (process.argv[1] === fileURLToPath(import.meta.url) ||
-        process.argv[1].includes("analyser"));
+    (process.argv[1] === fileURLToPath(import.meta.url) || process.argv[1].includes("analyser"));
 
-import {
-    shiftDate,
-    dateToString,
-    getWeekBoundsFromStr,
-} from "@shared/dates";
+import { shiftDate, dateToString, getWeekBoundsFromStr, parseDateString } from "@shared/dates";
 import type { ProposalEntry, DayProposal } from "@shared/analysis";
 import type { KbEntry, KbStore } from "@shared/kb";
 import { SYSTEM_PROMPT, userInstruction } from "./prompts";
@@ -33,7 +28,7 @@ import { OpenAiCompatibleProvider } from "./openAiCompatProvider";
 import { ClaudeCliProvider } from "./claudeCliProvider";
 import { GeminiProvider } from "./geminiProvider";
 import { refreshReportedHours } from "../targetprocess/refreshHours";
-import { readJson, readText, writeJson, listJsonFiles } from "../json-io";
+import { readJson, readText, writeJson, listJsonFiles, readJsonOrThrow } from "../json-io";
 export type { AnalyzerProvider, SignalDetail } from "./base";
 export { stripCodeFence } from "./base";
 
@@ -42,22 +37,9 @@ const log = createLogger("analyser");
 // ─── Paths ──────────────────────────────────────────────────────────
 export const AGG_DIR = path.join(process.cwd(), "data", "aggregated");
 export const PROPOSALS_DIR = path.join(process.cwd(), "data", "proposals");
-export const KB_FILE = path.join(
-    process.cwd(),
-    "data",
-    "kb",
-    "us-summaries.json",
-);
-export const DEFAULTS_FILE = path.join(
-    process.cwd(),
-    "config",
-    "defaults.json",
-);
-export const MASTER_RULES_FILE = path.join(
-    process.cwd(),
-    "config",
-    "master-rules.md",
-);
+export const KB_FILE = path.join(process.cwd(), "data", "kb", "us-summaries.json");
+export const DEFAULTS_FILE = path.join(process.cwd(), "config", "defaults.json");
+export const MASTER_RULES_FILE = path.join(process.cwd(), "config", "master-rules.md");
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -76,10 +58,10 @@ export interface DefaultsConfig {
 
 // ─── Shared utilities ───────────────────────────────────────────────
 import { AnalyzerProvider, SignalDetail } from "./base";
-import { isAfter, isBefore, isEqual } from "date-fns";
+import { isAfter, isBefore, isEqual, toDate } from "date-fns";
 import { CONFIG } from "@shared/env-config";
 import { AggregatedDay } from "@shared/aggregator";
-import { TeamsChatDataRaw } from "@shared/graph";
+import { toLeanDay } from "./reducer";
 
 // ─── Module-level regex constants ───────────────────────────────────
 // Used with .matchAll() only — never .test()/.exec() — to avoid g-flag lastIndex issues.
@@ -150,105 +132,18 @@ function extractCalendarKeywords(days: AggregatedDay[]): Set<string> {
     return words;
 }
 
-// ─── Step 3c: per-detail-level signal builder ───────────────────────
-function buildSignals(
-    day: AggregatedDay,
-    detail: SignalDetail,
-): Record<string, unknown> {
-    if (detail === "minimal") {
-        return {
-            calendarEvents: day.calendar.map((e) => ({
-                subject: e.subject,
-                start: e.start?.dateTime?.slice(11, 16),
-                end: e.end?.dateTime?.slice(11, 16),
-                attendees: e.attendees?.length ?? 0,
-            })),
-            teamsMessages: day.teams.reduce((s, c) => s + c.messages.length, 0),
-            gitCommits: day.gitCommits.map((c) => ({
-                repo: c.repo,
-                message: c.message,
-            })),
-            svnCommits: day.svnCommits.map((c) => ({ message: c.message })),
-            emailsReceived: day.emails.filter((e) => e.direction !== "sent").length,
-            emailsSent: day.emails.filter((e) => e.direction === "sent").length,
-        };
-    }
-
-    // browser task IDs — used in both compact and full
-    const browserTaskIds = [
-        ...new Set([
-            ...day.browserVisits.flatMap((v) =>
-                [...v.url.matchAll(TP_URL_RE)].map((m) => m[1]),
-            ),
-            ...day.browserVisits.flatMap((v) =>
-                v.title ? [...v.title.matchAll(TP_ID_RE)].map((m) => m[1]) : [],
-            ),
-        ]),
-    ];
-
-    if (detail === "compact") {
-        const teamsTopics = day.teams.map(c => c.chatTopic).filter(Boolean);
-        return {
-            calendarEvents: day.calendar.map((e) => ({
-                subject: e.subject,
-                start: e.start?.dateTime?.slice(11, 16),
-                end: e.end?.dateTime?.slice(11, 16),
-                attendees: e.attendees?.length ?? 0,
-            })),
-            teamsTopics,
-            gitCommits: day.gitCommits.map((c) => ({
-                repo: c.repo,
-                message: c.message,
-            })),
-            svnCommits: day.svnCommits.map((c) => ({ message: c.message })),
-            emailSubjects: day.emails
-                .slice(0, 5)
-                .map(
-                    (e) =>
-                        `[${e.direction === "sent" ? "sent" : "rcvd"}] ${e.subject.slice(0, 78)}`,
-                ),
-            browserTaskIds: browserTaskIds.length > 0 ? browserTaskIds : undefined,
-        };
-    }
-
-    // "full" — build teams with actual message content for AI context
-    return {
-        calendarEvents: day.calendar.map((e) => ({
-            subject: e.subject,
-            start: e.start?.dateTime?.slice(11, 16),
-            end: e.end?.dateTime?.slice(11, 16),
-            attendees: e.attendees?.slice(0, 5).map((a: { email: string }) => a.email ?? "unknown") ?? [],
-            body: e.bodyMd ? e.bodyMd.slice(0, 400) : undefined,
-        })),
-        teamsChats: day.teams.map((c: TeamsChatDataRaw) => ({
-            topic: c.chatTopic,
-            count: c.messages.length,
-            messages: c.messages
-                .sort((a, b) => a.createdDateTime.localeCompare(b.createdDateTime))
-                .slice(0, 5)
-                .map(m => [m.from ?? "?", (m.bodyMd ?? m.body).slice(0, 120)]),
-        })),
-        gitCommits: day.gitCommits.map((c) => ({
-            repo: c.repo,
-            message: c.message,
-        })),
-        svnCommits: day.svnCommits.map((c) => ({
-            message: c.message,
-            paths: c.paths.slice(0, 3),
-        })),
-        emails: day.emails
-            .slice(0, 15)
-            .map((e) => ({
-                subject: e.subject,
-                dir: e.direction,
-                body: e.bodyMd ? e.bodyMd.slice(0, 400) : undefined,
-            })),
-        browserTaskIds: browserTaskIds.length > 0 ? browserTaskIds : undefined,
-    };
-}
+// buildSignals has been replaced by toLeanDay in reducer.ts
 
 export async function loadKb(): Promise<KbEntry[]> {
     const store = await readJson<KbStore>(KB_FILE, { updatedAt: "", items: [] });
+    store.updatedAt = parseDateString(store.updatedAt ?? "1970-01-01");
+    store.items = store.items.map((i) => ({
+        ...i,
+        createDate: i.createDate ? parseDateString(i.createDate) : null,
+        cachedAt: parseDateString(i.cachedAt),
+        lastActivityDate: i.lastActivityDate ? parseDateString(i.lastActivityDate) : null,
+        lastStateChangeDate: i.lastStateChangeDate ? parseDateString(i.lastStateChangeDate) : null,
+    }));
     return store.items;
 }
 
@@ -274,16 +169,13 @@ export function buildUserPromptBatched(
     signalDetail: SignalDetail = "full",
 ): string {
     const taskIds = extractTaskIds(days);
-    const calKeywords =
-        taskIds.size === 0 ? extractCalendarKeywords(days) : new Set<string>();
+    const calKeywords = taskIds.size === 0 ? extractCalendarKeywords(days) : new Set<string>();
 
     const activeTasks = kbItems.map((kb) => {
         const idMatch = taskIds.has(String(kb.id));
         const kwMatch =
             !idMatch &&
-            Array.from(calKeywords).some((kw) =>
-                `${kb.name} ${kb.id}`.toLowerCase().includes(kw),
-            );
+            Array.from(calKeywords).some((kw) => `${kb.name} ${kb.id}`.toLowerCase().includes(kw));
         const base = {
             id: kb.id,
             entityType: kb.entityType,
@@ -295,54 +187,32 @@ export function buildUserPromptBatched(
                 ...base,
                 tags: kb.tags.length > 0 ? kb.tags : undefined,
                 userActivities:
-                    Object.keys(kb.userActivities).length > 0
-                        ? kb.userActivities
-                        : undefined,
+                    Object.keys(kb.userActivities).length > 0 ? kb.userActivities : undefined,
             };
         }
         return base;
     });
 
     const daysContext = days.map((day) => {
-        const recurringHours = defaults.recurringActivities.reduce(
-            (s, a) => s + a.hours,
-            0,
-        );
+        const recurringHours = defaults.recurringActivities.reduce((s, a) => s + a.hours, 0);
         const reportedHoursMap = day.reportedHours ?? {};
-        const totalReported = Object.values(reportedHoursMap).reduce(
-            (s, v) => s + v,
-            0,
-        );
+        const totalReported = Object.values(reportedHoursMap).reduce((s, v) => s + v, 0);
         const remainingToReport = Math.max(
             0,
             +(day.oreTarget - totalReported - recurringHours).toFixed(1),
         );
 
-        const signals = buildSignals(day, signalDetail);
+        const preSeeded = defaults.recurringActivities.map((a) => ({
+            taskId: a.taskId,
+            entityType: "recurring" as const,
+            taskName: a.label,
+            inferredHours: a.hours,
+            confidence: "high" as const,
+            reasoning: a.comment,
+            approved: a.autoApprove,
+        }));
 
-        const preSeeded: ProposalEntry[] = defaults.recurringActivities.map(
-            (a) => ({
-                taskId: a.taskId,
-                entityType: "recurring" as const,
-                taskName: a.label,
-                inferredHours: a.hours,
-                confidence: "high" as const,
-                reasoning: a.comment,
-                approved: a.autoApprove,
-            }),
-        );
-
-        return {
-            date: day.date,
-            totalDailyTarget: day.oreTarget,
-            totalAlreadyOnTargetProcess: totalReported,
-            reportedByTaskId: reportedHoursMap,
-            recurringAllocated: recurringHours,
-            actualHoursToAllocate: remainingToReport,
-            location: day.location,
-            signals,
-            preSeededEntries: preSeeded,
-        };
+        return toLeanDay(day, signalDetail, remainingToReport, preSeeded);
     });
 
     return JSON.stringify(
@@ -401,11 +271,8 @@ function filterKbByPeriod(items: KbEntry[], batchDates: Date[]): KbEntry[] {
 
 // ─── Step 3e: updated sortKbByRelevance ────────────────────────────
 /** Sorts KB items by relevance to the batch period (most relevant first). */
-function sortKbByRelevance(
-    items: KbEntry[],
-    batch: AggregatedDay[],
-): KbEntry[] {
-    const batchDates = batch.map((d) => d.date.toISOString());
+function sortKbByRelevance(items: KbEntry[], batch: AggregatedDay[]): KbEntry[] {
+    const batchDates = batch.map((d) => dateToString(d.date));
     if (batchDates.length === 0) return items;
 
     const batchSet = new Set(batchDates);
@@ -415,8 +282,7 @@ function sortKbByRelevance(
 
     // Use precise task-ID extraction; fall back to stopword-filtered calendar keywords
     const taskIds = extractTaskIds(batch);
-    const calKeywords =
-        taskIds.size === 0 ? extractCalendarKeywords(batch) : new Set<string>();
+    const calKeywords = taskIds.size === 0 ? extractCalendarKeywords(batch) : new Set<string>();
 
     const score = (e: KbEntry): number => {
         let s = 0;
@@ -433,8 +299,12 @@ function sortKbByRelevance(
         }
         // Temporal relevance
         if (e.lastActivityDate) {
-            if (batchSet.has(e.lastActivityDate.toISOString())) s += 5;
-            else if (e.lastActivityDate >= windowStart) s += 2;
+            if (batchSet.has(dateToString(e.lastActivityDate))) s += 5;
+            else if (
+                isEqual(e.lastActivityDate, windowStart) ||
+                isAfter(e.lastActivityDate, windowStart)
+            )
+                s += 2;
         }
         // State relevance
         if (e.isFinalState === false) s += 1;
@@ -449,11 +319,7 @@ function sortKbByRelevance(
 }
 
 /** Truncate KB items to fit within a character budget and the provider's declared item cap. */
-function fitKbItems(
-    items: KbEntry[],
-    budgetChars: number,
-    provider: AnalyzerProvider,
-): KbEntry[] {
+function fitKbItems(items: KbEntry[], budgetChars: number, provider: AnalyzerProvider): KbEntry[] {
     let total = 0;
     const result: KbEntry[] = [];
     const maxCount = provider.kbItemCap ?? Infinity;
@@ -484,9 +350,7 @@ function normalizeEntries(
     const currentTotal = entries.reduce((s, e) => s + e.inferredHours, 0);
     if (Math.abs(currentTotal - targetTotal) < 0.05) return entries;
 
-    const recurringIds = new Set(
-        defaults.recurringActivities.map((a) => a.taskId).filter(Boolean),
-    );
+    const recurringIds = new Set(defaults.recurringActivities.map((a) => a.taskId).filter(Boolean));
 
     const fixed: ProposalEntry[] = [];
     const scalable: ProposalEntry[] = [];
@@ -509,11 +373,9 @@ function normalizeEntries(
         // AI returned 0h for all non-recurring — distribute evenly
         const each = Math.round((scalableTarget / scalable.length) * 10) / 10;
         const scaled = scalable.map((e) => ({ ...e, inferredHours: each }));
-        const remainder =
-            Math.round((scalableTarget - each * scalable.length) * 10) / 10;
+        const remainder = Math.round((scalableTarget - each * scalable.length) * 10) / 10;
         if (remainder !== 0 && scaled.length > 0) {
-            scaled[0].inferredHours =
-                Math.round((scaled[0].inferredHours + remainder) * 10) / 10;
+            scaled[0].inferredHours = Math.round((scaled[0].inferredHours + remainder) * 10) / 10;
         }
         return [...fixed, ...scaled];
     }
@@ -521,21 +383,15 @@ function normalizeEntries(
     const factor = scalableTarget / scalableSum;
     const scaled = scalable.map((e) => ({
         ...e,
-        inferredHours: Math.max(
-            0.1,
-            Math.round(e.inferredHours * factor * 10) / 10,
-        ),
+        inferredHours: Math.max(0.1, Math.round(e.inferredHours * factor * 10) / 10),
     }));
 
     // Fix rounding remainder on the largest entry
     const scaledSum = scaled.reduce((s, e) => s + e.inferredHours, 0);
     const remainder = Math.round((scalableTarget - scaledSum) * 10) / 10;
     if (remainder !== 0 && scaled.length > 0) {
-        const largest = scaled.reduce((a, b) =>
-            a.inferredHours >= b.inferredHours ? a : b,
-        );
-        largest.inferredHours =
-            Math.round((largest.inferredHours + remainder) * 10) / 10;
+        const largest = scaled.reduce((a, b) => (a.inferredHours >= b.inferredHours ? a : b));
+        largest.inferredHours = Math.round((largest.inferredHours + remainder) * 10) / 10;
     }
 
     return [...fixed, ...scaled];
@@ -554,12 +410,10 @@ export async function analyseBatch(
     }
     const system = buildSystemPrompt(masterRules);
 
-    const batchDates = batch.map((d) => d.date);
+    const batchDates = batch.map((d) => parseDateString(d.date));
     const filteredKb = filterKbByPeriod(kbItems, batchDates);
     const sortedKb = sortKbByRelevance(filteredKb, batch);
-    log.info(
-        `KB filtrata: ${sortedKb.length}/${kbItems.length} items per il periodo`,
-    );
+    log.info(`KB filtrata: ${sortedKb.length}/${kbItems.length} items per il periodo`);
 
     let lastError: Error | null = null;
     for (const provider of providers) {
@@ -591,9 +445,7 @@ export async function analyseBatch(
         }
 
         try {
-            log.info(
-                `[${provider.name}] avvio analisi per ${batch.length} giorni...`,
-            );
+            log.info(`[${provider.name}] avvio analisi per ${batch.length} giorni...`);
             const t0 = Date.now();
             const results = await provider.analyseBatch(system, user);
             const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
@@ -613,7 +465,7 @@ export async function analyseBatch(
                 `[${provider.name}] analisi completata in ${elapsed}s — ${validResults.length}/${results.length} giorni validi`,
             );
             return validResults.map((r) => {
-                const day = batch.find((d) => isEqual(d.date, r.date))!;
+                const day = batch.find((d) => dateToString(d.date) === dateToString(r.date))!;
                 const roundedEntries = r.entries.map((e) => ({
                     ...e,
                     inferredHours: Math.round(e.inferredHours * 10) / 10,
@@ -621,18 +473,10 @@ export async function analyseBatch(
 
                 // Target: all hours the AI should have allocated (oreTarget − already reported)
                 const reportedHoursMap = day.reportedHours ?? {};
-                const totalReported = Object.values(reportedHoursMap).reduce(
-                    (s, v) => s + v,
-                    0,
-                );
-                const expectedTotal =
-                    Math.round((day.oreTarget - totalReported) * 10) / 10;
+                const totalReported = Object.values(reportedHoursMap).reduce((s, v) => s + v, 0);
+                const expectedTotal = Math.round((day.oreTarget - totalReported) * 10) / 10;
 
-                const normalized = normalizeEntries(
-                    roundedEntries,
-                    expectedTotal,
-                    defaults,
-                );
+                const normalized = normalizeEntries(roundedEntries, expectedTotal, defaults);
                 const totalHours = normalized.reduce((s, e) => s + e.inferredHours, 0);
 
                 if (Math.abs(totalHours - expectedTotal) >= 0.05) {
@@ -661,22 +505,23 @@ export async function analyseBatch(
 
 // ─── CLI entry point ────────────────────────────────────────────────
 async function run(): Promise<void> {
+    const defaults = await loadDefaults();
+    const sinceDate = CONFIG.COLLECT_SINCE;
+
     const force = process.argv.includes("--force");
-    const dateArg = process.argv
-        .find((a) => a.startsWith("--date="))
-        ?.split("=")[1];
-    const startDateArg = process.argv
-        .find((a) => a.startsWith("--start-date="))
-        ?.split("=")[1];
-    const endDateArg = process.argv
-        .find((a) => a.startsWith("--end-date="))
-        ?.split("=")[1];
-    const weekArg = process.argv
-        .find((a) => a.startsWith("--week="))
-        ?.split("=")[1];
-    const providerArg = process.argv
-        .find((a) => a.startsWith("--provider="))
-        ?.split("=")[1];
+    const dateArgStr = process.argv.find((a) => a.startsWith("--date="))?.split("=")[1];
+    const dateArg = dateArgStr ? parseDateString(dateArgStr) : null;
+
+    const startDateArg = parseDateString(
+        process.argv.find((a) => a.startsWith("--start-date="))?.split("=")[1] ??
+            dateToString(sinceDate),
+    );
+    const endDateArg = parseDateString(
+        process.argv.find((a) => a.startsWith("--end-date="))?.split("=")[1] ??
+            dateToString(new Date()),
+    );
+    const weekArg = process.argv.find((a) => a.startsWith("--week="))?.split("=")[1];
+    const providerArg = process.argv.find((a) => a.startsWith("--provider="))?.split("=")[1];
 
     let weekStart = "";
     let weekEnd = "";
@@ -697,22 +542,16 @@ async function run(): Promise<void> {
         process.exit(1);
     }
 
-    const defaults = await loadDefaults();
     const allProviders = buildProviders(providerArg);
-    const sinceDate = CONFIG.COLLECT_SINCE;
 
-    log.info(
-        `Provider configurati: ${allProviders.map((p) => p.name).join(", ")}`,
-    );
+    log.info(`Provider configurati: ${allProviders.map((p) => p.name).join(", ")}`);
     log.info("Verifica disponibilità provider...");
 
     const providers: AnalyzerProvider[] = [];
     for (const p of allProviders) {
         const ok = await p.isAvailable();
         if (ok) {
-            log.info(
-                `  ✓ ${p.name} — max ${p.maxInputChars.toLocaleString()} chars per batch`,
-            );
+            log.info(`  ✓ ${p.name} — max ${p.maxInputChars.toLocaleString()} chars per batch`);
             providers.push(p);
         } else {
             log.warn(`  ✗ ${p.name} — non disponibile`);
@@ -720,9 +559,7 @@ async function run(): Promise<void> {
     }
 
     if (providers.length === 0) {
-        log.error(
-            "[FATAL] Nessun provider disponibile. Controlla le variabili d'ambiente.",
-        );
+        log.error("[FATAL] Nessun provider disponibile. Controlla le variabili d'ambiente.");
         process.exit(1);
     }
 
@@ -730,16 +567,21 @@ async function run(): Promise<void> {
 
     await mkdir(PROPOSALS_DIR, { recursive: true });
 
-    const aggFiles = (await listJsonFiles(AGG_DIR, {
-        pattern: /^\d{4}-\d{2}-\d{2}\.json$/,
-        sinceDate,
-    })).filter((f) => {
-        const dateStr = f.replaceAll(".json", "");
-        if (dateArg && dateStr !== dateArg) return false;
-        if (startDateArg && dateStr < startDateArg) return false;
-        if (endDateArg && dateStr > endDateArg) return false;
-        if (weekStart && dateStr < weekStart) return false;
-        if (weekEnd && dateStr > weekEnd) return false;
+    const aggFiles = (
+        await listJsonFiles(AGG_DIR, {
+            pattern: /^\d{4}-\d{2}-\d{2}\.json$/,
+            sinceDate,
+        })
+    ).filter((f) => {
+        const fileDate = parseDateString(f.replaceAll(".json", ""));
+        if (dateArg && !isEqual(fileDate, dateArg)) return false;
+        if (startDateArg && isBefore(fileDate, startDateArg)) return false;
+        const condition = endDateArg && isAfter(fileDate, endDateArg);
+        if (condition) {
+            return false;
+        }
+        if (weekStart && isBefore(fileDate, weekStart)) return false;
+        if (weekEnd && isAfter(fileDate, weekEnd)) return false;
         return true;
     });
 
@@ -761,22 +603,15 @@ async function run(): Promise<void> {
         await refreshReportedHours(currentBatch);
 
         try {
-            const proposals = await analyseBatch(
-                currentBatch,
-                kbItems,
-                defaults,
-                providers,
-            );
+            const proposals = await analyseBatch(currentBatch, kbItems, defaults, providers);
             for (const proposal of proposals) {
-                const propPath = path.join(PROPOSALS_DIR, `${proposal.date}.json`);
+                const propPath = path.join(PROPOSALS_DIR, `${dateToString(proposal.date)}.json`);
 
                 // Preserve user-set statuses from previous existing file if any
                 const old = await readJson<{ entries?: ProposalEntry[] }>(propPath, {});
                 if (old.entries) {
                     for (const e of proposal.entries) {
-                        const oe = old.entries.find(
-                            (x: ProposalEntry) => x.taskId === e.taskId,
-                        );
+                        const oe = old.entries.find((x: ProposalEntry) => x.taskId === e.taskId);
                         if (oe?.status) e.status = oe.status;
                     }
                 }
@@ -793,9 +628,7 @@ async function run(): Promise<void> {
                 `    Errore batch per le date da ${currentBatch[0]?.date} a ${currentBatch.at(-1)?.date}: ${msg}`,
             );
             if (msg.includes("credit balance is too low")) {
-                log.error(
-                    "\n[FATAL] Credito Anthropic esaurito. Interruzione processo.",
-                );
+                log.error("\n[FATAL] Credito Anthropic esaurito. Interruzione processo.");
                 process.exit(1);
             }
         }
@@ -817,10 +650,11 @@ async function run(): Promise<void> {
             }
         }
 
-        const day = await readJson<AggregatedDay>(
+        const day = await readJsonOrThrow<AggregatedDay>(
             path.join(AGG_DIR, file),
-            null as unknown as AggregatedDay,
+            `File aggregato non trovato: ${file}`,
         );
+        day.date = parseDateString(day.date);
 
         if (!day?.isWorkday) {
             skipped++;
@@ -828,15 +662,10 @@ async function run(): Promise<void> {
         }
 
         // Step 3g: measure prompt size using the most restrictive provider's detail level
-        const restrictiveProvider = providers.find(
-            (p) => p.maxInputChars === maxInputChars,
-        )!;
-        const batchDatesForFit = [...currentBatch, day].map((d) => d.date);
+        const restrictiveProvider = providers.find((p) => p.maxInputChars === maxInputChars)!;
+        const batchDatesForFit = [...currentBatch, day].map((d) => toDate(d.date)); // sometimes d.date is string, sometimes Date — ensure uniformity for filterKbByPeriod
         const filteredKbForFit = filterKbByPeriod(kbItems, batchDatesForFit);
-        const sortedKbForFit = sortKbByRelevance(filteredKbForFit, [
-            ...currentBatch,
-            day,
-        ]);
+        const sortedKbForFit = sortKbByRelevance(filteredKbForFit, [...currentBatch, day]);
         const fittedKb = fitKbItems(
             sortedKbForFit,
             Math.floor(maxInputChars * 0.6),
@@ -873,9 +702,7 @@ async function run(): Promise<void> {
 
     await processBatch();
 
-    log.info(
-        `Analisi completata: ${processed} giorni analizzati, ${skipped} saltati.`,
-    );
+    log.info(`Analisi completata: ${processed} giorni analizzati, ${skipped} saltati.`);
 }
 
 // Only run when executed directly (not when imported)

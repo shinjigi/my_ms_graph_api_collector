@@ -1,7 +1,9 @@
 /**
  * Centralized JSON I/O utilities for the backend.
  * All functions are async (fs/promises). All writes use 2-space indentation.
-*/
+ */
+import { parseDateString } from "@shared/dates";
+import { isAfter, isEqual } from "date-fns";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 
@@ -9,8 +11,8 @@ import * as path from "node:path";
 
 export interface MonthMeta {
     lastExtractedDate: string; // YYYY-MM-DD
-    sources: string[];         // paths/URLs actually scanned for that month
-    activeDays?: string[];     // YYYY-MM-DD — days found inside this file/month
+    sources: string[]; // paths/URLs actually scanned for that month
+    activeDays?: string[]; // YYYY-MM-DD — days found inside this file/month
 }
 
 export function getJsonRawPath(whatEver: string) {
@@ -20,20 +22,34 @@ export function getJsonRawPath(whatEver: string) {
 // ─── Core read/write ───────────────────────────────────────────────
 
 /** Read and parse a JSON file. Returns fallback on missing or invalid file. */
-export async function readJson<T>(filePath: string, fallback: T): Promise<T> {
+export async function readJson<T>(
+    filePath: string,
+    fallback: T = null as unknown as T,
+    fallbackFn: () => T = (): T => fallback,
+): Promise<T> {
     try {
         const raw = await fs.readFile(filePath, "utf-8");
         return JSON.parse(raw) as T;
     } catch {
-        return fallback;
+        return fallbackFn ? fallbackFn() : fallback;
+    }
+}
+
+/** Read and parse a JSON file. Returns fallback on missing or invalid file. */
+export async function readJsonOrThrow<T>(
+    filePath: string,
+    throwMsg: string = `Failed to read JSON file: ${filePath}`,
+): Promise<T> {
+    try {
+        const raw = await fs.readFile(filePath, "utf-8");
+        return JSON.parse(raw) as T;
+    } catch {
+        throw new Error(throwMsg);
     }
 }
 
 /** Write an object as pretty-printed JSON (2-space indent, utf-8). */
-export async function writeJson(
-    filePath: string,
-    data: unknown,
-): Promise<void> {
+export async function writeJson(filePath: string, data: unknown): Promise<void> {
     await fs.writeFile(filePath, JSON.stringify(data, null, 2), "utf-8");
 }
 
@@ -61,11 +77,7 @@ export async function readText(filePath: string): Promise<string | null> {
 // ─── Merge-dedup ───────────────────────────────────────────────────
 
 /** Reads existing JSON array file, merges new items by key (dedup), returns merged array. */
-export async function mergeByKey<T>(
-    filePath: string,
-    newItems: T[],
-    key: keyof T,
-): Promise<T[]> {
+export async function mergeByKey<T>(filePath: string, newItems: T[], key: keyof T): Promise<T[]> {
     const existing = await readJsonArray<T>(filePath);
     const map = new Map<unknown, T>();
     for (const item of existing) map.set(item[key], item);
@@ -74,18 +86,12 @@ export async function mergeByKey<T>(
 }
 
 /** Read `.meta.json` sidecar for a directory. */
-export async function readMeta(
-    dir: string,
-): Promise<Record<string, MonthMeta>> {
+export async function readMeta(dir: string): Promise<Record<string, MonthMeta>> {
     return readJson(path.join(dir, ".meta.json"), {});
 }
 
 /** Write (merge) a single entry into the `.meta.json` sidecar. */
-export async function writeMeta(
-    dir: string,
-    key: string,
-    meta: MonthMeta,
-): Promise<void> {
+export async function writeMeta(dir: string, key: string, meta: MonthMeta): Promise<void> {
     const existing = await readMeta(dir);
     existing[key] = meta;
     await writeJson(path.join(dir, ".meta.json"), existing);
@@ -93,8 +99,8 @@ export async function writeMeta(
 
 // ─── Directory exploration ───────────────────────────────────────
 
-/** 
- * Lists JSON files in a directory, applying an optional regex filter on the filename 
+/**
+ * Lists JSON files in a directory, applying an optional regex filter on the filename
  * and an optional date filter (compared against the filename without .json).
  * Returns ONLY the filenames (optionally stripped of .json extension).
  */
@@ -102,7 +108,7 @@ export async function listJsonFiles(
     dir: string,
     options: {
         pattern?: RegExp;
-        sinceDate?: string;
+        sinceDate?: Date;
         stripExtension?: boolean;
         sortDir?: "asc" | "desc";
     } = {},
@@ -117,8 +123,10 @@ export async function listJsonFiles(
 
         if (options.sinceDate) {
             filtered = filtered.filter((f) => {
-                const datePart = f.replace(".json", "");
-                return datePart >= options.sinceDate!;
+                const datePart = parseDateString(f.replace(".json", ""));
+                return (
+                    isEqual(datePart, options.sinceDate!) || isAfter(datePart, options.sinceDate!)
+                );
             });
         }
 

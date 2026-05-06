@@ -106,7 +106,7 @@ export async function collectZucchetti(range: DateRange | undefined, force = fal
     await fs.mkdir(ZUCC_DIR, { recursive: true });
 
     const effectiveRange: DateRange = range ?? {
-        start: parseDateString(CONFIG.COLLECT_SINCE),
+        start: CONFIG.COLLECT_SINCE,
         end: new Date(),
     };
 
@@ -173,7 +173,7 @@ if (isMainModule) {
         date = `${yearArg}-${monthArg.padStart(2, "0")}`;
     }
 
-    let r: DateRange = { start: parseDateString(CONFIG.COLLECT_SINCE), end: new Date() };
+    let r: DateRange = { start: CONFIG.COLLECT_SINCE, end: new Date() };
 
     if (start && end) {
         r = { start: startOfDay(parseDateString(start)), end: endOfDay(parseDateString(end)) };
