@@ -59,6 +59,7 @@ export interface Day {
   nibol: NibolBooking | null;
   holiday: boolean;
   holidayName?: string;
+  holidayType: "national" | "absence" | null;
 }
 
 export type TsRowState = "Inception" | "Dev/Unit test" | "Testing";

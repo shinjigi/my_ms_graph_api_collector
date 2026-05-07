@@ -15,7 +15,7 @@
             :class="cellCls(d, i)"
             @click.stop="!d.holiday && !isPinned ? selectDay(i) : undefined">
             <template v-if="d.holiday">
-                <span class="text-xs ts-holiday-icon">🇮🇹</span>
+                <span class="text-xs ts-holiday-icon">{{ d.holidayType === 'absence' ? '🏖️' : '🇮🇹' }}</span>
             </template>
             <!-- Pinned row: quick-add + button (con supporto AI hint) -->
             <template v-else-if="isPinned">

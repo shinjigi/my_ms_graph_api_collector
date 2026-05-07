@@ -18,6 +18,7 @@ export interface WeekDayData {
     nibol:          NibolBooking | null;
     holiday:        boolean;
     holidayName?:   string;
+    holidayType:    "national" | "absence" | null;
     zucchetti:      ZucchettiDay | null;
     calendar:       CalendarEventRaw[];
     emails:         EmailRaw[];

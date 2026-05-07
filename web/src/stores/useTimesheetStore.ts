@@ -161,6 +161,7 @@ export const useTimesheetStore = defineStore(
                     nibol: d.nibol,
                     holiday: d.holiday,
                     holidayName: d.holidayName,
+                    holidayType: d.holidayType,
                 }));
 
                 allTasks.value = tpData.entries.map((e: any) => ({
@@ -337,7 +338,7 @@ export const useTimesheetStore = defineStore(
 
                 // 1. Holiday status
                 if (d?.holiday) {
-                    cls.push("holiday-col");
+                    cls.push(d.holidayType === "absence" ? "absence-col" : "holiday-col");
                 } else {
                     // 2. Health status (ok/warn/err)
                     const status = rendPerDay.value[i];

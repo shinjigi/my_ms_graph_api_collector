@@ -14,7 +14,9 @@
 /* ── Timesheet ── */
 .ts-totals-bg    { background: hsl(var(--b2) / 0.55); }
 .ts-holiday-hint { font-size: 0.6rem; color: hsl(280 60% 75%); }
+.absence-col .ts-holiday-hint { color: hsl(35 85% 65%); }
 .ts-holiday-icon { color: hsl(280 60% 70%); }
+.absence-col .ts-holiday-icon { color: hsl(35 85% 65%); }
 .text-xxs        { font-size: 0.6rem; }
 
 /* Timesheet column widths */
@@ -46,6 +48,7 @@
 .weekend-col { background: color-mix(in oklch, var(--color-base-200) 50%, transparent); opacity: 0.45; }
 .weekend-col .tc-wrap { pointer-events: none; opacity: 0.3; }
 .holiday-col { background: hsl(280 60% 50% / 0.12) !important; box-shadow: inset 0 0 0 1.5px hsl(280 60% 50% / 0.4); opacity: 0.7; }
+.absence-col { background: hsl(35 85% 55% / 0.10) !important; box-shadow: inset 0 0 0 1.5px hsl(35 85% 55% / 0.35); opacity: 0.75; }
 .day-header-cell { cursor: pointer; border-radius: 6px; padding: 4px 6px; transition: background 0.15s; }
 .day-header-cell:hover { background: color-mix(in oklch, var(--color-primary) 20%, transparent); }
 .ts-group-row td { background: color-mix(in oklch, var(--color-base-200) 50%, transparent) !important; padding-top: 10px !important; padding-bottom: 4px !important; }

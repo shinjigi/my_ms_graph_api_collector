@@ -107,7 +107,12 @@ weekRouter.get("/:date", async (req: Request, res: Response) => {
         const holiday = findHoliday(d);
         const isWd = agg?.isWorkday ?? (zuccDay ? isWorkday(zuccDay) : !isWeekend(d) && !holiday);
         const rawOre = zuccDay?.hOrd ? hhmmToHours(zuccDay.hOrd) : null;
-        const oreTarget = agg?.oreTarget ?? (isWd ? (rawOre ?? WORKDAY_HOURS) : 0);
+        // Detect full-day absence directly from Zucchetti (independent of oreTarget/agg).
+        const rawAbsenceLabel = zuccDay ? findAbsenceLabel(zuccDay) : null;
+        const isFullDayAbsence = isWd && rawAbsenceLabel !== null && !zuccDay?.hOrd;
+        const oreTarget = isFullDayAbsence
+            ? 0
+            : (agg?.oreTarget ?? (isWd ? (rawOre ?? WORKDAY_HOURS) : 0));
         // Location: Nibol is the primary source (desk booking is authoritative).
         const monthStr = currentMonthString(d);
         const nibolLastScraped = nibolMeta[monthStr]?.lastExtractedDate ?? null;
@@ -133,8 +138,11 @@ weekRouter.get("/:date", async (req: Request, res: Response) => {
             location = WorkLocation.unknown;
         }
 
-        // Detect full-day absence (ferie, permesso, etc.) — treat as holiday-like
-        const absenceLabel = isWd && oreTarget === 0 && zuccDay ? findAbsenceLabel(zuccDay) : null;
+        const holidayType: WeekDayData["holidayType"] = holiday
+            ? "national"
+            : isFullDayAbsence
+            ? "absence"
+            : null;
 
         const dayData: WeekDayData = {
             date: d,
@@ -142,8 +150,9 @@ weekRouter.get("/:date", async (req: Request, res: Response) => {
             oreTarget,
             location,
             nibol: agg?.nibol ?? null,
-            holiday: !isWd || absenceLabel !== null,
-            holidayName: holiday?.name ?? absenceLabel ?? undefined,
+            holiday: !isWd || isFullDayAbsence,
+            holidayName: holiday?.name ?? rawAbsenceLabel ?? undefined,
+            holidayType,
             zucchetti: zuccDay,
             calendar: agg?.calendar ?? [],
             emails: agg?.emails ?? [],

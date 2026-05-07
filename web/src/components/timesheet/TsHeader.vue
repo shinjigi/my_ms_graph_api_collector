@@ -10,7 +10,7 @@
                     <span class="flex flex-col items-center gap-0.5 opacity-80" :title="d.holidayName">
                         <span>{{ d.label }}</span>
                         <span class="font-normal text-xs">{{ d.date }}</span>
-                        <span class="ts-holiday-hint">Festività</span>
+                        <span class="ts-holiday-hint">{{ d.holidayType === 'absence' ? (d.holidayName ?? 'Assenza') : 'Festività' }}</span>
                     </span>
                 </template>
                 <template v-else>

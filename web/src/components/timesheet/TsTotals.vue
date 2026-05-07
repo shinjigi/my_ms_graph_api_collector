@@ -4,7 +4,7 @@
         <tr class="text-xs ts-totals-bg">
             <td colspan="2" class="text-right pr-3 text-base-content/50 text-xs font-semibold">Ore TP</td>
             <td v-for="(d, i) in ts.days.slice(0, 5)" :key="i" class="text-center text-xs font-bold" :class="totalsCellCls(d, i, 'tp')">
-                <template v-if="d.holiday">🇮🇹</template>
+                <template v-if="d.holiday">{{ d.holidayType === 'absence' ? '🏖️' : '🇮🇹' }}</template>
                 <template v-else>{{ +ts.totalsRow.tp[i].toFixed(1) || '—' }}</template>
             </td>
             <td class="text-center text-xs font-bold weekend-col we-col opacity-35">—</td>
@@ -17,7 +17,7 @@
             <td v-for="(d, i) in ts.days.slice(0, 5)" :key="i" 
                 class="text-center text-xs font-bold" 
                 :class="totalsCellCls(d, i, 'zuc')">
-                <template v-if="d.holiday">🇮🇹</template>
+                <template v-if="d.holiday">{{ d.holidayType === 'absence' ? '🏖️' : '🇮🇹' }}</template>
                 <template v-else-if="d.zucHours > 0 || zucGiust(i).length > 0">
                     <div class="flex flex-col items-center gap-0.5 py-0.5 cursor-pointer" @click="popover?.open(i)">
                         <span v-if="d.zucHours > 0" class="text-success">{{ d.zucHours }}</span>

@@ -43,6 +43,7 @@ async function postSubmitScrape(
     location: agg.location,
     nibol: agg.nibol,
     holiday: !agg.isWorkday,
+    holidayType: null,
     zucchetti: agg.zucchetti,
     calendar: agg.calendar,
     emails: agg.emails,

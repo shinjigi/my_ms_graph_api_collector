@@ -16,6 +16,7 @@ export const DAYS: Day[] = [
     zucHours: 8,
     nibol: { date: new Date("2024-06-01"), type: "home" },
     holiday: false,
+    holidayType: null,
   },
   {
     label: "Mar",
@@ -25,6 +26,7 @@ export const DAYS: Day[] = [
     nibol: null,
     holiday: true,
     holidayName: "🇮🇹 Festa della Repubblica",
+    holidayType: "national",
   },
   {
     label: "Mer",
@@ -33,6 +35,7 @@ export const DAYS: Day[] = [
     zucHours: WORKDAY_HOURS,
     nibol: { date: new Date("2024-06-03"), type: "office" },
     holiday: false,
+    holidayType: null,
   },
   {
     label: "Gio",
@@ -41,6 +44,7 @@ export const DAYS: Day[] = [
     zucHours: 0,
     nibol: { date: new Date("2024-06-04"), type: "office" },
     holiday: false,
+    holidayType: null,
   },
   {
     label: "Ven",
@@ -49,6 +53,7 @@ export const DAYS: Day[] = [
     zucHours: WORKDAY_HOURS,
     nibol: { date: new Date("2024-06-05"), type: "home" },
     holiday: false,
+    holidayType: null,
   },
   {
     label: "Sab",
@@ -57,6 +62,7 @@ export const DAYS: Day[] = [
     zucHours: 0,
     nibol: null,
     holiday: false,
+    holidayType: null,
   },
   {
     label: "Dom",
@@ -65,6 +71,7 @@ export const DAYS: Day[] = [
     zucHours: 0,
     nibol: null,
     holiday: false,
+    holidayType: null,
   },
 ];
 
