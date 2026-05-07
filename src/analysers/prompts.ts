@@ -15,7 +15,8 @@ RULES:
 5. Pre-seeded entries are recurring activities. Include them in your output unchanged unless day signals explicitly contradict them (e.g. no standup on sick/travel day).
 6. ALL text fields (taskName, reasoning, comment) MUST be in English.
 7. do not insert in the comment hours details.
-8. "taskId", "inferredHours" and "comment" are mandatory not empty fields.`;
+8. "taskId", "inferredHours" and "comment" are mandatory not empty fields.
+9. Comments must describe the work, never the detection method. NEVER write phrases like "based on calendar event", "based on email acceptance", "per Teams message", "based on commit", "based on browser history", "based on SVN activity". Write as if the person logged it themselves.`;
 
 /** Builds the user instruction string with interpolated variables. */
 export function userInstruction(): string {

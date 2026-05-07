@@ -65,10 +65,10 @@ Calendar events with 5+ attendees OR subjects containing "staff", "obiettivi", "
 Generic non-project email reading, time reporting itself, PC/network troubleshooting → attribute to #324913. Hours are pre-seeded — do not override unless signals contradict.
 
 ### Untracked calls
-Dense Teams message bursts without a matching calendar event → 0.5–1h to the most relevant open US. Comment: `"Untracked Teams call — <topic>"`.
+Dense Teams message bursts without a matching calendar event → 0.5–1h to the most relevant open US. Comment: `"Untracked call — <topic>"`.
 
 ### Received emails → Ops triggers
-- **Uptrends** alerts → #324895: `"Platform health check following Uptrends alert"`
+- **Uptrends** alerts → #324895: `"Platform health check"`
 - **TeamCity / CI** failure → #324895: `"CI pipeline investigation — <build name>"`
 - **Sitecore deploy** (including cancelled) → #324895: `"Sitecore deploy monitoring"`
 - **Service desk / incident** → #324893: `"Incident response — <brief description>"`
@@ -101,5 +101,12 @@ Commits on day X may relate to day X−1 work. If a commit references a task wit
 
 ## 5. Comment quality
 
-Every `comment` must be: English, one sentence, referencing the strongest signal.
-Examples: `"Investigation of #329300 based on Teams discussion"`, `"Platform health check following Uptrends alert"`, `"Deploy coordination — reply to release thread"`.
+Every `comment` must be: English, one sentence, describing the work itself.
+
+**NEVER reference how the work was detected.** Do not write phrases like:
+- "based on calendar event", "based on email acceptance", "per Teams message"
+- "based on commit", "based on browser history", "following Uptrends alert"
+- "based on SVN activity", "based on calendar acceptance"
+
+Comments must read as if written by the person who did the work.
+Examples: `"Investigation of #329300 — learning session"`, `"Platform health check"`, `"Deploy coordination — release thread"`.

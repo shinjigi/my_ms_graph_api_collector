@@ -16,7 +16,7 @@ import { GoogleGenAI } from "@google/genai";
 import { createLogger } from "../logger";
 import { saveRawResponse } from "../analysers/aiRaw";
 import { TargetprocessClient } from "./client";
-import { dateToString, getISOTimestamp } from "@shared/dates";
+import { dateToString, getISOTimestamp, parseDateString } from "@shared/dates";
 import { AnalysisPrompts } from "./prompts";
 import type { KbEntry, KbStore } from "@shared/kb";
 import { parseTpDate, nameSet, nameSetHas } from "./format";
@@ -181,6 +181,8 @@ abstract class BatchKbProvider implements KbCollectorProvider {
 
   protected readonly maxTpm: number;
   protected readonly tpmThreshold = 0.8;
+  protected readonly maxItemsPerBatch: number = Infinity;
+  protected readonly interBatchDelayMs: number = 10_000;
 
   constructor(maxTpm: number) {
     this.maxTpm = maxTpm;
@@ -219,10 +221,12 @@ abstract class BatchKbProvider implements KbCollectorProvider {
 
       if (
         batch.length > 0 &&
-        batchTokens + itemTokens > this.maxTpm * this.tpmThreshold
+        (batchTokens + itemTokens > this.maxTpm * this.tpmThreshold ||
+          batch.length >= this.maxItemsPerBatch)
       ) {
         await flush();
-        await new Promise((r) => setTimeout(r, 10_000));
+        logger.info(`[${this.name}] Attesa inter-batch ${this.interBatchDelayMs / 1000}s...`);
+        await new Promise((r) => setTimeout(r, this.interBatchDelayMs));
       }
 
       batch.push(entry);
@@ -286,7 +290,9 @@ function applyResults(
       timeEntryDates.length > 0
         ? timeEntryDates.reduce((a, b) => (a > b ? a : b))
         : undefined;
-    const stateDate = original.item.lastStateChangeDate;
+    const stateDate = original.item.lastStateChangeDate
+      ? parseDateString(original.item.lastStateChangeDate as unknown as string | Date)
+      : undefined;
     const lastActivityDate =
       maxTimeEntry && stateDate
         ? maxTimeEntry.getTime() > stateDate.getTime()
@@ -304,7 +310,9 @@ function applyResults(
       userActivities: result.userActivities ?? {},
       stakeholders: (result.stakeholders || result.stakeholder) ?? [],
       cachedAt: new Date(),
-      createDate: original.item.createDate,
+      createDate: original.item.createDate
+        ? parseDateString(original.item.createDate as unknown as string | Date)
+        : undefined,
       currentState: original.item.stateName,
       isFinalState: original.item.isFinalState,
       lastStateChangeDate: stateDate,
@@ -323,6 +331,8 @@ function applyResults(
 // ─── Claude provider ──────────────────────────────────────────────────────────
 class ClaudeKbProvider extends BatchKbProvider {
   readonly name = "claude";
+  protected override readonly maxItemsPerBatch = 15;
+  protected override readonly interBatchDelayMs = 65_000;
 
   constructor() {
     super(CONFIG.CLAUDE_MODEL_MAX_TPM);
@@ -351,7 +361,7 @@ class ClaudeKbProvider extends BatchKbProvider {
 
     const message = await client.messages.create({
       model: modelName,
-      max_tokens: 4000,
+      max_tokens: 8192,
       messages: [{ role: "user", content: prompt }],
     });
 
