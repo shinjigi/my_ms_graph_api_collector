@@ -147,7 +147,8 @@ registry=https://registry.npmjs.org/
 
 ## Development Guidelines
 
-- **Date Manipulation**: Always use `@shared/dates.ts` for any date or date-string manipulation (formatting, offsets, extraction). Never use manual `slice(0, 10)`, `substring`, or `padStart` for ISO dates. Use `dateToString()`, `getMonday()`, `extractMonthStr()`, `getApiStartOfDay()`, etc.
+- **Date Manipulation**: Always use `@shared/dates.ts` for any date or date-string manipulation (formatting, offsets, parsing, coercion). Never use raw `new Date(str)`, `slice(0, 10)`, `substring`, or `padStart` for ISO dates. Use `dateToString()`, `parseDateString()`, `getMonday()`, `extractMonthStr()`, `getApiStartOfDay()`, etc. `parseDateString()` handles both `Date` and `string` — prefer it over `new Date()` for coercion.
+- **JSON File I/O**: Always use `src/json-io.ts` helpers for reading/writing JSON files. Never use raw `fs.readFile`/`fs.writeFile` + `JSON.parse`/`JSON.stringify` directly. Use `readJson<T>()`, `writeJson()`, `getJsonRawPath()`, `readMeta()`, `writeMeta()`, etc.
 - **Standards & Constants**: Use `@shared/standards.ts` for shared business logic constants like `WORKDAY_HOURS`.
 - **Personal registry**: Always use the public npm registry (`https://registry.npmjs.org/`).
 

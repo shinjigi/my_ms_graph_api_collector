@@ -112,7 +112,7 @@ async function runAnalysis(job: AnalysisJobStatus & { id: string }, force: boole
           providers,
         );
         for (const proposal of proposals) {
-          const propPath = path.join(PROPOSALS_DIR, `${proposal.date}.json`);
+          const propPath = path.join(PROPOSALS_DIR, `${dateToString(proposal.date)}.json`);
 
           // Data integrity: merge user-set statuses/approvals from existing file
           const old = await readJson<DayProposal | null>(propPath, null);

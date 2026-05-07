@@ -77,6 +77,7 @@ const ConfigSchema = z.object({
     SVN_USERNAME: z.string().nonoptional(),
     SVN_PASSWORD: z.string().nonoptional(),
     SVN_BIN: z.string().default("svn"),
+    SVN_ROOTS: semicolonStringToArray.optional(),
 
     // --- COLLECTORS: ZUCCHETTI & NIBOL ---
     ZUCCHETTI_USERNAME: z.string().nonoptional(),
@@ -149,6 +150,7 @@ export const CONFIG = ConfigSchema.parse({
     SVN_USERNAME: process.env.SVN_USERNAME,
     SVN_PASSWORD: process.env.SVN_PASSWORD,
     SVN_BIN: process.env.SVN_BIN,
+    SVN_ROOTS: process.env.SVN_ROOTS,
 
     ZUCCHETTI_USERNAME: process.env.ZUCCHETTI_USERNAME,
     ZUCCHETTI_PASSWORD: process.env.ZUCCHETTI_PASSWORD,

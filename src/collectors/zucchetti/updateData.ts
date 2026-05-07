@@ -8,11 +8,8 @@ import { scrapeSingleDay, validateDay, patchRawZucchettiFile } from "./scraper";
 import { aggregateSingleDay } from "../../aggregators/aggregator";
 import type { WeekDayData } from "@shared/week";
 import type { ZucchettiRequestResult } from "@shared/submit";
-import { ZucchettiRequestParams } from "@shared/zucchetti";
-
-// Zucchetti valid giustificativi mapped to the HTML select options
-import { ZUCCHETTI_ACTIVITIES } from "@shared/zucchetti";
-import { fileURLToPath } from "url";
+import { ZucchettiRequestParams, ZUCCHETTI_ACTIVITIES } from "@shared/zucchetti";
+import { fileURLToPath } from "node:url";
 
 const isMainModule =
   process.argv[1] &&
@@ -28,6 +25,8 @@ async function postSubmitScrape(
   targetDate: string,
 ): Promise<WeekDayData> {
   log.info(`Post-submit scrape for ${targetDate}...`);
+  // Wait for grid to reload after submission (iframe reloads after Invia)
+  await page.waitForSelector('tr[id*="_Grid1_row"]', { state: "visible", timeout: 20000 });
   const scraped = await scrapeSingleDay(page, new Date(targetDate));
   if (!scraped)
     throw new Error(`Day ${targetDate} not found in Cartellino grid.`);
@@ -68,7 +67,7 @@ export async function submitZucchettiRequest(
     fullDay: isFullDay,
     hours = 0,
     minutes = 0,
-    headless = true,
+    headless,
     scrapeAfterSubmit = false,
   } = params;
   const activityType = rawType.trim().toUpperCase();
@@ -344,9 +343,29 @@ export async function submitZucchettiRequest(
       result.message = `Request sent for ${targetDate}, but verification timed out. Check portal manually.`;
     }
 
-    // Post-submit scrape: reuse the same page to read updated day data
+    // Post-submit scrape: close the modal first so Zucchetti reloads the grid,
+    // then re-identify the frame and scrape the updated day data.
     if (scrapeAfterSubmit) {
       try {
+        // Close the success modal (spModalLayer_closebtn_2) — this triggers grid reload
+        const closeBtn = newPage.locator('[id$="_closebtn_2"], [id$="_closebtn"]').first();
+        if (await closeBtn.count() > 0) {
+          log.info("Closing submission modal...");
+          await closeBtn.click();
+        }
+        // Wait for the grid iframe to fully reload
+        await newPage.waitForLoadState("networkidle", { timeout: 20000 });
+        await newPage.waitForTimeout(2000);
+
+        // Re-identify the grid frame after reload (old reference may be stale)
+        for (const frame of newPage.frames()) {
+          const rows = await frame.locator('tr[id*="_Grid1_row"]').count();
+          if (rows > 0) {
+            gridFrame = frame;
+            break;
+          }
+        }
+
         result.dayUpdate = await postSubmitScrape(gridFrame, targetDate);
       } catch (err) {
         result.scrapeError = (err as Error).message;

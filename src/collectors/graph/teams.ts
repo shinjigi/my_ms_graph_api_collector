@@ -4,7 +4,7 @@ import { Client } from "@microsoft/microsoft-graph-client";
 import { Chat, ChatMessage } from "@microsoft/microsoft-graph-types";
 import { createLogger } from "../../logger";
 import { readJson, writeJson, readMeta, writeMeta, getJsonRawPath } from "../../json-io";
-import { DateRange, dateToString } from "@shared/dates";
+import { DateRange, dateToString, parseDateString } from "@shared/dates";
 import { GraphPage, mapToLeanMessage, TeamsChatDataRaw, TeamsChatMessageRaw } from "@shared/graph";
 import { CONFIG } from "@shared/env-config";
 import { isAfter, parseISO } from "date-fns";
@@ -173,18 +173,8 @@ function mergeChatMessages(
     const msgMap = new Map<string, TeamsChatMessageRaw>();
     for (const m of existing ?? []) msgMap.set(m.id, m);
     for (const m of newItems) msgMap.set(m.id, m);
-    return Array.from(msgMap.values()).sort((a, b) => {
-        try {
-            return b?.createdDateTime
-                ? b.createdDateTime.getTime()
-                : 0 - (a?.createdDateTime ? a.createdDateTime.getTime() : 0);
-        } catch {
-            log.warn(
-                `    [Warning] Invalid date format in messages ${a.id} '${b?.createdDateTime}' or ${b.id} '${a?.createdDateTime}', defaulting to no order.`,
-            );
-            return 0;
-        }
-    });
+    const toMs = (d: Date | string | null | undefined) => (d ? parseDateString(d).getTime() : 0);
+    return Array.from(msgMap.values()).sort((a, b) => toMs(b.createdDateTime) - toMs(a.createdDateTime));
 }
 
 async function updateChatMeta(TEAMS_DIR: string, fileName: string, merged: TeamsChatMessageRaw[]) {

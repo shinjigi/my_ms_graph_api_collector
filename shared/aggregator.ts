@@ -24,6 +24,7 @@ export interface GitCommitRaw {
   date: Date;
   message: string;
   repo: string;
+  paths: string[];
 }
 
 export interface SvnCommitRaw {

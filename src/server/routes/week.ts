@@ -101,7 +101,7 @@ weekRouter.get("/:date", async (req: Request, res: Response) => {
 
         // Fall back to raw Zucchetti for days without an aggregated file
         const zuccDay: ZucchettiDay | null =
-            agg?.zucchetti ?? zuccAll.find((z) => isSameDay(new Date(z.date), d)) ?? null;
+            agg?.zucchetti ?? zuccAll.find((z) => isSameDay(z.date, d)) ?? null;
 
         // Default: weekdays (Mon-Fri) are workdays; only override if we have Zucchetti evidence
         const holiday = findHoliday(d);
@@ -338,7 +338,7 @@ weekRouter.post("/:date/submit", async (req: Request, res: Response) => {
 
         // Refresh reportedHours for all affected dates
         if (submitted.length > 0) {
-            const affectedDates = [...new Set(body.edits!.map((e) => e.date))];
+            const affectedDates = [...new Set(body.edits.map((e) => e.date))];
             const aggDays: AggregatedDay[] = [];
             for (const d of affectedDates) {
                 const day = await readJson<AggregatedDay | null>(path.join(AGG_DIR, `${d}.json`), null);

@@ -9,6 +9,7 @@
             "runtimeArgs": ["tsx", "src/server/app.ts"],
             "cwd": "${workspaceFolder}",
             "envFile": "${workspaceFolder}/.env",
+            "env": { "ZUCCHETTI_HEADLESS": "false" },
             "sourceMaps": true,
             "console": "integratedTerminal",
             "skipFiles": ["<node_internals>/**"]

@@ -14,7 +14,7 @@ import {
   parseDateString,
 } from "@shared/dates";
 import { CONFIG } from "@shared/env-config";
-import { getJsonRawPath } from "../../json-io";
+import { getJsonRawPath, writeJson } from "../../json-io";
 
 const log = createLogger("vcs-git");
 const GIT_DIR = getJsonRawPath("git");
@@ -34,31 +34,34 @@ function findGitRepos(root: string): string[] {
   }
 }
 
-function getCommitsFromRepo(repoPath: string, since: Date): GitCommitRaw[] {
+function getCommitsFromRepo(repoPath: string, since: Date, root?: string): GitCommitRaw[] {
   const SEP = "\x1F";
-  const REC = "\x1E";
-  const fmt = `--format=%H${SEP}%an${SEP}%ae${SEP}%ad${SEP}%B${REC}`;
+  const REC = "\x01"; // git emette SOH via %x01 — nessun null byte nella command string
+  const fmt = `--format=%x01%H${SEP}%an${SEP}%ae${SEP}%ad${SEP}%s`;
 
   try {
     const out = execSync(
-      `git log ${fmt} --date=short --since="${dateToString(since)}" --all`,
+      `git log ${fmt} --name-only --date=short --since="${dateToString(since)}" --all`,
       { cwd: repoPath, encoding: "utf-8", stdio: ["pipe", "pipe", "ignore"] },
     );
 
     return out
       .split(REC)
-      .map((r) => r.trim())
-      .filter((r) => r.length > 0)
-      .map((r) => {
-        const [hash, author, email, date, ...msgParts] = r.split(SEP);
-        return {
+      .filter(Boolean)
+      .flatMap((record) => {
+        const lines = record.trim().split("\n").filter(Boolean);
+        if (!lines[0]) return [];
+        const [hash, author, email, date, ...msgParts] = lines[0].split(SEP);
+        if (!date) return [];
+        return [{
           hash: hash ?? "",
           author: author ?? "",
           email: email ?? "",
           date: parseDateString(date),
           message: msgParts.join(SEP).trim(),
-          repo: path.basename(repoPath),
-        };
+          repo: root ? path.relative(root, repoPath).replace(/\\/g, "/") : path.basename(repoPath),
+          paths: lines.slice(1),
+        }];
       });
   } catch {
     return [];
@@ -90,7 +93,7 @@ export async function collectGitCommits(
   for (const root of roots) {
     const repos = findGitRepos(root);
     for (const repo of repos) {
-      allCommits.push(...getCommitsFromRepo(repo, since));
+      allCommits.push(...getCommitsFromRepo(repo, since, root));
     }
   }
 
@@ -110,30 +113,6 @@ export async function collectGitCommits(
   }
 
   const meta = await readMeta(GIT_DIR);
-  // if (range) {
-  //   // Range-aware mode
-  //   const month = currentMonthString(range.start);
-  //   const outPath = path.join(GIT_DIR, `${month}.json`);
-  //   const startStr = range.start.toISOString();
-  //   const endStr = range.end.toISOString();
-
-  //   try {
-  //     const commits = await fetchMonthCommits(
-  //       repos, 
-  //       startStr,
-  //       endStr,
-  //     );
-  //     const merged = await mergeByKey<GitCommitRaw>(outPath, commits, "hash");
-  //     await fs.writeFile(outPath, JSON.stringify(merged, null, 2), "utf-8");
-  //     await writeMeta(GIT_DIR, month, { lastExtractedDate: today, sources: roots });
-  //     return [outPath];
-  //   } catch (err) {
-  //     log.warn(`  [Git] Errore nel range: ${(err as Error).message}`);
-  //     return [];
-  //   }
-  // }
-
-  // let current = startOfMonth(since);
   const outPaths: string[] = [];
   const months = Array.from(byMonth.keys()).sort((a, b) => a.localeCompare(b));
 
@@ -153,7 +132,7 @@ export async function collectGitCommits(
 
     const newCommits = byMonth.get(month) ?? [];
     const merged = await mergeByKey<GitCommitRaw>(outPath, newCommits, "hash");
-    await fs.writeFile(outPath, JSON.stringify(merged, null, 2), "utf-8");
+    await writeJson(outPath, merged);
     await writeMeta(GIT_DIR, month, {
       lastExtractedDate: today,
       sources: roots,

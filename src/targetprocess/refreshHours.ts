@@ -15,6 +15,7 @@ import { TargetprocessClient } from "./client";
 import { parseTpDate, groupTpEntriesByTask } from "./format";
 import { isEqual } from "date-fns";
 import { createLogger } from "../logger";
+import { dateToString } from "@shared/dates";
 
 const log = createLogger("tp-refresh");
 const AGG_DIR = path.join(process.cwd(), "data", "aggregated");
@@ -66,7 +67,7 @@ export async function refreshReportedHours(
             await fs.mkdir(AGG_DIR, { recursive: true });
             let written = 0;
             for (const day of days) {
-                const filePath = path.join(AGG_DIR, `${day.date}.json`);
+                const filePath = path.join(AGG_DIR, `${dateToString(day.date)}.json`);
                 try {
                     await fs.writeFile(
                         filePath,
