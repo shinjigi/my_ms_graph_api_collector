@@ -4,7 +4,7 @@ import { spawn } from "node:child_process";
 import { parseString } from "xml2js";
 import { createLogger } from "../../logger";
 
-import { mergeByKey, writeMeta, writeJson } from "../../utils";
+import { mergeByKey, readMeta, writeMeta, writeJson, shouldSkipMonth } from "../../utils";
 import { SvnCommitRaw } from "@shared/aggregator";
 import {
     dateToString,
@@ -210,6 +210,13 @@ export async function collectSvnCommits(
         const outPath = path.join(SVN_DIR, `${month}.json`);
         const startStr = dateToString(range.start);
         const endStr = dateToString(range.end);
+        const meta = await readMeta(SVN_DIR);
+        const isCurrentMonth = month === currentMonthString();
+        if (!_force && !isCurrentMonth && shouldSkipMonth(meta[month], month, [svnUrl])) {
+            log.info(`  [SVN] ${month}: skip`);
+            return [outPath];
+        }
+
         log.info(`  [SVN] Range ${startStr} → ${endStr}...`);
         try {
             return [
@@ -236,29 +243,36 @@ export async function collectSvnCommits(
     let current = startOfMonth(CONFIG.COLLECT_SINCE);
     const now = new Date();
 
+    const meta = await readMeta(SVN_DIR);
     while (current <= now) {
         const month = currentMonthString(current);
+        const isCurrentMonth = month === currentMonthString();
         const outPath = path.join(SVN_DIR, `${month}.json`);
         const startStr = dateToString(current);
         const endStr = lastDayOfMonthString(current);
 
-        log.info(`  [SVN] ${month}...`);
-        try {
-            outPaths.push(
-                await fetchAndWrite(
-                    svnUrl,
-                    svnBin,
-                    user,
-                    pass,
-                    startStr,
-                    endStr,
-                    outPath,
-                    month,
-                    wcMappings,
-                ),
-            );
-        } catch (err) {
-            log.warn(`  [SVN] ${month}: ${(err as Error).message}`);
+        if (!_force && !isCurrentMonth && shouldSkipMonth(meta[month], month, [svnUrl])) {
+            log.info(`  [SVN] ${month}: skip`);
+            outPaths.push(outPath);
+        } else {
+            log.info(`  [SVN] ${month}...`);
+            try {
+                outPaths.push(
+                    await fetchAndWrite(
+                        svnUrl,
+                        svnBin,
+                        user,
+                        pass,
+                        startStr,
+                        endStr,
+                        outPath,
+                        month,
+                        wcMappings,
+                    ),
+                );
+            } catch (err) {
+                log.warn(`  [SVN] ${month}: ${(err as Error).message}`);
+            }
         }
 
         current = addMonths(current, 1);
