@@ -218,7 +218,6 @@ export async function startZucchettiSession(
           }
         }
       } catch (e) {
-        log.warn(`Accesso a window["${key}"] ha lanciato un errore, skip.`, e);
         // property access on window[key] may throw — skip silently
       }
     }

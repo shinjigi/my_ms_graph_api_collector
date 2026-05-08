@@ -12,7 +12,12 @@ import * as nodeFs from "node:fs/promises";
 import { chromium } from "playwright";
 import { readMeta, writeMeta, shouldSkipMonth, listJsonFiles } from "../../utils";
 import { createLogger } from "../../logger";
-import { dateToString, currentMonthString, getYearMonth, DateRange } from "@shared/dates";
+import { dateToString, currentMonthString,    getYearMonth,
+    DateRange,
+    endOfMonth,
+    parseDateString,
+    isSameDay,
+} from "@shared/dates";
 import type { NibolBooking } from "@shared/aggregator";
 import { CONFIG } from "@shared/env-config";
 import { parseISO } from "date-fns";
@@ -550,8 +555,8 @@ export async function nibolFetchCalendarData(range?: {
       const start = new Date(range.start);
       const end = new Date(range.end);
       return allBookings.filter((b) => {
-        const bDate = new Date(b.date);
-        return bDate >= start && bDate <= end;
+        const bDate = parseDateString(b.date);
+        return (bDate >= start || isSameDay(bDate, start)) && (bDate <= end || isSameDay(bDate, end));
       });
     }
 
@@ -576,8 +581,8 @@ export async function collectNibol(
   const currentMonth = currentMonthString();
 
   const effectiveRange = range ?? {
-    start: parseISO(`${currentMonth}-01`),
-    end: parseISO(today),
+    start: parseDateString(`${currentMonth}-01`),
+    end: endOfMonth(today),
   };
 
   // Skip the entire Playwright scrape if current month was already collected today
