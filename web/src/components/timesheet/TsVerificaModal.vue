@@ -20,11 +20,8 @@
                         <td class="text-center">{{ row.zuc > 0 ? row.zuc + 'h' : '—' }}</td>
                         <td class="text-center" :class="row.server !== row.tp ? 'text-warning/70' : ''">{{ row.server > 0 ? row.server + 'h' : '—' }}</td>
                         <td class="text-center font-medium">{{ row.tp > 0 ? row.tp + 'h' : '—' }}</td>
-                        <td class="text-center">
-                            <span v-if="row.status === 'skip'" class="opacity-30">—</span>
-                            <span v-else-if="row.status === 'ok'" class="text-success font-bold">✓</span>
-                            <span v-else-if="row.status === 'over'" class="text-warning">+{{ Math.abs(row.delta) }}h</span>
-                            <span v-else class="text-error">−{{ row.delta }}h</span>
+                        <td class="text-center" :class="getDeltaHoursCls(row.delta)">
+                            {{ formatDeltaHours(row.status === 'skip' ? null : row.delta) }}
                         </td>
                         <td class="text-center">
                             <span v-if="row.status === 'ok'"   class="badge badge-xs badge-success">OK</span>
@@ -41,7 +38,7 @@
                         <td class="text-center">{{ ts.zucWorkdayTotal }}h</td>
                         <td class="text-center">{{ serverWorkdayTotal }}h</td>
                         <td class="text-center">{{ ts.tpWorkdayTotal }}h</td>
-                        <td class="text-center" :class="ts.workdayDeltaTotal === 0 ? 'text-success' : 'text-error'">
+                        <td class="text-center" :class="getDeltaHoursCls(ts.workdayDeltaTotal)">
                             {{ formatDeltaHours(ts.workdayDeltaTotal) }}
                         </td>
                         <td></td>
@@ -74,7 +71,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useTimesheetStore } from '../../stores/useTimesheetStore';
-import { formatDeltaHours } from '../../utils';
+import { formatDeltaHours, getDeltaHoursCls } from '../../utils';
 
 defineProps<{ open: boolean }>();
 defineEmits<{ (e: 'close'): void }>();

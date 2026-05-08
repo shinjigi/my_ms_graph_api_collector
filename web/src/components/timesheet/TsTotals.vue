@@ -41,17 +41,14 @@
             <td v-for="(d, i) in ts.days.slice(0, 5)" :key="i" class="text-center text-xs" :class="totalsCellCls(d, i, 'delta')">
                 <template v-if="d.holiday && !(d.holidayType === 'absence' && ts.totalsRow.tp[i] > 0)">—</template>
                 <template v-else>
-                    <span :class="(d.holidayType === 'absence' && ts.totalsRow.tp[i] > 0) ? 'text-error font-bold'
-                        : ts.totalsRow.delta[i] === 0 ? 'text-success font-black'
-                        : ts.totalsRow.delta[i] > 0 ? 'text-error'
-                        : 'text-primary font-bold'">
+                    <span :class="getDeltaHoursCls(ts.totalsRow.delta[i], d.holidayType === 'absence' && ts.totalsRow.tp[i] > 0)">
                         {{ formatDeltaHours(ts.totalsRow.delta[i]) }}
                     </span>
                 </template>
             </td>
             <td class="text-center text-xs weekend-col we-col opacity-35">—</td>
             <td v-if="ui.weVisible" class="text-center text-xs weekend-col opacity-35">—</td>
-            <td class="text-center font-bold text-error text-xs">{{ formatDeltaHours(ts.windowDeltaTotal) }}</td>
+            <td class="text-center font-bold text-xs" :class="getDeltaHoursCls(ts.windowDeltaTotal)">{{ formatDeltaHours(ts.windowDeltaTotal) }}</td>
             <td></td>
         </tr>
     </tbody>
@@ -61,7 +58,7 @@
 import { ref } from 'vue';
 import { useTimesheetStore } from "../../stores/useTimesheetStore";
 import { useUiStore }                            from '../../stores/useUiStore';
-import { locationEmoji, locationTitle, giustActivityEmojis, formatDeltaHours } from '../../utils';
+import { locationEmoji, locationTitle, giustActivityEmojis, formatDeltaHours, getDeltaHoursCls } from '../../utils';
 import type { Day } from '../../types';
 import type { ZucchettiJustification } from '@shared/zucchetti';
 import DayLocationPopover from './DayLocationPopover.vue';

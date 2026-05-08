@@ -110,8 +110,17 @@ export function rendStatusIconCls(status: "ok" | "warn" | "err" | null): string 
 }
 
 /** Formats hour deltas as ✓, -Xh, or +Xh */
-export function formatDeltaHours(delta: number): string {
+export function formatDeltaHours(delta: number | null | undefined): string {
+  if (delta == null) return "—";
   const rounded = +delta.toFixed(1);
   if (Math.abs(rounded) < 0.05) return "✓";
   return rounded > 0 ? `−${rounded}h` : `+${Math.abs(rounded)}h`;
+}
+
+/** Centralized coloring/styling for delta hours */
+export function getDeltaHoursCls(delta: number, isHolidayAbsence = false): string {
+  if (isHolidayAbsence) return "text-error font-bold";
+  const rounded = +delta.toFixed(1);
+  if (Math.abs(rounded) < 0.05) return "text-success font-black";
+  return rounded > 0 ? "text-error" : "text-primary font-bold";
 }

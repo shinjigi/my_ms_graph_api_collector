@@ -171,7 +171,7 @@ export const useTimesheetStore = defineStore(
                 currentMonday.value = weekRes.monday;
 
                 days.value = weekRes.days.map((d, i) => ({
-                    label: getDayOfWeek(i) ?? "?",
+                    label: getDayOfWeek(d.date) ?? "?",
                     date: formatShortDateLabel(d.date),
                     rend: null,
                     zucHours: d.oreTarget,

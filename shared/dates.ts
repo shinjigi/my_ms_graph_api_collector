@@ -247,22 +247,22 @@ export function getMonthRange(start: Date | string, end: Date | string): string[
 
 /**
  * Returns the day of the week as a string.
- * @param {Date | number} input - The date to get the day of the week for.
- * @returns {string} The day of the week as a string.
+ * @param {Date | number | string} input - The date (Date/string) or index (number) to get the day for.
+ * @returns {string} The day of the week as a string (e.g. "Lun").
  */
-export function getDayOfWeek(input: Date | number): string {
-    const index = typeof input === "number" ? input : input.getDay();
-    return DAYABB_IT[index];
+export function getDayOfWeek(input: Date | number | string): string {
+    if (typeof input === "number") return DAYABB_IT[input];
+    return DAYABB_IT[ensureDate(input).getDay()];
 }
 
 /**
  * Returns the month as a string.
- * @param {Date | number} input - The date to get the month for.
- * @returns {string} The month as a string.
+ * @param {Date | number | string} input - The date (Date/string) or index (number) to get the month for.
+ * @returns {string} The month as a string (e.g. "Gennaio").
  */
-export function getMonth(input: Date | number): string {
-    const index = typeof input === "number" ? input : input.getMonth();
-    return MONTH_IT[index];
+export function getMonth(input: Date | number | string): string {
+    if (typeof input === "number") return MONTH_IT[input];
+    return MONTH_IT[ensureDate(input).getMonth()];
 }
 
 /**
