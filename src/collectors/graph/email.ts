@@ -124,14 +124,10 @@ function getLatestEmailDates(emails: EmailRaw[]) {
   let maxSent: Date | null = null;
 
   for (const e of emails) {
-    // Nota: EmailRaw estende Message, quindi receivedDateTime è disponibile.
-    // Usiamo il casting a unknown poi a Record per evitare warning di 'any' se necessario,
-    // ma receivedDateTime dovrebbe essere visibile.
-    const receivedDate = (e as any).receivedDateTime as string | undefined;
     const sentDate = e.sentDateTime;
 
-    const d = receivedDate
-        ? parseDateString(receivedDate)
+    const d = e.receivedDateTime
+        ? parseDateString(e.receivedDateTime)
         : sentDate
           ? parseDateString(sentDate)
           : null;
