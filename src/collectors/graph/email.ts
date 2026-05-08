@@ -5,7 +5,7 @@ import  { Message } from "@microsoft/microsoft-graph-types";
 import { createLogger } from "../../logger";
 
 const log = createLogger("graph-email");
-import { mergeByKey, readMeta, writeMeta, shouldSkipMonth, writeJson } from "../../utils";
+import { mergeByKey, readMeta, writeMeta, shouldSkipMonth, writeJson, readJsonArray } from "../../utils";
 import { getJsonRawPath } from "../../json-io";
 import {
   dateToString,
@@ -16,6 +16,8 @@ import {
   getApiEndOfDay,
   extractMonthStr,
   DateRange,
+  isAfter,
+  parseDateString,
 } from "@shared/dates";
 import { GraphPage, mapToLeanEmail, EmailRaw } from "@shared/graph";
 import { CONFIG } from "@shared/env-config";
@@ -114,6 +116,36 @@ async function fetchEmails(
   return { results: results.slice(0, maxItems), excluded };
 }
 
+/**
+ * Trova le date dell'email ricevuta e inviata più recenti in un array di email.
+ */
+function getLatestEmailDates(emails: EmailRaw[]) {
+  let maxReceived: Date | null = null;
+  let maxSent: Date | null = null;
+
+  for (const e of emails) {
+    // Nota: EmailRaw estende Message, quindi receivedDateTime è disponibile.
+    // Usiamo il casting a unknown poi a Record per evitare warning di 'any' se necessario,
+    // ma receivedDateTime dovrebbe essere visibile.
+    const receivedDate = (e as any).receivedDateTime as string | undefined;
+    const sentDate = e.sentDateTime;
+
+    const d = receivedDate
+        ? parseDateString(receivedDate)
+        : sentDate
+          ? parseDateString(sentDate)
+          : null;
+
+    if (!d) continue;
+    if (e.direction === "received") {
+      if (!maxReceived || isAfter(d, maxReceived)) maxReceived = d;
+    } else {
+      if (!maxSent || isAfter(d, maxSent)) maxSent = d;
+    }
+  }
+  return { maxReceived, maxSent };
+}
+
 export async function collectGraphEmail(
   client: Client,
   range: DateRange | undefined,
@@ -147,8 +179,18 @@ export async function collectGraphEmail(
     const startStr = range.start.toISOString();
     const endStr = range.end.toISOString();
 
-    const receivedFilter = `receivedDateTime ge ${startStr} and receivedDateTime le ${endStr}`;
-    const sentFilter = `sentDateTime ge ${startStr} and sentDateTime le ${endStr}`;
+    let receivedSince = startStr;
+    let sentSince = startStr;
+
+    if (!force) {
+      const existing = await readJsonArray<EmailRaw>(outPath);
+      const { maxReceived, maxSent } = getLatestEmailDates(existing);
+      if (maxReceived && isAfter(maxReceived, range.start)) receivedSince = maxReceived.toISOString();
+      if (maxSent && isAfter(maxSent, range.start)) sentSince = maxSent.toISOString();
+    }
+
+    const receivedFilter = `receivedDateTime ge ${receivedSince} and receivedDateTime le ${endStr}`;
+    const sentFilter = `sentDateTime ge ${sentSince} and sentDateTime le ${endStr}`;
     const [
       { results: received, excluded },
       { results: sent },
@@ -195,8 +237,22 @@ export async function collectGraphEmail(
       outPaths.push(outPath);
     } else {
       try {
-        const receivedFilter = `receivedDateTime ge ${getApiStartOfDay(month)} and receivedDateTime le ${getApiEndOfDay(month)}`;
-        const sentFilter = `sentDateTime ge ${getApiStartOfDay(month)} and sentDateTime le ${getApiEndOfDay(month)}`;
+        const startDay = getApiStartOfDay(month);
+        const endDay = getApiEndOfDay(month);
+
+        let receivedSince = startDay;
+        let sentSince = startDay;
+
+        if (!force) {
+          const existing = await readJsonArray<EmailRaw>(outPath);
+          const { maxReceived, maxSent } = getLatestEmailDates(existing);
+          const startLimit = parseDateString(startDay);
+          if (maxReceived && isAfter(maxReceived, startLimit)) receivedSince = maxReceived.toISOString();
+          if (maxSent && isAfter(maxSent, startLimit)) sentSince = maxSent.toISOString();
+        }
+
+        const receivedFilter = `receivedDateTime ge ${receivedSince} and receivedDateTime le ${endDay}`;
+        const sentFilter = `sentDateTime ge ${sentSince} and sentDateTime le ${endDay}`;
         const [
           { results: received, excluded },
           { results: sent },

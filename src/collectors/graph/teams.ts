@@ -4,10 +4,9 @@ import { Client } from "@microsoft/microsoft-graph-client";
 import { Chat, ChatMessage } from "@microsoft/microsoft-graph-types";
 import { createLogger } from "../../logger";
 import { readJson, writeJson, readMeta, writeMeta, getJsonRawPath } from "../../json-io";
-import { DateRange, dateToString, parseDateString } from "@shared/dates";
+import { DateRange, dateToString, parseDateString, isAfter } from "@shared/dates";
 import { GraphPage, mapToLeanMessage, TeamsChatDataRaw, TeamsChatMessageRaw } from "@shared/graph";
 import { CONFIG } from "@shared/env-config";
-import { isAfter, parseISO } from "date-fns";
 
 interface ChatProcessParams {
     client: Client;
@@ -16,6 +15,7 @@ interface ChatProcessParams {
     total: number;
     range: DateRange;
     myName: string;
+    force: boolean;
 }
 
 const log = createLogger("graph-teams");
@@ -91,9 +91,9 @@ async function fetchChatMessagesRange(
         for (const m of page) {
             if (
                 m.lastModifiedDateTime &&
-                isAfter(parseISO(m.lastModifiedDateTime), maxLastModified)
+                isAfter(parseDateString(m.lastModifiedDateTime), maxLastModified)
             ) {
-                maxLastModified = parseISO(m.lastModifiedDateTime);
+                maxLastModified = parseDateString(m.lastModifiedDateTime);
             }
         }
 
@@ -159,8 +159,9 @@ function mapAndFilterMessages(rawMessages: ChatMessage[], range: DateRange): Tea
     const lean: TeamsChatMessageRaw[] = [];
     for (const m of rawMessages) {
         if (!m.createdDateTime) continue;
-        if (range.start && parseISO(m.createdDateTime) < range.start) continue;
-        if (range.end && parseISO(m.createdDateTime) > range.end) continue;
+        const createdDate = parseDateString(m.createdDateTime);
+        if (range.start && isAfter(range.start, createdDate)) continue;
+        if (range.end && isAfter(createdDate, range.end)) continue;
         lean.push(mapToLeanMessage(m));
     }
     return lean;
@@ -197,6 +198,7 @@ async function processSingleChat({
     total,
     range,
     myName,
+    force,
 }: ChatProcessParams): Promise<string | null> {
     const chatId = chat.id ?? "0";
     if (chatId === "0") return null;
@@ -219,21 +221,44 @@ async function processSingleChat({
     const prelimPath = path.join(TEAMS_DIR, `${prelimFileName}.json`);
     const prelimExisting = await readJson<TeamsChatDataRaw>(prelimPath, defaultChat);
 
+    // Recuperiamo il timestamp locale tramite le utility condivise
+    const localLastModified = prelimExisting.lastModifiedDateTime
+        ? parseDateString(prelimExisting.lastModifiedDateTime)
+        : null;
+
+    // 1. Ottimizzazione: se la chat non è cambiata lato Microsoft e non siamo in --force, saltiamo
+    if (!force && localLastModified && chat.lastUpdatedDateTime) {
+        const remoteLastModified = parseDateString(chat.lastUpdatedDateTime);
+        if (!isAfter(remoteLastModified, localLastModified)) {
+            if (idx % 50 === 0) log.info(`    [Progress] Analizzate ${idx}/${total} chat...`);
+            return prelimPath;
+        }
+    }
+
+    // 2. Recupero incrementale: partiamo dall'ultimo messaggio che abbiamo o dal range.start
+    const fetchSince =
+        !force && localLastModified && isAfter(localLastModified, range.start)
+            ? localLastModified
+            : range.start;
+
     try {
         const { messages: rawMessages, maxLastModified } = await fetchChatMessagesRange(
             client,
             chatId,
-            range.start,
+            fetchSince,
             range.end,
         );
 
         if (rawMessages.length === 0) {
             if (idx % 50 === 0) log.info(`    [Progress] Analizzate ${idx}/${total} chat...`);
-            return null;
+            return prelimPath;
         }
 
         const resolvedTopic = resolveTopic(chat, rawMessages, myName);
-        log.info(`    [Chat ${idx}/${total}] ${resolvedTopic}: +${rawMessages.length} messaggi`);
+        const isIncremental = localLastModified && isAfter(fetchSince, range.start);
+        log.info(
+            `    [Chat ${idx}/${total}] ${resolvedTopic}: +${rawMessages.length} messaggi${isIncremental ? " (nuovi)" : ""}`,
+        );
 
         const newLean = mapAndFilterMessages(rawMessages, range);
         if (newLean.length === 0) return null;
@@ -321,6 +346,7 @@ export async function collectGraphTeams(
             total: allChats.length,
             range: effectiveRange,
             myName,
+            force: _force,
         });
         if (outPath) outPathsSet.add(outPath);
     }

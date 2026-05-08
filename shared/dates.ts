@@ -10,6 +10,7 @@ import {
     isWeekend as isWeekendFns,
     isSameDay as isSameDayFns,
     isEqual as isEqualFns,
+    isAfter as isAfterFns,
     lastDayOfMonth as lastDayOfMonthFns,
     parse,
     parseISO,
@@ -99,6 +100,11 @@ export function isEqual(d1: Date, d2: Date): boolean {
 /** Returns true if d1 is strictly before d2. */
 export function isBefore(d1: Date, d2: Date): boolean {
     return isBeforeFns(d1, d2);
+}
+
+/** Returns true if d1 is strictly after d2. */
+export function isAfter(d1: Date, d2: Date): boolean {
+    return isAfterFns(d1, d2);
 }
 
 /** Returns true if the date is in the future relative to now. */
