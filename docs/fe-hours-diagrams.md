@@ -105,7 +105,7 @@ classDiagram
 stateDiagram-v2
     direction LR
 
-    [*] --> suggested : POST /api/analyse/:date<br />AI → proposals/*.json status="suggested"<br />loadWeekHints() ricarica weekHints
+    [*] --> suggested : POST /api/analyse/#58;date<br />AI → proposals/*.json status="suggested"<br />loadWeekHints() ricarica weekHints
 
     suggested --> accepted : acceptHint() o quickAdd()<br />① setHours() → ts.draft_hours localStorage<br />② setEntryStatus("accepted") → PATCH proposals/*.json
 
