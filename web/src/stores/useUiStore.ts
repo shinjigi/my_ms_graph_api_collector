@@ -48,7 +48,15 @@ export const useUiStore = defineStore('ui', () => {
     };
 }, {
     persist: {
-        key:  'portal_ui',
-        pick: ['weVisible', 'quickSort', 'pinnedSort'],
+        key:  'ui.prefs',
+        pick: [
+            'activeView',
+            'weVisible',
+            'browserExpanded',
+            'quickFilterSignals',
+            'pinnedFilterSignals',
+            'quickSort',
+            'pinnedSort',
+        ],
     },
 });

@@ -37,6 +37,10 @@ export const usePickerStore = defineStore(
         const today = todayMidnight();
         const pickerToday = ref<Date>(today);
         const pickerSelected = ref<Date>(todayMidnight());
+        /** 
+         * Currently displayed month in the picker. Kept as a ref (instead of computed 
+         * from pickerSelected) to allow browsing months without changing the selection.
+         */
         const pickerMonth = ref<Date>(startOfMonth(today));
 
         const monthLabel = computed(() => formatMonthYearLabel(pickerMonth.value));
@@ -127,7 +131,7 @@ export const usePickerStore = defineStore(
     },
     {
         persist: {
-            key: "portal_picker",
+            key: "picker.selection",
             pick: ["pickerSelected", "pickerMonth"],
             serializer: {
                 serialize: (s: Record<string, unknown>) =>

@@ -9,7 +9,7 @@ export interface ProposalEntry {
     reasoning:     string;
     comment?:      string;
     approved:      boolean;
-    status?:       'suggested' | 'applied' | 'dismissed' | 'modified';
+    status?:       'suggested' | 'accepted' | 'overridden' | 'applied' | 'dismissed' | 'modified';
 }
 
 export interface DayProposal {

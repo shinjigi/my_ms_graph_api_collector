@@ -8,7 +8,8 @@
                     <tr class="text-xs">
                         <th>Giorno</th>
                         <th class="text-center">Zucchetti</th>
-                        <th class="text-center">TP loggato</th>
+                        <th class="text-center">TP ora</th>
+                        <th class="text-center">Da inviare</th>
                         <th class="text-center">Delta</th>
                         <th class="text-center">Stato</th>
                     </tr>
@@ -17,7 +18,8 @@
                     <tr v-for="row in verificaRows" :key="row.label" class="text-xs">
                         <td :class="row.isToday ? 'font-bold text-primary' : ''">{{ row.label }}</td>
                         <td class="text-center">{{ row.zuc > 0 ? row.zuc + 'h' : '—' }}</td>
-                        <td class="text-center">{{ row.tp > 0 ? row.tp + 'h' : '—' }}</td>
+                        <td class="text-center" :class="row.server !== row.tp ? 'text-warning/70' : ''">{{ row.server > 0 ? row.server + 'h' : '—' }}</td>
+                        <td class="text-center font-medium">{{ row.tp > 0 ? row.tp + 'h' : '—' }}</td>
                         <td class="text-center">
                             <span v-if="row.status === 'skip'" class="opacity-30">—</span>
                             <span v-else-if="row.status === 'ok'" class="text-success font-bold">✓</span>
@@ -37,6 +39,7 @@
                     <tr class="font-bold text-xs">
                         <td>Totale settimana</td>
                         <td class="text-center">{{ ts.zucWorkdayTotal }}h</td>
+                        <td class="text-center">{{ serverWorkdayTotal }}h</td>
                         <td class="text-center">{{ ts.tpWorkdayTotal }}h</td>
                         <td class="text-center" :class="ts.workdayDeltaTotal === 0 ? 'text-success' : 'text-error'">
                             {{ formatDeltaHours(ts.workdayDeltaTotal) }}
@@ -45,6 +48,15 @@
                     </tr>
                 </tfoot>
             </table>
+            <div v-if="deletePending.length > 0" class="alert alert-error text-xs p-2 mb-3">
+                <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                </svg>
+                <span>
+                    Attenzione: {{ deletePending.length }} entr{{ deletePending.length === 1 ? 'y verrà cancellata' : 'y verranno cancellate' }} da TP (ore → 0):
+                    <strong>{{ deletePending.map(e => e.usName).join(', ') }}</strong>
+                </span>
+            </div>
             <div v-if="ts.pendingSubmissions.length > 0" class="alert alert-info text-xs p-2 mb-3">
                 <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
@@ -72,6 +84,7 @@ const ts     = useTimesheetStore();
 interface VerificaRow {
     label:   string;
     zuc:     number;
+    server:  number;
     tp:      number;
     delta:   number;
     status:  'ok' | 'warn' | 'err' | 'over' | 'skip';
@@ -81,18 +94,25 @@ interface VerificaRow {
 const verificaRows = computed<VerificaRow[]>(() =>
     ts.days.slice(0, 5).map((d, i) => {
         if (d.holiday) {
-            return { label: d.label, zuc: 0, tp: 0, delta: 0, status: 'skip', isToday: false };
+            return { label: d.label, zuc: 0, server: 0, tp: 0, delta: 0, status: 'skip', isToday: false };
         }
-        const zuc   = d.zucHours;
-        const tp    = +ts.totalsRow.tp[i].toFixed(1);
-        const delta = +(zuc - tp).toFixed(1);
+        const zuc    = d.zucHours;
+        const server = ts.serverTotalsRow[i];
+        const tp     = +ts.totalsRow.tp[i].toFixed(1);
+        const delta  = +(zuc - tp).toFixed(1);
         const isToday = ts.getDayColCls(i).includes('today-col');
 
-        if (zuc === 0 && tp === 0) return { label: d.label, zuc, tp, delta: 0, status: 'skip', isToday };
-        if (delta === 0)           return { label: d.label, zuc, tp, delta: 0, status: 'ok',   isToday };
-        if (tp === 0)              return { label: d.label, zuc, tp, delta,    status: 'err',  isToday };
-        if (delta < 0)             return { label: d.label, zuc, tp, delta,    status: 'over', isToday };
-        return                            { label: d.label, zuc, tp, delta,    status: 'warn', isToday };
+        if (zuc === 0 && tp === 0) return { label: d.label, zuc, server, tp, delta: 0, status: 'skip', isToday };
+        if (delta === 0)           return { label: d.label, zuc, server, tp, delta: 0, status: 'ok',   isToday };
+        if (tp === 0)              return { label: d.label, zuc, server, tp, delta,    status: 'err',  isToday };
+        if (delta < 0)             return { label: d.label, zuc, server, tp, delta,    status: 'over', isToday };
+        return                            { label: d.label, zuc, server, tp, delta,    status: 'warn', isToday };
     })
 );
+
+const serverWorkdayTotal = computed(() =>
+    ts.serverTotalsRow.slice(0, 5).reduce((a, b) => a + b, 0)
+);
+
+const deletePending = computed(() => ts.pendingSubmissions.filter(e => e.isDelete));
 </script>

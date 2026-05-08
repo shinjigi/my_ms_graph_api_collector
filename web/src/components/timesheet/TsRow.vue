@@ -13,8 +13,8 @@
         <td v-for="(d, i) in days.slice(0, 5)" :key="i"
             class="text-center"
             :class="cellCls(d, i)"
-            @click.stop="!d.holiday && !isPinned ? selectDay(i) : undefined">
-            <template v-if="d.holiday">
+            @click.stop="(!d.holiday || (d.holidayType === 'absence' && ts.getHours(row.tpId, i) > 0)) && !isPinned ? selectDay(i) : undefined">
+            <template v-if="d.holiday && (d.holidayType !== 'absence' || ts.getHours(row.tpId, i) === 0)">
                 <span class="text-xs ts-holiday-icon">{{ d.holidayType === 'absence' ? '🏖️' : '🇮🇹' }}</span>
             </template>
             <!-- Pinned row: quick-add + button (con supporto AI hint) -->
@@ -58,7 +58,7 @@
                                 <span class="ai-hint-dot"></span>
                             </button>
                             <button class="ts-hint-dismiss"
-                                    @click.stop="analysis.dismissHint(row.tpId, i, ts.currentMonday)"
+                                    @click.stop="dismissHint(i)"
                                     title="Ignora suggerimento">✕</button>
                         </div>
                     </template>
@@ -70,14 +70,7 @@
                             :day-delta="ts.totalsRow.delta[i]"
                             :hint-val="cellHint(i)?.inferredHours"
                             :cell-mode="computeCellMode(i)"
-                            @update="val => {
-                                ts.setHours(row.tpId, i, val);
-                                if (val === 0) ts.setNote(row.tpId, i, '');
-                                else {
-                                    const noteText = cellHint(i)?.comment || cellHint(i)?.reasoning;
-                                    if (noteText) ts.setNote(row.tpId, i, noteText);
-                                }
-                            }"
+                            @update="val => handleCellUpdate(i, val)"
                         />
                     </template>
                     <TsNoteCell :tpId="row.tpId" :day-idx="i" />
@@ -183,10 +176,29 @@ function acceptHint(dayIdx: number) {
     const noteText = hint.comment || hint.reasoning;
     if (noteText)
         ts.setNote(props.row.tpId, dayIdx, noteText);
-    
-    // Persist to server
     const dateStr = shiftDate(ts.currentMonday!, dayIdx);
-    analysis.setEntryStatus(dateStr, props.row.tpId, 'applied');
+    analysis.setEntryStatus(dateStr, props.row.tpId, 'accepted');
+}
+
+function dismissHint(dayIdx: number) {
+    if (!ts.currentMonday) return;
+    analysis.dismissHint(props.row.tpId, dayIdx, ts.currentMonday);
+    ts.clearCellEdit(props.row.tpId, dayIdx);
+}
+
+function handleCellUpdate(dayIdx: number, val: number) {
+    ts.setHours(props.row.tpId, dayIdx, val);
+    if (val === 0) {
+        ts.setNote(props.row.tpId, dayIdx, '');
+    } else {
+        const noteText = cellHint(dayIdx)?.comment || cellHint(dayIdx)?.reasoning;
+        if (noteText) ts.setNote(props.row.tpId, dayIdx, noteText);
+    }
+    const hint = cellHint(dayIdx);
+    if (hint?.status === 'accepted' && val !== hint.inferredHours && ts.currentMonday) {
+        const dateStr = shiftDate(ts.currentMonday, dayIdx);
+        analysis.setEntryStatus(dateStr, props.row.tpId, 'overridden');
+    }
 }
 
 function quickAdd(dayIdx: number) {
@@ -197,6 +209,10 @@ function quickAdd(dayIdx: number) {
         const noteText = hint.comment || hint.reasoning;
         if (noteText)
             ts.setNote(props.row.tpId, dayIdx, noteText);
+        if (ts.currentMonday) {
+            const dateStr = shiftDate(ts.currentMonday, dayIdx);
+            analysis.setEntryStatus(dateStr, props.row.tpId, 'accepted');
+        }
     } else {
         ts.setHours(props.row.tpId, dayIdx, current + 0.5);
     }

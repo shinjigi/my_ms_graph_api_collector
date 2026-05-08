@@ -36,7 +36,16 @@
                                 @input="ts.setNote(e.tpId, e.dayIdx, ($event.target as HTMLInputElement).value)"
                             />
                         </div>
-                        <span class="text-xs font-bold text-success shrink-0 w-10 text-right mt-5">{{ e.hours }}h</span>
+                        <span class="text-xs font-bold shrink-0 w-10 text-right mt-5"
+                              :class="e.hours <= 0 ? 'text-error' : 'text-success'">{{ e.hours }}h</span>
+                        <button class="btn btn-ghost btn-xs btn-square shrink-0 mt-4
+                                       text-base-content/30
+                                       hover:text-error hover:bg-error/10 transition-colors"
+                                :disabled="submitting"
+                                @click="dismissEntry(e)"
+                                title="Rimuovi dalla lista di invio">
+                            ✕
+                        </button>
                     </div>
                 </div>
             </div>
@@ -179,6 +188,16 @@ function doReset() {
     showErrors.value = false;
     submitMsg.value  = '';
     close();
+}
+
+function dismissEntry(e: EntryRow) {
+    // Clear the local draft edit (hoursEdits + noteEdits)
+    ts.clearCellEdit(e.tpId, e.dayIdx);
+
+    // If it's an AI hint, also mark it as dismissed in the proposal file
+    if (e.isHint && ts.currentMonday) {
+        analysis.dismissHint(e.tpId, e.dayIdx, ts.currentMonday);
+    }
 }
 
 // --- Public API ---

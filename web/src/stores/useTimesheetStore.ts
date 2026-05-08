@@ -52,6 +52,14 @@ export const useTimesheetStore = defineStore(
         const active = computed(() => allRowsFlattened.value.filter(isRowActive));
         const pinned = computed(() => allRowsFlattened.value.filter((r) => !isRowActive(r)));
 
+        const serverTotalsRow = computed(() =>
+            days.value.map((_, i) =>
+                +allRowsFlattened.value
+                    .reduce((acc, r) => acc + (r.hours?.[i] ?? 0), 0)
+                    .toFixed(1)
+            )
+        );
+
         const totalsRow = computed(() => {
             const tp = days.value.map(
                 (_, i) =>
@@ -66,7 +74,12 @@ export const useTimesheetStore = defineStore(
 
         const rendPerDay = computed<Array<"ok" | "warn" | "err" | null>>(() => {
             return days.value.map((d, i) => {
-                if (d.holiday || i >= 5 || d.zucHours === 0) return null;
+                if (d.holiday) {
+                    // Absence day with TP hours logged = error (should be 0)
+                    if (d.holidayType === "absence" && totalsRow.value.tp[i] > 0) return "err";
+                    return null;
+                }
+                if (i >= 5 || d.zucHours === 0) return null;
                 // Skip future days — no color indicator until the day has passed (or is today)
                 const dayDate = weekData.value?.days[i]?.date;
                 if (dayDate && isFuture(dayDate)) return null;
@@ -85,6 +98,8 @@ export const useTimesheetStore = defineStore(
                 isHint: boolean;
                 usName: string;
                 status?: string;
+                serverHours: number;
+                isDelete: boolean;
             })[] => {
                 const monday = currentMonday.value;
                 if (!monday) return [];
@@ -107,8 +122,9 @@ export const useTimesheetStore = defineStore(
                             description = getNote(row.tpId, i);
                         } else {
                             const hint = useAnalysisStore().getHint(row.tpId, i, monday);
-                            // Ignore if no hint, if it was already applied, or if it matched TP already
-                            if (!hint || hint.inferredHours <= 0 || hint.status === "applied")
+                            // Path B è solo safety net: include solo hint esplicitamente accepted
+                            // (suggested = opt-in, non auto-queued)
+                            if (!hint || hint.inferredHours <= 0 || hint.status !== "accepted")
                                 continue;
 
                             // Evita di mascherare o sovrascrivere in automatico le ore già presenti su TP!
@@ -132,6 +148,8 @@ export const useTimesheetStore = defineStore(
                             isHint,
                             usName: row.us,
                             status,
+                            serverHours,
+                            isDelete: targetHours === 0 && serverHours > 0,
                         });
                     }
                 }
@@ -205,6 +223,12 @@ export const useTimesheetStore = defineStore(
         function clearEdits() {
             hoursEdits.value = {};
             noteEdits.value = {};
+        }
+
+        function clearCellEdit(tpId: number, dayIdx: number) {
+            const key = `${tpId}_${dayIdx}`;
+            delete hoursEdits.value[key];
+            delete noteEdits.value[key];
         }
 
         async function submitWeekHours() {
@@ -321,6 +345,8 @@ export const useTimesheetStore = defineStore(
             setHours,
             setNote,
             clearEdits,
+            clearCellEdit,
+            serverTotalsRow,
             submitWeekHours,
             submitDayHours,
             schedulePromotion,
@@ -339,6 +365,7 @@ export const useTimesheetStore = defineStore(
                 // 1. Holiday status
                 if (d?.holiday) {
                     cls.push(d.holidayType === "absence" ? "absence-col" : "holiday-col");
+                    if (rendPerDay.value[i] === "err") cls.push("day-err");
                 } else {
                     // 2. Health status (ok/warn/err)
                     const status = rendPerDay.value[i];
@@ -384,9 +411,9 @@ export const useTimesheetStore = defineStore(
     },
     {
         persist: [
-            { key: "portal_hours", pick: ["hoursEdits"] },
-            { key: "portal_ts_notes", pick: ["noteEdits"] },
-            { key: "portal_us_extra", pick: ["usExtra"] },
+            { key: "ts.draft_hours",  pick: ["hoursEdits"] },
+            { key: "ts.draft_notes",  pick: ["noteEdits"] },
+            { key: "ts.extra_tasks",  pick: ["usExtra"] },
         ],
     },
 );

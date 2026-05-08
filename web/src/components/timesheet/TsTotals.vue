@@ -4,7 +4,7 @@
         <tr class="text-xs ts-totals-bg">
             <td colspan="2" class="text-right pr-3 text-base-content/50 text-xs font-semibold">Ore TP</td>
             <td v-for="(d, i) in ts.days.slice(0, 5)" :key="i" class="text-center text-xs font-bold" :class="totalsCellCls(d, i, 'tp')">
-                <template v-if="d.holiday">{{ d.holidayType === 'absence' ? '🏖️' : '🇮🇹' }}</template>
+                <template v-if="d.holiday && !(d.holidayType === 'absence' && ts.totalsRow.tp[i] > 0)">{{ d.holidayType === 'absence' ? '🏖️' : '🇮🇹' }}</template>
                 <template v-else>{{ +ts.totalsRow.tp[i].toFixed(1) || '—' }}</template>
             </td>
             <td class="text-center text-xs font-bold weekend-col we-col opacity-35">—</td>
@@ -39,9 +39,12 @@
         <tr class="text-xs border-b-2 border-base-300 ts-totals-bg">
             <td colspan="2" class="text-right pr-3 text-base-content/50 text-xs font-semibold">Delta</td>
             <td v-for="(d, i) in ts.days.slice(0, 5)" :key="i" class="text-center text-xs" :class="totalsCellCls(d, i, 'delta')">
-                <template v-if="d.holiday">—</template>
+                <template v-if="d.holiday && !(d.holidayType === 'absence' && ts.totalsRow.tp[i] > 0)">—</template>
                 <template v-else>
-                    <span :class="ts.totalsRow.delta[i] === 0 ? 'text-success font-black' : ts.totalsRow.delta[i] > 0 ? 'text-error' : 'text-primary font-bold'">
+                    <span :class="(d.holidayType === 'absence' && ts.totalsRow.tp[i] > 0) ? 'text-error font-bold'
+                        : ts.totalsRow.delta[i] === 0 ? 'text-success font-black'
+                        : ts.totalsRow.delta[i] > 0 ? 'text-error'
+                        : 'text-primary font-bold'">
                         {{ formatDeltaHours(ts.totalsRow.delta[i]) }}
                     </span>
                 </template>
@@ -57,7 +60,6 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { useTimesheetStore } from "../../stores/useTimesheetStore";
-import { usePickerStore } from "../../stores/usePickerStore";
 import { useUiStore }                            from '../../stores/useUiStore';
 import { locationEmoji, locationTitle, giustActivityEmojis, formatDeltaHours } from '../../utils';
 import type { Day } from '../../types';
@@ -65,7 +67,6 @@ import type { ZucchettiJustification } from '@shared/zucchetti';
 import DayLocationPopover from './DayLocationPopover.vue';
 
 const ts     = useTimesheetStore();
-const picker = usePickerStore();
 const ui     = useUiStore();
 
 const popover = ref<InstanceType<typeof DayLocationPopover> | null>(null);
