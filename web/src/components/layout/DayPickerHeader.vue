@@ -1,18 +1,36 @@
 <template>
     <header class="bg-base-100 border-b border-base-300 px-3 py-2 flex items-center gap-2 shrink-0">
-        <button @click="picker.prevMonth()" class="btn btn-ghost btn-xs btn-square shrink-0">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
-            </svg>
-        </button>
-        <span class="text-sm font-semibold min-w-[7rem] text-center shrink-0 select-none">
-            {{ picker.monthLabel }}
-        </span>
-        <button @click="picker.nextMonth()" class="btn btn-ghost btn-xs btn-square shrink-0">
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
-            </svg>
-        </button>
+        <div class="flex items-center bg-base-200/50 rounded-lg p-0.5 gap-0.5">
+            <!-- Mese Precedente -->
+            <button @click="picker.prevMonth()" class="btn btn-ghost btn-xs btn-square shrink-0" title="Mese precedente">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/>
+                </svg>
+            </button>
+            <!-- Settimana Precedente -->
+            <button @click="picker.prevWeek()" class="btn btn-ghost btn-xs btn-square shrink-0" title="Settimana precedente">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+                </svg>
+            </button>
+
+            <span class="text-xs font-bold px-2 min-w-[7.5rem] text-center select-none uppercase tracking-wide">
+                {{ picker.monthLabel }}
+            </span>
+
+            <!-- Settimana Successiva -->
+            <button @click="picker.nextWeek()" class="btn btn-ghost btn-xs btn-square shrink-0" title="Settimana successiva">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+            </button>
+            <!-- Mese Successivo -->
+            <button @click="picker.nextMonth()" class="btn btn-ghost btn-xs btn-square shrink-0" title="Mese successivo">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/>
+                </svg>
+            </button>
+        </div>
         <button @click="picker.goToday()" class="btn btn-ghost btn-xs shrink-0">Oggi</button>
 
         <div ref="scrollRef" class="day-picker-btns flex gap-0.5 overflow-x-auto flex-1 py-0.5">

@@ -114,6 +114,16 @@ export const usePickerStore = defineStore(
             router.push(`/${ui.activeView}/${today}`);
         }
 
+        function prevWeek() {
+            const prev = shiftDate(pickerSelected.value, -7);
+            selectDay(prev.getFullYear(), prev.getMonth(), prev.getDate());
+        }
+
+        function nextWeek() {
+            const next = shiftDate(pickerSelected.value, 7);
+            selectDay(next.getFullYear(), next.getMonth(), next.getDate());
+        }
+
         return {
             pickerToday,
             pickerSelected,
@@ -127,6 +137,8 @@ export const usePickerStore = defineStore(
             prevMonth,
             nextMonth,
             goToday,
+            prevWeek,
+            nextWeek,
         };
     },
     {
