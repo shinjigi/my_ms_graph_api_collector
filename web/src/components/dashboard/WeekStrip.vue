@@ -60,7 +60,7 @@
                         <span
                             v-for="b in card.badges"
                             :key="b.emoji"
-                            class="ws-badge"
+                            class="ts-badge"
                             :title="b.title"
                             >{{ b.emoji }}</span
                         >
@@ -142,15 +142,3 @@ const weekCards = computed(() => {
 });
 </script>
 
-<style scoped>
-.ws-badge {
-    font-size: 0.7rem;
-    line-height: 1;
-    padding: 1px 3px;
-    border-radius: 3px;
-    background: oklch(var(--b3));
-    display: inline-flex;
-    align-items: center;
-    cursor: default;
-}
-</style>

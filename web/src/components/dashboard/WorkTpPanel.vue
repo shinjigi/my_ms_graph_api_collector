@@ -282,62 +282,20 @@ const filteredQuickLog = computed(() => {
 </script>
 
 <style scoped>
-.hours-bar-bg { background-color: oklch(var(--b2)); height:4px; border-radius:2px; overflow:hidden; }
-.hours-bar-tp { background-color: oklch(var(--p)); height:100%; border-radius:2px; }
-.hours-bar-zuc { background-color: oklch(var(--su) / 0.5); height:100%; border-radius:2px; }
+.hours-bar-bg  { background-color: oklch(var(--b2)); height: 4px; border-radius: 2px; overflow: hidden; }
+.hours-bar-tp  { background-color: oklch(var(--p));         height: 100%; border-radius: 2px; }
+.hours-bar-zuc { background-color: oklch(var(--su) / 0.5);  height: 100%; border-radius: 2px; }
 
-.us-card { border-bottom: 1px solid oklch(var(--b3)); transition: background 0.2s; }
+.us-card            { border-bottom: 1px solid oklch(var(--b3)); transition: background 0.2s; }
 .us-card:last-child { border-bottom: none; }
-.us-card.highlight { background: oklch(var(--p) / 0.05); }
+.us-card.highlight  { background: oklch(var(--p) / 0.05); }
 
+/* 6px variant — intentionally smaller than global 8px state-dot used in TsRow */
 .state-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+
 .us-signal {
     background: oklch(var(--b2)); padding: 1px 6px; border-radius: 99px;
-    font-size: 0.65rem; color: oklch(var(--bc) / 0.5); display: flex; align-items: center; gap: 4px; border: 1px solid oklch(var(--b3));
+    font-size: 0.65rem; color: oklch(var(--bc) / 0.5);
+    display: flex; align-items: center; gap: 4px; border: 1px solid oklch(var(--b3));
 }
-
-@keyframes ai-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 var(--ai-color); }
-    50%       { box-shadow: 0 0 0 3px var(--ai-color); }
-}
-@keyframes ai-dot-blink {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0.2; }
-}
-
-.ai-hint-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    padding: 2px 5px;
-    border-radius: 4px;
-    font-size: 0.7rem;
-    font-weight: 700;
-    cursor: pointer;
-    background: transparent;
-    border: 1px solid;
-    transition: background 0.15s;
-    --ai-color: oklch(var(--wa) / 0.45);
-    color: oklch(var(--wa));
-    border-color: oklch(var(--wa) / 0.5);
-    animation: ai-pulse 2s ease-in-out infinite;
-}
-.ai-hint-btn.confidence-high {
-    --ai-color: oklch(var(--su) / 0.45);
-    color: oklch(var(--su));
-    border-color: oklch(var(--su) / 0.5);
-}
-.ai-hint-btn.confidence-low {
-    --ai-color: oklch(var(--er) / 0.3);
-    color: oklch(var(--er) / 0.7);
-    border-color: oklch(var(--er) / 0.35);
-}
-.ai-hint-btn:hover { background: oklch(var(--b3)); }
-.ai-hint-dot {
-    width: 4px; height: 4px;
-    border-radius: 50%;
-    background: currentColor;
-    animation: ai-dot-blink 1.4s ease-in-out infinite;
-}
-.ai-hint-val { line-height: 1; }
 </style>

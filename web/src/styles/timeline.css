@@ -1,0 +1,13 @@
+.timeline-hour            { height: 60px; border-top: 1px solid color-mix(in oklch, var(--color-base-300) 50%, transparent); position: relative; }
+.timeline-hour:first-child { border-top: none; }
+.timeline-label           { position: absolute; top: -9px; left: 0; font-size: 0.75rem; color: color-mix(in oklch, var(--color-base-content) 35%, transparent); width: 36px; text-align: right; }
+.timeline-now             { position: absolute; left: 44px; right: 0; height: 2px; background: var(--color-primary); z-index: 10; }
+.timeline-now::before     { content: ''; position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--color-primary); }
+.tl-event                 { position: absolute; left: 52px; right: 4px; border-radius: 6px; padding: 3px 7px; font-size: 0.75rem; cursor: pointer; transition: filter 0.15s; overflow: hidden; }
+.tl-event:hover           { filter: brightness(1.15); }
+.tl-event-meeting  { background: hsl(205 90% 55% / 0.20); border-left: 3px solid #0ea5e9; color: #7dd3fc; }
+.tl-event-commit   { background: hsl(245 60% 60% / 0.20); border-left: 3px solid #6366f1; color: #a5b4fc; }
+.tl-event-svn      { background: hsl(38 90% 55% / 0.20);  border-left: 3px solid #f59e0b; color: #fcd34d; }
+.tl-event-email-in { background: hsl(152 60% 45% / 0.20); border-left: 3px solid #10b981; color: #6ee7b7; }
+.tl-event-email-out { background: hsl(152 60% 45% / 0.12); border-left: 3px solid #059669; color: #6ee7b7; border-style: dashed; }
+.tl-event-corr     { outline: 1.5px solid color-mix(in oklch, var(--color-primary) 60%, transparent); }

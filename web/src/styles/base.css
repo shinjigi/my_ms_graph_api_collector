@@ -1,0 +1,11 @@
+.nav-link.active { background: color-mix(in oklch, var(--color-primary) 15%, transparent); color: var(--color-primary); font-weight: 600; }
+.commit-dot   { width: 8px; height: 8px; border-radius: 50%; display: inline-block; flex-shrink: 0; }
+.source-git   { background: #6366f1; }
+.source-svn   { background: #f59e0b; }
+.source-teams { background: #0ea5e9; }
+.source-mail  { background: #10b981; }
+.text-xxs     { font-size: 0.6rem; }
+
+input[type="number"] { appearance: textfield; -moz-appearance: textfield; }
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button { appearance: none; -webkit-appearance: none; margin: 0; }

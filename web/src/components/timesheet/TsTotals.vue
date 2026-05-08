@@ -23,7 +23,7 @@
                         <span v-if="d.zucHours > 0" class="text-success">{{ d.zucHours }}</span>
                         <div v-if="zucBadges(d, i).length > 0" class="flex flex-wrap gap-0.5 justify-center">
                             <span v-for="b in zucBadges(d, i)" :key="b.emoji"
-                                  class="zuc-badge" :title="b.title">{{ b.emoji }}</span>
+                                  class="ts-badge" :title="b.title">{{ b.emoji }}</span>
                         </div>
                     </div>
                 </template>
@@ -102,14 +102,6 @@ function zucBadges(d: Day, i: number): Badge[] {
 </script>
 
 <style scoped>
-.zuc-badge {
-    font-size: 0.7rem;
-    line-height: 1;
-    padding: 1px 3px;
-    border-radius: 3px;
-    background: oklch(var(--b3));
-    display: inline-flex;
-    align-items: center;
-    cursor: default;
-}
+.ts-totals-bg { background: hsl(var(--b2) / 0.55); }
+.day-err .err-x { color: #fff; font-weight: 900; text-shadow: 0 0 4px #0006; }
 </style>

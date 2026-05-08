@@ -75,6 +75,33 @@ function onKeydown(e: KeyboardEvent) {
 </script>
 
 <style scoped>
+/* ── Layout ── */
+.tc-wrap { display: inline-flex; align-items: center; gap: 3px; position: relative; }
+.tc-btn {
+    opacity: 0.4; width: 17px; height: 17px; border-radius: 50%; padding: 0;
+    border: 1px solid color-mix(in oklch, var(--color-primary) 50%, transparent); color: var(--color-primary);
+    font-size: 13px; line-height: 1; cursor: pointer; background: transparent;
+    display: flex; align-items: center; justify-content: center;
+    transition: opacity 0.12s, background 0.1s; flex-shrink: 0;
+}
+.tc-btn:hover { background: color-mix(in oklch, var(--color-primary) 25%, transparent); opacity: 1; }
+.tc-btn.invisible { pointer-events: none; opacity: 0 !important; }
+.tc-wrap:hover .tc-btn:not(.invisible) { opacity: 1; }
+.tc-val {
+    cursor: pointer; min-width: 22px; text-align: center;
+    border-radius: 4px; padding: 1px 2px;
+    transition: color 0.1s, background 0.1s;
+}
+.tc-val:hover { color: var(--color-primary); background: color-mix(in oklch, var(--color-primary) 10%, transparent); }
+.tc-input {
+    width: 38px; text-align: center;
+    background: var(--color-base-200); border: 1px solid var(--color-primary);
+    border-radius: 4px; font-size: 0.75rem; padding: 1px 3px;
+    outline: none; color: var(--color-primary); font-weight: 600;
+    appearance: none;
+}
+
+/* ── States ── */
 .tc-hint-differ {
     text-decoration: underline dotted oklch(var(--wa) / 0.6);
     cursor: help;

@@ -251,79 +251,27 @@ function cellCls(d: Day, i: number): string[] {
 </script>
 
 <style scoped>
+/* Layout only — color/border handled by :not(.ai-hint-btn) to avoid overriding global ai-hint-btn */
 .pin-add-btn {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: 2px;
-    width: 100%;
-    padding: 2px 0;
-    border-radius: 4px;
-    font-size: 0.7rem;
-    color: oklch(var(--bc) / 0.4);
-    transition: color 0.15s, background 0.15s;
-    cursor: pointer;
-    background: transparent;
-    border: none;
+    display: inline-flex; align-items: center; justify-content: center;
+    gap: 2px; width: 100%; padding: 2px 0; border-radius: 4px;
+    font-size: 0.7rem; transition: color 0.15s, background 0.15s;
+    cursor: pointer; background: transparent;
 }
-.pin-add-btn:hover {
-    color: oklch(var(--bc) / 0.9);
-    background: oklch(var(--b3));
-}
-.pin-add-hours {
-    font-weight: 700;
-    color: oklch(var(--wa));
-}
-.pin-add-plus {
-    font-size: 0.85rem;
-    font-weight: 700;
-    line-height: 1;
-}
+.pin-add-btn:not(.ai-hint-btn)       { color: oklch(var(--bc) / 0.4); border: none; }
+.pin-add-btn:not(.ai-hint-btn):hover { color: oklch(var(--bc) / 0.9); background: oklch(var(--b3)); }
+.pin-add-hours { font-weight: 700; color: oklch(var(--wa)); }
+.pin-add-plus  { font-size: 0.85rem; font-weight: 700; line-height: 1; }
 
-/* AI hint button — usato sia su active rows che su pinned */
-@keyframes ai-pulse {
-    0%, 100% { box-shadow: 0 0 0 0 var(--ai-color); }
-    50%       { box-shadow: 0 0 0 3px var(--ai-color); }
+/* Dismiss button for AI hint overlay */
+.ts-hint-dismiss {
+    position: absolute; right: -6px; top: -6px;
+    font-size: 0.55rem; width: 12px; height: 12px;
+    background: oklch(var(--b3)); color: oklch(var(--bc) / 0.5);
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; opacity: 0; transition: opacity 0.15s, color 0.1s;
+    z-index: 10; border: 1px solid oklch(var(--b3));
 }
-@keyframes ai-dot-blink {
-    0%, 100% { opacity: 1; }
-    50%       { opacity: 0.2; }
-}
-.ai-hint-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 3px;
-    padding: 2px 5px;
-    border-radius: 4px;
-    font-size: 0.7rem;
-    font-weight: 700;
-    cursor: pointer;
-    background: transparent;
-    border: 1px solid;
-    transition: background 0.15s;
-    /* default = medium/warning */
-    --ai-color: oklch(var(--wa) / 0.45);
-    color: oklch(var(--wa));
-    border-color: oklch(var(--wa) / 0.5);
-    animation: ai-pulse 2s ease-in-out infinite;
-}
-.ai-hint-btn.confidence-high {
-    --ai-color: oklch(var(--su) / 0.45);
-    color: oklch(var(--su));
-    border-color: oklch(var(--su) / 0.5);
-}
-.ai-hint-btn.confidence-low {
-    --ai-color: oklch(var(--er) / 0.3);
-    color: oklch(var(--er) / 0.7);
-    border-color: oklch(var(--er) / 0.35);
-}
-.ai-hint-btn:hover { background: oklch(var(--b3)); }
-.ai-hint-dot {
-    width: 4px;
-    height: 4px;
-    border-radius: 50%;
-    background: currentColor;
-    animation: ai-dot-blink 1.4s ease-in-out infinite;
-}
-.ai-hint-val { line-height: 1; }
+.group\/hint:hover .ts-hint-dismiss { opacity: 1; }
+.ts-hint-dismiss:hover { color: oklch(var(--er)); }
 </style>
