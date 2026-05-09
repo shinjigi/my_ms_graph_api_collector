@@ -1,7 +1,6 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { useRouter } from "vue-router";
-import { useUiStore } from "./useUiStore";
 import { findHoliday } from "@shared/holidays";
 
 interface PickerDay {
@@ -90,8 +89,8 @@ export const usePickerStore = defineStore(
          */
         function selectDay(yr: number, mo: number, d: number) {
             const dateStr = dateToString(new Date(yr, mo, d));
-            const ui = useUiStore();
-            router.push(`/${ui.activeView}/${dateStr}`);
+            const view = router.currentRoute.value.path.split('/')[1] || 'dashboard';
+            router.push(`/${view}/${dateStr}`);
         }
 
         /** Silent update from router — does NOT push to history. */
@@ -110,8 +109,8 @@ export const usePickerStore = defineStore(
 
         function goToday() {
             const today = dateToString(pickerToday.value);
-            const ui = useUiStore();
-            router.push(`/${ui.activeView}/${today}`);
+            const view = router.currentRoute.value.path.split('/')[1] || 'dashboard';
+            router.push(`/${view}/${today}`);
         }
 
         function prevWeek() {

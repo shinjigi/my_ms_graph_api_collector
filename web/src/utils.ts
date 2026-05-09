@@ -1,6 +1,6 @@
 /** Shared utility functions — single source of truth. */
 
-import type { ZucchettiJustification } from "@shared/zucchetti";
+import type { WorkLocation, ZucchettiJustification } from "@shared/zucchetti";
 import { ABSENCE_KEYWORDS } from "@shared/zucchetti";
 import type { Day, DayStatus } from "./types";
 
@@ -24,7 +24,7 @@ export function tpLink(id: number): string {
 // Location + giustificativi emoji helpers
 // ---------------------------------------------------------------------------
 
-export function locationEmoji(location: Day["location"]): string {
+export function locationEmoji(location?: WorkLocation): string {
   switch (location) {
     case "smart":
       return "🏠";
@@ -41,7 +41,24 @@ export function locationEmoji(location: Day["location"]): string {
   }
 }
 
-export function locationTitle(location: Day["location"]): string {
+export function locationShortLabel(location?: WorkLocation): string {
+  switch (location) {
+    case "smart":
+      return "Smart working";
+    case "office":
+      return "In ufficio";
+    case "travel":
+      return "Trasferta";
+    case "external":
+      return "Servizio esterno";
+    case "mixed":
+      return "Misto";
+    default:
+      return "Sconosciuto";
+  }
+}
+
+export function locationTitle(location?: WorkLocation): string {
   switch (location) {
     case "smart":
       return "Smart working (Nibol/Zucchetti)";
@@ -124,3 +141,15 @@ export function getDeltaHoursCls(delta: number, isHolidayAbsence = false): strin
   if (Math.abs(rounded) < 0.05) return "text-success font-black";
   return rounded > 0 ? "text-error" : "text-primary font-bold";
 }
+
+/** Extracts the first line of a multi-line string */
+export function firstLine(msg: string): string {
+  return msg.split('\n')[0];
+}
+
+/** Extracts all but the first line of a multi-line string */
+export function restOfMessage(msg: string): string {
+  const rest = msg.split('\n').slice(1).join('\n').trim();
+  return rest || '';
+}
+

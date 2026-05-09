@@ -277,6 +277,17 @@ export function formatDateLabel(input: Date | string): string {
 }
 
 /**
+ * Parses to formal visual representation suffix localized string including year. Example: "Lun 31 Mar 2026".
+ *
+ * @param {Date | string} input - Parsing context (if string, format "YYYY-MM" or "YYYY-MM-DD").
+ * @returns {string} Capitalized standard localized identifier string with year (e.g., "Lun 31 Mar 2026").
+ */
+export function formatFullDateLabel(input: Date | string): string {
+    const d = ensureDate(input);
+    return `${getDayOfWeek(d)} ${d.getDate()} ${getMonth(d).substring(0, 3)} ${getYear(d)}`;
+}
+
+/**
  * Shortened alternative format standard suffix localized string. Example: "31 Mar".
  *
  * @param {Date | string} input - Incoming date properties contextual indicator (if string, format "YYYY-MM" or "YYYY-MM-DD").

@@ -4,42 +4,63 @@
  * The date segment always drives the picker store.
  */
 import { createRouter, createWebHashHistory } from 'vue-router';
-import type { ActiveView } from '../types';
+import { getMonday } from "@shared/dates";
+import { usePickerStore } from '../stores/usePickerStore';
+import { useTimesheetStore } from '../stores/useTimesheetStore';
+import { useAnalysisStore } from '../stores/useAnalysisStore';
 
-const VALID_VIEWS: ActiveView[] = ['dashboard', 'timesheet', 'activity', 'teams', 'browser'];
-
-import { dateToString } from "@shared/dates";
 
 export const router = createRouter({
     history: createWebHashHistory(),
     routes: [
-        // Root → redirect to dashboard/today
+        { path: '/', redirect: () => `/dashboard/${new Date().toISOString().split('T')[0]}` },
+        { path: '/:view', redirect: (to) => `/${to.params.view}/${new Date().toISOString().split('T')[0]}` },
         {
-            path: '/',
-            redirect: () => `/dashboard/${dateToString()}`,
+            path: '/dashboard/:date',
+            component: () => import('../views/DashboardView.vue'),
         },
-        // /:view (no date) → append today
         {
-            path: '/:view',
-            redirect: (to) => `/${to.params.view}/${dateToString()}`,
+            path: '/timesheet/:date',
+            component: () => import('../components/timesheet/TimesheetView.vue'),
         },
-        // Main route
         {
-            path:      '/:view/:date',
-            component: () => import('../views/PortalView.vue'),
-            props:     true,
-            beforeEnter(to) {
-                const view = to.params.view as string;
-                const date = to.params.date as string;
-                if (!VALID_VIEWS.includes(view as ActiveView)) {
-                    return `/dashboard/${date}`;
-                }
-                if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-                    return `/${view}/${dateToString()}`;
-                }
-            },
+            path: '/activity/:date',
+            component: () => import('../components/activity/ActivityView.vue'),
         },
-        // Catch-all
+        {
+            path: '/teams/:date',
+            component: () => import('../components/teams/TeamsView.vue'),
+        },
+        {
+            path: '/browser/:date',
+            component: () => import('../components/browser/BrowserView.vue'),
+        },
         { path: '/:pathMatch(.*)*', redirect: '/' },
     ],
+});
+
+router.afterEach((to) => {
+    const date = to.params.date as string;
+
+    if (date && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        const parts = date.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (parts) {
+            const picker = usePickerStore();
+            const ts = useTimesheetStore();
+            const analysis = useAnalysisStore();
+
+            const yr = Number.parseInt(parts[1], 10);
+            const mo = Number.parseInt(parts[2], 10) - 1;
+            const d = Number.parseInt(parts[3], 10);
+            const current = picker.pickerSelected;
+
+            if (current.getFullYear() !== yr || current.getMonth() !== mo || current.getDate() !== d) {
+                picker.setFromDate(new Date(yr, mo, d));
+            }
+
+            const monday = getMonday(new Date(yr, mo, d));
+            ts.fetchWeekData(monday);
+            analysis.loadWeekHints(monday);
+        }
+    }
 });

@@ -27,9 +27,9 @@
             </ul>
             <div class="text-xs text-base-content/30 font-semibold px-3 pt-4 pb-1 uppercase tracking-wider">Sorgenti</div>
             <ul class="menu menu-sm gap-0.5">
-                <li><a class="rounded-lg opacity-60 hover:opacity-100 text-xs"><span class="commit-dot source-git"></span> Git (610)</a></li>
-                <li><a class="rounded-lg opacity-60 hover:opacity-100 text-xs"><span class="commit-dot source-svn"></span> SVN</a></li>
-                <li><a class="rounded-lg opacity-60 hover:opacity-100 text-xs"><span class="commit-dot source-teams"></span> Teams / Mail</a></li>
+                <li><a class="rounded-lg opacity-60 hover:opacity-100 text-xs"><SignalBadge type="git" label="Git (610)" /></a></li>
+                <li><a class="rounded-lg opacity-60 hover:opacity-100 text-xs"><SignalBadge type="svn" label="SVN" /></a></li>
+                <li><a class="rounded-lg opacity-60 hover:opacity-100 text-xs"><SignalBadge type="teams" label="Teams / Mail" /></a></li>
             </ul>
         </nav>
         <div class="p-3 border-t border-base-300">
@@ -53,6 +53,7 @@ import { computed }      from 'vue';
 import { usePickerStore } from '../../stores/usePickerStore';
 import { dateToString } from '@shared/dates';
 import type { ActiveView } from '../../types';
+import SignalBadge from '../common/SignalBadge.vue';
 
 const picker = usePickerStore();
 

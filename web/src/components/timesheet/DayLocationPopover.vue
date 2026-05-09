@@ -118,10 +118,10 @@
 import { ref, computed }                 from 'vue';
 import { useTimesheetStore }              from '../../stores/useTimesheetStore';
 import { syncData, submitZucchettiRequest } from '../../api';
-import { locationEmoji, locationTitle }  from '../../utils';
+import { locationEmoji, locationTitle, locationShortLabel }  from '../../utils';
 import { WORKDAY_HOURS, HALF_WORKDAY_HOURS } from '@shared/standards';
 import { formatDateLabel, dateToString }  from '@shared/dates';
-import type { WeekDayResponse }          from '../../types';
+import { parseNibolLocation } from '@shared/zucchetti';
 import type { ZucchettiJustification, ZucchettiRequest } from '@shared/zucchetti';
 
 const ts = useTimesheetStore();
@@ -141,8 +141,8 @@ const dateLabel = computed(() => {
 const nibolLabel = computed(() => {
     const n = dayData.value?.nibol;
     if (!n) return null;
-    const t = n.type.toLowerCase();
-    return t === 'remote' || t === 'home' ? '🏠 Smart working' : '🏢 In ufficio';
+    const loc = parseNibolLocation(n.type);
+    return `${locationEmoji(loc)} ${locationShortLabel(loc)}`;
 });
 
 const giust = computed((): ZucchettiJustification[] =>
@@ -246,7 +246,7 @@ async function doAction(
                 actionMsg.value    = result.skipped ? 'Già presente' : `✓ ${type}`;
                 actionMsgCls.value = result.skipped ? 'text-warning' : 'text-success';
                 if (result.dayUpdate) {
-                    ts.patchDay(dayIdx.value, result.dayUpdate as unknown as WeekDayResponse);
+                    ts.patchDay(dayIdx.value, result.dayUpdate);
                 }
             }
             ts.fillDay(dayIdx.value, tpHours);

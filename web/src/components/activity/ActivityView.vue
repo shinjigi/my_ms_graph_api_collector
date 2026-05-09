@@ -3,10 +3,10 @@
         <div class="flex items-center gap-3 mb-4">
             <h2 class="text-base font-bold">Commit — {{ dateLabel }}</h2>
             <span class="badge badge-outline badge-sm">
-                <span class="commit-dot source-git mr-1"></span>{{ day.gitCommits.length }} Git
+                <SignalBadge type="git" :count="day.gitCommits.length" label="Git" />
             </span>
             <span class="badge badge-outline badge-sm">
-                <span class="commit-dot source-svn mr-1"></span>{{ day.svnCommits.length }} SVN
+                <SignalBadge type="svn" :count="day.svnCommits.length" label="SVN" />
             </span>
         </div>
 
@@ -19,12 +19,12 @@
             <!-- Git commits -->
             <template v-if="day.gitCommits.length > 0">
                 <div class="text-xs font-bold text-base-content/50 uppercase tracking-wide mb-1 flex items-center gap-1.5">
-                    <span class="commit-dot source-git"></span> Git ({{ day.gitCommits.length }})
+                    <SignalBadge type="git" :label="`Git (${day.gitCommits.length})`" />
                 </div>
-                <div class="card bg-base-100 border border-base-300 shadow-sm">
+                <BaseCard no-padding>
                     <div class="divide-y divide-base-200">
                         <div v-for="c in day.gitCommits" :key="c.hash" class="p-3 flex items-start gap-3">
-                            <span class="commit-dot source-git mt-1.5 shrink-0"></span>
+                            <SignalBadge type="git" wrapper-class="mt-1.5 shrink-0" />
                             <div class="min-w-0 flex-1">
                                 <div class="text-sm font-medium text-base-content/80 break-words">{{ firstLine(c.message) }}</div>
                                 <div v-if="restOfMessage(c.message)" class="text-xs text-base-content/40 mt-0.5 whitespace-pre-wrap">{{ restOfMessage(c.message) }}</div>
@@ -36,18 +36,18 @@
                             </div>
                         </div>
                     </div>
-                </div>
+                </BaseCard>
             </template>
 
             <!-- SVN commits -->
             <template v-if="day.svnCommits.length > 0">
                 <div class="text-xs font-bold text-base-content/50 uppercase tracking-wide mb-1 mt-4 flex items-center gap-1.5">
-                    <span class="commit-dot source-svn"></span> SVN ({{ day.svnCommits.length }})
+                    <SignalBadge type="svn" :label="`SVN (${day.svnCommits.length})`" />
                 </div>
-                <div class="card bg-base-100 border border-base-300 shadow-sm">
+                <BaseCard no-padding>
                     <div class="divide-y divide-base-200">
                         <div v-for="c in day.svnCommits" :key="c.revision" class="p-3 flex items-start gap-3">
-                            <span class="commit-dot source-svn mt-1.5 shrink-0"></span>
+                            <SignalBadge type="svn" wrapper-class="mt-1.5 shrink-0" />
                             <div class="min-w-0 flex-1">
                                 <div class="text-sm font-medium text-base-content/80 break-words">{{ firstLine(c.message) }}</div>
                                 <div v-if="restOfMessage(c.message)" class="text-xs text-base-content/40 mt-0.5 whitespace-pre-wrap">{{ restOfMessage(c.message) }}</div>
@@ -61,29 +61,23 @@
                             </div>
                         </div>
                     </div>
-                </div>
+                </BaseCard>
             </template>
         </div>
     </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch }            from 'vue';
+import { computed }  from 'vue';
 import { usePickerStore }        from '../../stores/usePickerStore';
 import { useDayStore }           from '../../stores/useDayStore';
+import { firstLine, restOfMessage } from '../../utils';
+import { formatDateLabel }       from '@shared/dates';
+import BaseCard                  from '../common/BaseCard.vue';
+import SignalBadge               from '../common/SignalBadge.vue';
 
 const picker = usePickerStore();
 const day    = useDayStore();
 
-const dateLabel = ref('');
-
-function firstLine(msg: string)   { return msg.split('\n')[0]; }
-function restOfMessage(msg: string) {
-    const rest = msg.split('\n').slice(1).join('\n').trim();
-    return rest || '';
-}
-
-watch(() => picker.pickerSelected, (d) => {
-    dateLabel.value = d.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'short' });
-}, { immediate: true });
+const dateLabel = computed(() => formatDateLabel(picker.pickerSelected));
 </script>

@@ -1,9 +1,8 @@
 import { defineStore }  from 'pinia';
 import { ref }          from 'vue';
-import type { ActiveView, QuickSortState } from '../types';
+import type { QuickSortState } from '../types';
 
 export const useUiStore = defineStore('ui', () => {
-    const activeView      = ref<ActiveView>('dashboard');
     const weVisible       = ref(false);
     const browserExpanded = ref(false);
     const quickFilterSignals  = ref(false);
@@ -15,7 +14,6 @@ export const useUiStore = defineStore('ui', () => {
     const aiChatOpen      = ref(false);
     const emailModalId    = ref<number | null>(null);
 
-    function setView(v: ActiveView) { activeView.value = v; }
     function toggleWE()             { weVisible.value = !weVisible.value; }
     function toggleBrowser()        { browserExpanded.value = !browserExpanded.value; }
     function toggleAiChat()         { aiChatOpen.value = !aiChatOpen.value; }
@@ -39,18 +37,17 @@ export const useUiStore = defineStore('ui', () => {
     }
 
     return {
-        activeView, weVisible, browserExpanded,
+        weVisible, browserExpanded,
         quickFilterSignals, quickSearch, quickSort,
         pinnedFilterSignals, pinnedSearch, pinnedSort,
         aiChatOpen, emailModalId,
-        setView, toggleWE, toggleBrowser, toggleAiChat,
+        toggleWE, toggleBrowser, toggleAiChat,
         openEmail, closeEmail, sortQuick, sortPinned,
     };
 }, {
     persist: {
         key:  'ui.prefs',
         pick: [
-            'activeView',
             'weVisible',
             'browserExpanded',
             'quickFilterSignals',

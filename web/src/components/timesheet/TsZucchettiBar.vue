@@ -87,9 +87,7 @@ async function doAction(type: string, fullDay: boolean, tpHours: number, hours?:
             msgCls.value = result.skipped ? 'text-warning' : 'text-success';
 
             if (result.dayUpdate) {
-                // dayUpdate is WeekDayData (shared type with unknown[] arrays);
-                // at runtime the backend sends the fully typed structure — safe cast.
-                ts.patchDay(picker.selectedDayIdx, result.dayUpdate as unknown as WeekDayResponse);
+                ts.patchDay(picker.selectedDayIdx, result.dayUpdate);
             }
             if (result.scrapeError) {
                 console.warn('[TsZucchettiBar] Post-submit scrape failed:', result.scrapeError);

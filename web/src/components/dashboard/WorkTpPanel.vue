@@ -1,5 +1,5 @@
 <template>
-    <div class="card bg-base-100 border border-base-300 shadow-sm overflow-y-auto" style="max-height:660px;">
+    <BaseCard class="overflow-y-auto" style="max-height:660px;" no-padding padding-class="p-3">
         <div class="card-body p-3">
             <div class="flex items-center justify-between mb-2">
                 <div class="text-xs font-bold text-base-content/50 uppercase">Lavoro · TP</div>
@@ -20,13 +20,13 @@
 
             <!-- US cards -->
             <div
-                v-for="us in day.usToday"
+                v-for="us in enrichedUsToday"
                 :key="us.tpId"
                 class="us-card py-2 px-3"
                 :class="{ highlight: highlightedUs === us.us }"
             >
                 <div class="flex items-center gap-2 mb-1.5">
-                    <span class="state-dot shrink-0" :style="{ background: stateColor(us.state) }"></span>
+                    <StateDot :state="us.state" size="6px" extra-class="shrink-0" />
                     <a :href="tpLink(us.tpId)" target="_blank"
                        class="text-sm font-semibold hover:underline flex-1 truncate"
                        :style="{ color: us.color }">{{ us.us }}</a>
@@ -55,25 +55,25 @@
                 </div>
                 <div class="flex items-center gap-2 flex-wrap">
                     <span class="text-xs text-base-content/40 font-medium shrink-0">TP:</span>
-                    <template v-if="actions.computeCellMode(us.tpId, picker.selectedDayIdx) === 'hint-only'">
+                    <template v-if="us.cellMode === 'hint-only'">
                         <button class="ai-hint-btn"
-                                :class="`confidence-${actions.getHint(us.tpId, picker.selectedDayIdx)!.confidence}`"
+                                :class="`confidence-${us.hint!.confidence}`"
                                 @click="acceptCardHint(us.tpId)"
-                                :title="`AI (${actions.getHint(us.tpId, picker.selectedDayIdx)!.confidence}): ${actions.getHint(us.tpId, picker.selectedDayIdx)!.inferredHours}h`">
-                            <span class="ai-hint-val">{{ actions.getHint(us.tpId, picker.selectedDayIdx)!.inferredHours }}h</span>
+                                :title="`AI (${us.hint!.confidence}): ${us.hint!.inferredHours}h`">
+                            <span class="ai-hint-val">{{ us.hint!.inferredHours }}h</span>
                             <span class="ai-hint-dot"></span>
                         </button>
                     </template>
                     <template v-else>
                         <TimeCellWidget
                             :model-value="us.tpHours"
-                            :hint-val="actions.getHint(us.tpId, picker.selectedDayIdx)?.inferredHours"
-                            :cell-mode="actions.computeCellMode(us.tpId, picker.selectedDayIdx)"
+                            :hint-val="us.hint?.inferredHours"
+                            :cell-mode="us.cellMode"
                             @update="val => actions.updateCell(us.tpId, picker.selectedDayIdx, val)"
                         />
                     </template>
-                    <span v-if="us.emails"   class="us-signal"><span class="commit-dot source-mail" style="width:5px;height:5px"></span>{{ us.emails }} email</span>
-                    <span v-if="us.commits"  class="us-signal"><span class="commit-dot source-git"  style="width:5px;height:5px"></span>{{ us.commits }} commit</span>
+                    <SignalBadge v-if="us.emails" type="mail" small :label="`${us.emails} email`" wrapper-class="us-signal" />
+                    <SignalBadge v-if="us.commits" type="git" small :label="`${us.commits} commit`" wrapper-class="us-signal" />
                     <span v-if="us.meetings" class="us-signal">📅 {{ us.meetings }} meeting</span>
                     <a :href="tpLink(us.tpId)" target="_blank" class="us-signal text-primary hover:underline ml-auto shrink-0">→ TP #{{ us.tpId }}</a>
                 </div>
@@ -123,7 +123,7 @@
                     class="flex items-center gap-2 py-1 px-2 rounded-lg hover:bg-base-200/60 transition-colors group"
                     :class="r.commits > 0 ? '' : 'opacity-60'"
                 >
-                    <span class="state-dot shrink-0" :style="{ background: stateColor(r.state) }"></span>
+                    <StateDot :state="r.state" size="6px" extra-class="shrink-0" />
                     <a :href="tpLink(r.tpId)" target="_blank"
                        class="text-xs flex-1 truncate hover:underline hover:text-primary transition-colors"
                        :class="r.commits > 0 ? 'text-base-content/80' : 'text-base-content/50'"
@@ -142,7 +142,7 @@
                 </div>
             </div>
         </div>
-    </div>
+    </BaseCard>
 </template>
 
 <script setup lang="ts">
@@ -151,11 +151,13 @@ import { useDayStore }         from '../../stores/useDayStore';
 import { useUiStore }          from '../../stores/useUiStore';
 import { useTimesheetStore }   from '../../stores/useTimesheetStore';
 import { usePickerStore }      from '../../stores/usePickerStore';
-import { useDayStatus }        from '../../composables/useDayStatus';
 import { useCellActions }      from '../../composables/useCellActions';
-import { stateColor, tpLink } from '../../utils';
+import { tpLink } from '../../utils';
 import TimeCellWidget          from '../TimeCellWidget.vue';
 import NoteEdit                from './NoteEdit.vue';
+import BaseCard                from '../common/BaseCard.vue';
+import SignalBadge             from '../common/SignalBadge.vue';
+import StateDot                from '../common/StateDot.vue';
 import type { UsCard, QuickSortState } from '../../types';
 
 defineProps<{ highlightedUs?: string }>();
@@ -164,8 +166,15 @@ const day      = useDayStore();
 const ui       = useUiStore();
 const ts       = useTimesheetStore();
 const picker   = usePickerStore();
-const status   = useDayStatus();
 const actions  = useCellActions();
+
+const enrichedUsToday = computed(() => {
+    return day.usToday.map(us => ({
+        ...us,
+        cellMode: actions.computeCellMode(us.tpId, picker.selectedDayIdx),
+        hint: actions.getHint(us.tpId, picker.selectedDayIdx)
+    }));
+});
 
 function acceptCardHint(tpId: number) {
     actions.acceptHint(tpId, picker.selectedDayIdx);
@@ -249,9 +258,6 @@ const filteredQuickLog = computed(() => {
 .us-card            { border-bottom: 1px solid oklch(var(--b3)); transition: background 0.2s; }
 .us-card:last-child { border-bottom: none; }
 .us-card.highlight  { background: oklch(var(--p) / 0.05); }
-
-/* 6px variant — intentionally smaller than global 8px state-dot used in TsRow */
-.state-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
 
 .us-signal {
     background: oklch(var(--b2)); padding: 1px 6px; border-radius: 99px;

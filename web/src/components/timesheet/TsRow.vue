@@ -5,7 +5,7 @@
         </td>
         <td class="truncate">
             <span class="state-dot-wrap">
-                <span class="state-dot" :style="{ background: dotColor }"></span>
+                <StateDot :state="row.state" />
                 {{ stateAbbr }}
             </span>
         </td>
@@ -39,8 +39,8 @@
                     </button>
                     <TsNoteCell v-if="ts.getHours(row.tpId, i) > 0" :tpId="row.tpId" :day-idx="i" />
                     <div class="flex gap-1">
-                        <span v-if="row.git?.[i]" class="commit-dot source-git" :title="`${row.git[i]} git commit`"></span>
-                        <span v-if="row.svn?.[i]" class="commit-dot source-svn" :title="`${row.svn[i]} svn commit`"></span>
+                        <SignalBadge v-if="row.git?.[i]" type="git" :title="`${row.git[i]} git commit`" />
+                        <SignalBadge v-if="row.svn?.[i]" type="svn" :title="`${row.svn[i]} svn commit`" />
                     </div>
                 </div>
             </template>
@@ -75,8 +75,8 @@
                     </template>
                     <TsNoteCell :tpId="row.tpId" :day-idx="i" />
                     <div class="flex gap-1 mt-0.5">
-                        <span v-if="row.git?.[i]" class="commit-dot source-git"></span>
-                        <span v-if="row.svn?.[i]" class="commit-dot source-svn"></span>
+                        <SignalBadge v-if="row.git?.[i]" type="git" />
+                        <SignalBadge v-if="row.svn?.[i]" type="svn" />
                     </div>
                 </div>
             </template>
@@ -90,8 +90,8 @@
                     @update="val => ts.setHours(row.tpId, 5, val)"
                 />
                 <div class="flex gap-1 mt-0.5">
-                    <span v-if="ui.weVisible ? row.git?.[5] : (row.git?.[5] ?? 0) + (row.git?.[6] ?? 0)" class="commit-dot source-git"></span>
-                    <span v-if="ui.weVisible ? row.svn?.[5] : (row.svn?.[5] ?? 0) + (row.svn?.[6] ?? 0)" class="commit-dot source-svn"></span>
+                    <SignalBadge v-if="ui.weVisible ? row.git?.[5] : (row.git?.[5] ?? 0) + (row.git?.[6] ?? 0)" type="git" />
+                    <SignalBadge v-if="ui.weVisible ? row.svn?.[5] : (row.svn?.[5] ?? 0) + (row.svn?.[6] ?? 0)" type="svn" />
                 </div>
             </div>
         </td>
@@ -104,8 +104,8 @@
                     @update="val => ts.setHours(row.tpId, 6, val)"
                 />
                 <div class="flex gap-1 mt-0.5">
-                    <span v-if="row.git?.[6]" class="commit-dot source-git"></span>
-                    <span v-if="row.svn?.[6]" class="commit-dot source-svn"></span>
+                    <SignalBadge v-if="row.git?.[6]" type="git" />
+                    <SignalBadge v-if="row.svn?.[6]" type="svn" />
                 </div>
             </div>
         </td>
@@ -129,11 +129,13 @@ import { usePickerStore }      from '../../stores/usePickerStore';
 import { useUiStore }          from '../../stores/useUiStore';
 import { useDayStatus }        from '../../composables/useDayStatus';
 import { useCellActions }      from '../../composables/useCellActions';
-import { stateColor, tpLink as makeTpLink } from '../../utils';
+import { tpLink as makeTpLink } from '../../utils';
 import { hoursToHhmm, getMonday } from '@shared/dates';
 import type { TsRow }          from '../../types';
 import TimeCellWidget          from '../TimeCellWidget.vue';
 import TsNoteCell              from './TsNoteCell.vue';
+import StateDot                from '../common/StateDot.vue';
+import SignalBadge             from '../common/SignalBadge.vue';
 
 const props = defineProps<{ row: TsRow; isPinned: boolean }>();
 
@@ -153,7 +155,6 @@ function selectDay(dayIdx: number) {
 }
 
 const rowTpLink = makeTpLink(props.row.tpId);
-const dotColor  = computed(() => stateColor(props.row.state));
 const stateAbbr = computed(() =>
     ({
         'Inception': 'Inception',
