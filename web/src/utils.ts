@@ -2,7 +2,7 @@
 
 import type { ZucchettiJustification } from "@shared/zucchetti";
 import { ABSENCE_KEYWORDS } from "@shared/zucchetti";
-import type { Day } from "./types";
+import type { Day, DayStatus } from "./types";
 
 const STATE_COLORS: Record<string, string> = {
   Inception: "#94a3b8",
@@ -87,24 +87,24 @@ export function giustActivityEmojis(
   return result;
 }
 
-export function rendStatusCls(status: "ok" | "warn" | "err" | null): string[] {
+export function rendStatusCls(status: DayStatus): string[] {
   if (!status) return [];
   if (status === "ok") return ["day-ok"];
-  if (status === "warn") return ["day-warn"];
+  if (status === "warn" || status === "over") return ["day-warn"];
   if (status === "err") return ["day-err"];
   return [];
 }
 
-export function rendStatusIcon(status: "ok" | "warn" | "err" | null): string {
+export function rendStatusIcon(status: DayStatus): string {
   if (status === "ok") return "✓";
-  if (status === "warn") return "⚠";
+  if (status === "warn" || status === "over") return "⚠";
   if (status === "err") return "✗";
   return "";
 }
 
-export function rendStatusIconCls(status: "ok" | "warn" | "err" | null): string {
+export function rendStatusIconCls(status: DayStatus): string {
   if (status === "ok") return "text-success";
-  if (status === "warn") return "text-warning";
+  if (status === "warn" || status === "over") return "text-warning";
   if (status === "err") return "text-error opacity-80";
   return "opacity-0";
 }

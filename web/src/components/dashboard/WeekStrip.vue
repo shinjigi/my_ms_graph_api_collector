@@ -23,9 +23,9 @@
                         active: card.isSelected,
                         'outline outline-2 outline-offset-1 outline-primary/60 shadow-md':
                             card.isToday,
-                        'rend-ok': ts.rendPerDay[i] === 'ok',
-                        'rend-warn': ts.rendPerDay[i] === 'warn',
-                        'rend-err': ts.rendPerDay[i] === 'err',
+                        'rend-ok': card.rendStatus === 'ok',
+                        'rend-warn': card.rendStatus === 'warn',
+                        'rend-err': card.rendStatus === 'err',
                     }"
                     @click="
                         picker.selectDay(
@@ -85,6 +85,7 @@
 import { computed, ref } from "vue";
 import { usePickerStore } from "../../stores/usePickerStore";
 import { useTimesheetStore } from "../../stores/useTimesheetStore";
+import { useDayStatus } from "../../composables/useDayStatus";
 import {
     locationEmoji,
     locationTitle,
@@ -97,6 +98,7 @@ import DayLocationPopover from "../timesheet/DayLocationPopover.vue";
 
 const picker = usePickerStore();
 const ts = useTimesheetStore();
+const { getStatus, getDayColCls } = useDayStatus();
 const popover = ref<InstanceType<typeof DayLocationPopover> | null>(null);
 
 const weekCards = computed(() => {
@@ -110,12 +112,12 @@ const weekCards = computed(() => {
         const monAbbr = date.toLocaleDateString("it-IT", { month: "short" });
         const dateLabel = `${date.getDate()} ${monAbbr.charAt(0).toUpperCase() + monAbbr.slice(1, 3)}`;
 
-        const colCls = ts.getDayColCls(i);
+        const colCls = getDayColCls(i);
         const isSelected = colCls.includes("selected-col");
         const isToday = colCls.includes("today-col");
         const tpH = ts.totalsRow.tp[i];
 
-        const r = ts.rendPerDay[i] ?? null;
+        const r = getStatus(i) ?? null;
         const rendIcon = rendStatusIcon(r) || "·";
         const rendIconCls = rendStatusIconCls(r) || "text-base-content/20";
 
@@ -131,6 +133,7 @@ const weekCards = computed(() => {
             dateLabel,
             isSelected,
             isToday,
+            rendStatus: r,
             rendIcon,
             rendIconCls,
             zucH: d.zucHours,

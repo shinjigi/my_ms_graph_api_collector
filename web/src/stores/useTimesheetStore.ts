@@ -3,7 +3,6 @@ import { ref, computed } from "vue";
 import { fetchWeek, fetchTpWeekHours, submitWeekHours as submitWeekHoursApi } from "../api";
 import type { Day, TsRow, ApiWeekResponse, SubmitEdit, WeekDayResponse } from "../types";
 import { useAnalysisStore } from "./useAnalysisStore";
-import { usePickerStore } from "./usePickerStore";
 import { getDayOfWeek, shiftDate, formatShortDateLabel, getMonday, isEqual, isSameDay, isFuture } from "@shared/dates";
 
 export const useTimesheetStore = defineStore(
@@ -72,23 +71,6 @@ export const useTimesheetStore = defineStore(
             return { tp, zuc, delta };
         });
 
-        const rendPerDay = computed<Array<"ok" | "warn" | "err" | null>>(() => {
-            return days.value.map((d, i) => {
-                if (d.holiday) {
-                    // Absence day with TP hours logged = error (should be 0)
-                    if (d.holidayType === "absence" && totalsRow.value.tp[i] > 0) return "err";
-                    return null;
-                }
-                if (i >= 5 || d.zucHours === 0) return null;
-                // Skip future days — no color indicator until the day has passed (or is today)
-                const dayDate = weekData.value?.days[i]?.date;
-                if (dayDate && isFuture(dayDate)) return null;
-                const delta = totalsRow.value.delta[i];
-                if (Math.abs(delta) < 0.05) return "ok";
-                return totalsRow.value.tp[i] === 0 ? "err" : "warn";
-            });
-        });
-
         /**
          * Single Source of Truth for pending actions.
          * Union of manual Edits and AI Hints.
@@ -123,7 +105,6 @@ export const useTimesheetStore = defineStore(
                         } else {
                             const hint = useAnalysisStore().getHint(row.tpId, i, monday);
                             // Path B è solo safety net: include solo hint esplicitamente accepted
-                            // (suggested = opt-in, non auto-queued)
                             if (!hint || hint.inferredHours <= 0 || hint.status !== "accepted")
                                 continue;
 
@@ -170,7 +151,7 @@ export const useTimesheetStore = defineStore(
                 if (currentMonday.value && !isEqual(currentMonday.value, weekRes.monday)) clearEdits();
                 currentMonday.value = weekRes.monday;
 
-                days.value = weekRes.days.map((d, i) => ({
+                days.value = weekRes.days.map((d) => ({
                     label: getDayOfWeek(d.date) ?? "?",
                     date: formatShortDateLabel(d.date),
                     rend: null,
@@ -297,13 +278,11 @@ export const useTimesheetStore = defineStore(
         }
 
         function fillDay(dayIdx: number, targetHours: number) {
-            // Find all rows that have hours for this day
             const all = allRowsFlattened.value;
             const current = +all.reduce((acc, r) => acc + getHours(r.tpId, dayIdx), 0).toFixed(1);
             const diff = +(targetHours - current).toFixed(1);
             if (Math.abs(diff) < 0.05) return;
 
-            // Try to find an existing active task to add the diff to
             const targetTask = all.find((r) => getHours(r.tpId, dayIdx) > 0) || all[0];
             if (targetTask) {
                 const newVal = Math.max(0, getHours(targetTask.tpId, dayIdx) + diff);
@@ -338,7 +317,6 @@ export const useTimesheetStore = defineStore(
             pendingPromotion,
             pendingSubmissions,
             totalsRow,
-            rendPerDay,
             fetchWeekData,
             getHours,
             getNote,
@@ -355,36 +333,6 @@ export const useTimesheetStore = defineStore(
             addExtraTask,
             allTasks,
             usExtra,
-
-            /** Centralized logic for column CSS classes (holiday, today, selected, health status) */
-            getDayColCls(i: number): string[] {
-                const picker = usePickerStore();
-                const d = days.value[i];
-                const cls: string[] = [];
-
-                // 1. Holiday status
-                if (d?.holiday) {
-                    cls.push(d.holidayType === "absence" ? "absence-col" : "holiday-col");
-                    if (rendPerDay.value[i] === "err") cls.push("day-err");
-                } else {
-                    // 2. Health status (ok/warn/err)
-                    const status = rendPerDay.value[i];
-                    if (status === "ok") cls.push("day-ok");
-                    if (status === "warn") cls.push("day-warn");
-                    if (status === "err") cls.push("day-err");
-                }
-
-                // 3. Temporal highlighting
-                const dayDate = weekData.value?.days[i]?.date;
-                if (dayDate && isSameDay(new Date(dayDate), picker.pickerToday)) {
-                    cls.push("today-col");
-                }
-                if (i === picker.selectedDayIdx) {
-                    cls.push("selected-col");
-                }
-
-                return cls;
-            },
 
             /** Weekly totals (Mon-Sun) */
             tpWeekTotal: computed(() => totalsRow.value.tp.reduce((a, b) => a + b, 0)),
@@ -411,9 +359,9 @@ export const useTimesheetStore = defineStore(
     },
     {
         persist: [
-            { key: "ts.draft_hours",  pick: ["hoursEdits"] },
-            { key: "ts.draft_notes",  pick: ["noteEdits"] },
-            { key: "ts.extra_tasks",  pick: ["usExtra"] },
+            { key: "ts.draft_hours", pick: ["hoursEdits"] },
+            { key: "ts.draft_notes", pick: ["noteEdits"] },
+            { key: "ts.extra_tasks", pick: ["usExtra"] },
         ],
     },
 );

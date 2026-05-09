@@ -55,26 +55,21 @@
                 </div>
                 <div class="flex items-center gap-2 flex-wrap">
                     <span class="text-xs text-base-content/40 font-medium shrink-0">TP:</span>
-                    <template v-if="cardCellMode(us.tpId) === 'hint-only'">
+                    <template v-if="actions.computeCellMode(us.tpId, picker.selectedDayIdx) === 'hint-only'">
                         <button class="ai-hint-btn"
-                                :class="`confidence-${cardHint(us.tpId)!.confidence}`"
+                                :class="`confidence-${actions.getHint(us.tpId, picker.selectedDayIdx)!.confidence}`"
                                 @click="acceptCardHint(us.tpId)"
-                                :title="`AI (${cardHint(us.tpId)!.confidence}): ${cardHint(us.tpId)!.inferredHours}h`">
-                            <span class="ai-hint-val">{{ cardHint(us.tpId)!.inferredHours }}h</span>
+                                :title="`AI (${actions.getHint(us.tpId, picker.selectedDayIdx)!.confidence}): ${actions.getHint(us.tpId, picker.selectedDayIdx)!.inferredHours}h`">
+                            <span class="ai-hint-val">{{ actions.getHint(us.tpId, picker.selectedDayIdx)!.inferredHours }}h</span>
                             <span class="ai-hint-dot"></span>
                         </button>
                     </template>
                     <template v-else>
                         <TimeCellWidget
                             :model-value="us.tpHours"
-                            :hint-val="cardHint(us.tpId)?.inferredHours"
-                            :cell-mode="cardCellMode(us.tpId)"
-                            @update="val => {
-                                day.setTpHours(us.tpId, val);
-                                if (val === 0) day.setUsNote(us.tpId, '');
-                                else if (cardHint(us.tpId)?.comment)
-                                    day.setUsNote(us.tpId, cardHint(us.tpId)!.comment!);
-                            }"
+                            :hint-val="actions.getHint(us.tpId, picker.selectedDayIdx)?.inferredHours"
+                            :cell-mode="actions.computeCellMode(us.tpId, picker.selectedDayIdx)"
+                            @update="val => actions.updateCell(us.tpId, picker.selectedDayIdx, val)"
                         />
                     </template>
                     <span v-if="us.emails"   class="us-signal"><span class="commit-dot source-mail" style="width:5px;height:5px"></span>{{ us.emails }} email</span>
@@ -86,7 +81,7 @@
                 <NoteEdit
                     class="mt-1.5 pt-1.5 border-t border-base-300/50 text-xs text-base-content/55"
                     :value="us.note"
-                    @update="val => day.setUsNote(us.tpId, val)"
+                    @update="val => actions.updateNote(us.tpId, picker.selectedDayIdx, val)"
                 />
             </div>
 
@@ -137,7 +132,7 @@
                     <span class="text-base-content/25 text-xs shrink-0 tabular-nums">{{ r.totAllTime ?? '' }}h</span>
                     <button
                         class="btn btn-ghost btn-xs btn-square text-base-content/35 hover:text-primary hover:bg-primary/10 opacity-0 group-hover:opacity-100 transition-opacity"
-                        @click="day.addToWorkToday(r.tpId)"
+                        @click="actions.activateTask(r.tpId, picker.selectedDayIdx)"
                         title="Aggiungi a Lavoro TP"
                     >
                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -156,12 +151,12 @@ import { useDayStore }         from '../../stores/useDayStore';
 import { useUiStore }          from '../../stores/useUiStore';
 import { useTimesheetStore }   from '../../stores/useTimesheetStore';
 import { usePickerStore }      from '../../stores/usePickerStore';
-import { useAnalysisStore }    from '../../stores/useAnalysisStore';
+import { useDayStatus }        from '../../composables/useDayStatus';
+import { useCellActions }      from '../../composables/useCellActions';
 import { stateColor, tpLink } from '../../utils';
-import { shiftDate }        from '@shared/dates';
 import TimeCellWidget          from '../TimeCellWidget.vue';
 import NoteEdit                from './NoteEdit.vue';
-import type { UsCard, QuickSortState, CellMode } from '../../types';
+import type { UsCard, QuickSortState } from '../../types';
 
 defineProps<{ highlightedUs?: string }>();
 
@@ -169,46 +164,11 @@ const day      = useDayStore();
 const ui       = useUiStore();
 const ts       = useTimesheetStore();
 const picker   = usePickerStore();
-const analysis = useAnalysisStore();
-
-function cardHint(tpId: number) {
-    const monday = ts.currentMonday;
-    const i      = picker.selectedDayIdx;
-    if (!monday || i < 0) return null;
-    return analysis.getHint(tpId, i, monday);
-}
-
-function cardCellMode(tpId: number): CellMode {
-    const monday = ts.currentMonday;
-    const i      = picker.selectedDayIdx;
-    if (!monday || i < 0) return 'clean';
-    const hint    = analysis.getHint(tpId, i, monday);
-    const key     = `${tpId}_${i}`;
-    const hasEdit = key in ts.hoursEdits;
-    const hours   = ts.getHours(tpId, i);
-
-    // If day is balanced, hide pulsating hints (hint-only) for tasks without hours
-    if (Math.abs(day.dayTotals.delta) < 0.05 && (!hasEdit || hours === 0))
-        return 'clean';
-
-    if (!hint || hint.inferredHours <= 0)
-        return hasEdit && hours > 0 ? 'user-edit' : 'clean';
-    if (!hasEdit || hours === 0) return 'hint-only';
-    if (+hours.toFixed(1) === +hint.inferredHours.toFixed(1)) return 'hint-match';
-    return 'hint-differ';
-}
+const status   = useDayStatus();
+const actions  = useCellActions();
 
 function acceptCardHint(tpId: number) {
-    const i    = picker.selectedDayIdx;
-    const hint = cardHint(tpId);
-    if (!hint || i < 0 || !ts.currentMonday) return;
-    ts.setHours(tpId, i, hint.inferredHours);
-    if (hint.comment)
-        ts.setNote(tpId, i, hint.comment);
-
-    // Persist to server
-    const dateStr = shiftDate(ts.currentMonday, i);
-    analysis.setEntryStatus(dateStr, tpId, 'applied');
+    actions.acceptHint(tpId, picker.selectedDayIdx);
 }
 
 const submitting   = ref(false);

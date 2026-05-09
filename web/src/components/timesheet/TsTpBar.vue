@@ -11,8 +11,7 @@
 
         <button class="btn btn-xs btn-outline btn-secondary gap-1"
                 :disabled="analysis.isRunning"
-                @click="runWeekAnalysis(false)"
-                @click.shift.stop="runWeekAnalysis(true)"
+                @click="handleAnalyzeClick"
                 title="Analizza settimana con AI · Shift+click per forzare rigenerazione">
             <span v-if="analysis.isRunning" class="loading loading-spinner loading-xs"></span>
             <svg v-else class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -55,7 +54,7 @@ import { useTimesheetStore }    from '../../stores/useTimesheetStore';
 import { useAnalysisStore }     from '../../stores/useAnalysisStore';
 import { usePickerStore }       from '../../stores/usePickerStore';
 import TpSubmitPopover          from './TpSubmitPopover.vue';
-import { dateToString }         from '@shared/dates';
+import { dateToString, parseDateString } from '@shared/dates';
 
 defineEmits<{ (e: 'open-verifica'): void }>();
 
@@ -71,7 +70,13 @@ function selectedDateStr(): string {
     return dateToString(picker.pickerSelected);
 }
 
+function handleAnalyzeClick(e: MouseEvent) {
+    runWeekAnalysis(e.shiftKey);
+}
+
 function runWeekAnalysis(force = false) {
+    analysisDoneMsg.value = '';
+    alreadyDone.value = false;
     const monday = ts.currentMonday ? dateToString(ts.currentMonday) : selectedDateStr();
     analysis.runWeek(monday, force);
 }
@@ -91,6 +96,7 @@ watch(() => analysis.status?.status, (newStatus) => {
         const s     = analysis.status;
         const count = Object.keys(s?.completed ?? {}).length;
         const errs  = Object.keys(s?.errors ?? {}).length;
+        
         if (count > 0) {
             analysisDoneMsg.value = `✓ ${count} giorni analizzati`;
             alreadyDone.value     = false;
@@ -98,9 +104,16 @@ watch(() => analysis.status?.status, (newStatus) => {
             analysisDoneMsg.value = '✓ Già analizzato';
             alreadyDone.value     = true;
         }
+
         // Reload hints from baseline files now that analysis is done
-        analysis.loadWeekHints(ts.currentMonday || selectedDateStr());
-        setTimeout(() => { analysisDoneMsg.value = ''; alreadyDone.value = false; }, 10000);
+        // Ensure we pass a Date object
+        const monday = ts.currentMonday || parseDateString(selectedDateStr());
+        analysis.loadWeekHints(monday);
+
+        setTimeout(() => { 
+            analysisDoneMsg.value = ''; 
+            // We keep alreadyDone true if it was set, so the button stays until manual reset or 10s
+        }, 10000);
     }
 });
 

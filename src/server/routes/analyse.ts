@@ -79,15 +79,27 @@ async function runAnalysis(job: AnalysisJobStatus & { id: string }, force: boole
     await mkdir(PROPOSALS_DIR, { recursive: true });
 
     const daysToProcess: AggregatedDay[] = [];
+    const skippedExisting: string[] = [];
+    const skippedNotWorkday: string[] = [];
 
     for (const date of job.dates) {
       // Skip if proposal exists and not forced
       if (!force && (await proposalExists(date))) {
+        skippedExisting.push(date);
         continue;
       }
 
       const day = await loadAggDay(date);
-      if (!day?.isWorkday) continue;
+      if (!day) {
+        logger.debug(`[analyse-job ${job.id}] ${date}: nessun file aggregato — skip`);
+        skippedNotWorkday.push(date);
+        continue;
+      }
+      if (!day.isWorkday) {
+        logger.debug(`[analyse-job ${job.id}] ${date}: isWorkday=false — skip`);
+        skippedNotWorkday.push(date);
+        continue;
+      }
       daysToProcess.push(day);
     }
 
@@ -97,9 +109,15 @@ async function runAnalysis(job: AnalysisJobStatus & { id: string }, force: boole
     }
 
     if (daysToProcess.length === 0) {
-      logger.info(
-        `[analyse-job ${job.id}] Tutti i giorni già analizzati — nessun nuovo proposal da generare (usa force=true per forzare).`,
-      );
+      if (skippedNotWorkday.length > 0) {
+        logger.info(
+          `[analyse-job ${job.id}] Nessun giorno lavorativo da analizzare. Non-lavorativi: [${skippedNotWorkday.join(', ')}].`,
+        );
+      } else {
+        logger.info(
+          `[analyse-job ${job.id}] Tutti i giorni già analizzati — nessun nuovo proposal da generare (usa force=true per forzare).`,
+        );
+      }
     } else {
       logger.info(
         `[analyse-job ${job.id}] Analisi batch per ${daysToProcess.length} giorni...`,

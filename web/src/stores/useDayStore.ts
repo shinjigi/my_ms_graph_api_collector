@@ -162,24 +162,9 @@ export const useDayStore = defineStore("day", () => {
 
     // --- Actions ---
 
-    function addToWorkToday(tpId: number) {
-        if (dayIdx.value < 0) return;
-        ts.setHours(tpId, dayIdx.value, 0.1); // Setting minimum hours "activates" it for today view
-    }
-
     function addManualRow(name: string) {
         if (dayIdx.value < 0) return;
         ts.addExtraTask(name, dayIdx.value);
-    }
-
-    function setUsNote(tpId: number, text: string) {
-        if (dayIdx.value < 0) return;
-        ts.setNote(tpId, dayIdx.value, text);
-    }
-
-    function setTpHours(tpId: number, val: number) {
-        if (dayIdx.value < 0) return;
-        ts.setHours(tpId, dayIdx.value, val);
     }
 
     const dayTotals = computed(() => {
@@ -201,9 +186,6 @@ export const useDayStore = defineStore("day", () => {
         svnCommits,
         quickLog,
         dayTotals,
-        addToWorkToday,
         addManualRow,
-        setUsNote,
-        setTpHours,
     };
 });

@@ -48,6 +48,7 @@ import { usePickerStore }    from '../stores/usePickerStore';
 import { useTimesheetStore } from '../stores/useTimesheetStore';
 import { useDayStore }       from '../stores/useDayStore';
 import { useAnalysisStore }  from '../stores/useAnalysisStore';
+import { useDayStatus }      from '../composables/useDayStatus';
 import type { ActiveView }   from '../types';
 import StatStrip             from '../components/dashboard/StatStrip.vue';
 import WeekStrip             from '../components/dashboard/WeekStrip.vue';
@@ -68,6 +69,7 @@ const picker = usePickerStore();
 const ts       = useTimesheetStore();
 const day      = useDayStore();
 const analysis = useAnalysisStore();
+const { getStatus } = useDayStatus();
 
 const highlightUs = ref('');
 
@@ -109,6 +111,6 @@ const dayLocation = computed(() => {
 });
 
 const dayRendStatus = computed(() =>
-    dayIdx.value >= 0 ? (ts.rendPerDay[dayIdx.value] ?? null) : null
+    dayIdx.value >= 0 ? (getStatus(dayIdx.value) ?? null) : null
 );
 </script>

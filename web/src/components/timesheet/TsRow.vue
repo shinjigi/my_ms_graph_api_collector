@@ -10,9 +10,9 @@
             </span>
         </td>
         <!-- Day cells Mon–Fri -->
-        <td v-for="(d, i) in days.slice(0, 5)" :key="i"
+        <td v-for="(d, i) in ts.days.slice(0, 5)" :key="i"
             class="text-center"
-            :class="cellCls(d, i)"
+            :class="status.getDayColCls(i)"
             @click.stop="(!d.holiday || (d.holidayType === 'absence' && ts.getHours(row.tpId, i) > 0)) && !isPinned ? selectDay(i) : undefined">
             <template v-if="d.holiday && (d.holidayType !== 'absence' || ts.getHours(row.tpId, i) === 0)">
                 <span class="text-xs ts-holiday-icon">{{ d.holidayType === 'absence' ? '🏖️' : '🇮🇹' }}</span>
@@ -22,16 +22,16 @@
                 <div class="flex flex-col items-center gap-0.5">
                     <button class="pin-add-btn"
                             :class="{
-                                'ai-hint-btn': !!(cellHint(i) && ts.getHours(row.tpId, i) === 0),
-                                [`confidence-${cellHint(i)?.confidence}`]: !!(cellHint(i) && ts.getHours(row.tpId, i) === 0)
+                                'ai-hint-btn': !!(actions.getHint(row.tpId, i) && ts.getHours(row.tpId, i) === 0),
+                                [`confidence-${actions.getHint(row.tpId, i)?.confidence}`]: !!(actions.getHint(row.tpId, i) && ts.getHours(row.tpId, i) === 0)
                             }"
-                            @click.stop="quickAdd(i)"
-                            :title="cellHint(i) && ts.getHours(row.tpId, i) === 0
-                                ? `AI (${cellHint(i)!.confidence}): ${cellHint(i)!.inferredHours}h`
+                            @click.stop="actions.quickAdd(row.tpId, i)"
+                            :title="actions.getHint(row.tpId, i) && ts.getHours(row.tpId, i) === 0
+                                ? `AI (${actions.getHint(row.tpId, i)!.confidence}): ${actions.getHint(row.tpId, i)!.inferredHours}h`
                                 : '+0.5h'">
                         <span v-if="ts.getHours(row.tpId, i) > 0" class="pin-add-hours">{{ hoursToHhmm(ts.getHours(row.tpId, i)) }}</span>
-                        <template v-else-if="cellHint(i)">
-                            <span class="ai-hint-val">{{ cellHint(i)!.inferredHours }}h</span>
+                        <template v-else-if="actions.getHint(row.tpId, i)">
+                            <span class="ai-hint-val">{{ actions.getHint(row.tpId, i)!.inferredHours }}h</span>
                             <span class="ai-hint-dot"></span>
                         </template>
                         <span v-else class="pin-add-plus">+</span>
@@ -48,17 +48,17 @@
             <template v-else>
                 <div class="flex flex-col items-center gap-0">
                     <!-- HINT-ONLY: bottone pulsante AI -->
-                    <template v-if="computeCellMode(i) === 'hint-only'">
+                    <template v-if="actions.computeCellMode(row.tpId, i) === 'hint-only'">
                         <div class="relative group/hint">
                             <button class="ai-hint-btn"
-                                    :class="`confidence-${cellHint(i)!.confidence}`"
-                                    @click.stop="acceptHint(i)"
-                                    :title="`AI (${cellHint(i)!.confidence}): ${(cellHint(i)!.reasoning ?? '').slice(0, 80)}`">
-                                <span class="ai-hint-val">{{ cellHint(i)!.inferredHours }}h</span>
+                                    :class="`confidence-${actions.getHint(row.tpId, i)!.confidence}`"
+                                    @click.stop="actions.acceptHint(row.tpId, i)"
+                                    :title="`AI (${actions.getHint(row.tpId, i)!.confidence}): ${(actions.getHint(row.tpId, i)!.reasoning ?? '').slice(0, 80)}`">
+                                <span class="ai-hint-val">{{ actions.getHint(row.tpId, i)!.inferredHours }}h</span>
                                 <span class="ai-hint-dot"></span>
                             </button>
                             <button class="ts-hint-dismiss"
-                                    @click.stop="dismissHint(i)"
+                                    @click.stop="actions.dismissHint(row.tpId, i)"
                                     title="Ignora suggerimento">✕</button>
                         </div>
                     </template>
@@ -66,11 +66,11 @@
                     <template v-else>
                         <TimeCellWidget
                             :model-value="ts.getHours(row.tpId, i)"
-                            :extra-val-cls="`font-bold text-xs ${i === picker.selectedDayIdx ? 'text-primary' : ''}`"
+                            :extra-val-cls="`font-bold text-xs ${status.isSelected(i) ? 'text-primary' : ''}`"
                             :day-delta="ts.totalsRow.delta[i]"
-                            :hint-val="cellHint(i)?.inferredHours"
-                            :cell-mode="computeCellMode(i)"
-                            @update="val => handleCellUpdate(i, val)"
+                            :hint-val="actions.getHint(row.tpId, i)?.inferredHours"
+                            :cell-mode="actions.computeCellMode(row.tpId, i)"
+                            @update="val => actions.updateCell(row.tpId, i, val)"
                         />
                     </template>
                     <TsNoteCell :tpId="row.tpId" :day-idx="i" />
@@ -127,98 +127,23 @@ import { computed }            from 'vue';
 import { useTimesheetStore }   from '../../stores/useTimesheetStore';
 import { usePickerStore }      from '../../stores/usePickerStore';
 import { useUiStore }          from '../../stores/useUiStore';
-import { useAnalysisStore }    from '../../stores/useAnalysisStore';
+import { useDayStatus }        from '../../composables/useDayStatus';
+import { useCellActions }      from '../../composables/useCellActions';
 import { stateColor, tpLink as makeTpLink } from '../../utils';
-import { hoursToHhmm, getMonday, shiftDate } from '@shared/dates';
-import type { TsRow, Day, CellMode } from '../../types';
+import { hoursToHhmm, getMonday } from '@shared/dates';
+import type { TsRow }          from '../../types';
 import TimeCellWidget          from '../TimeCellWidget.vue';
 import TsNoteCell              from './TsNoteCell.vue';
 
 const props = defineProps<{ row: TsRow; isPinned: boolean }>();
 
-const ts       = useTimesheetStore();
-const picker   = usePickerStore();
-const ui       = useUiStore();
-const analysis = useAnalysisStore();
+const ts      = useTimesheetStore();
+const picker  = usePickerStore();
+const ui      = useUiStore();
+const status  = useDayStatus();
+const actions = useCellActions();
 
 const isPending = computed(() => ts.pendingPromotion.includes(props.row.tpId));
-
-function cellHint(i: number) {
-    const monday = ts.currentMonday;
-    if (!monday) return null;
-    return analysis.getHint(props.row.tpId, i, monday);
-}
-
-function computeCellMode(i: number): CellMode {
-    const hint    = cellHint(i);
-    const key     = `${props.row.tpId}_${i}`;
-    const hasEdit = key in ts.hoursEdits;
-    const hours   = ts.getHours(props.row.tpId, i);
-
-    // If day is balanced, hide pulsating hints (hint-only) for tasks without hours
-    if (Math.abs(ts.totalsRow.delta[i]) < 0.05 && hours === 0)
-        return 'clean';
-
-    if (!hint || hint.inferredHours <= 0)
-        return hasEdit ? 'user-edit' : 'clean';
-        
-    if (hasEdit) return 'user-edit';
-    
-    if (hours === 0) return 'hint-only';
-    if (+hours.toFixed(1) === +hint.inferredHours.toFixed(1)) return 'hint-match';
-    return 'hint-differ';
-}
-
-function acceptHint(dayIdx: number) {
-    const hint = cellHint(dayIdx);
-    if (!hint || !ts.currentMonday) return;
-    ts.setHours(props.row.tpId, dayIdx, hint.inferredHours);
-    const noteText = hint.comment || hint.reasoning;
-    if (noteText)
-        ts.setNote(props.row.tpId, dayIdx, noteText);
-    const dateStr = shiftDate(ts.currentMonday!, dayIdx);
-    analysis.setEntryStatus(dateStr, props.row.tpId, 'accepted');
-}
-
-function dismissHint(dayIdx: number) {
-    if (!ts.currentMonday) return;
-    analysis.dismissHint(props.row.tpId, dayIdx, ts.currentMonday);
-    ts.clearCellEdit(props.row.tpId, dayIdx);
-}
-
-function handleCellUpdate(dayIdx: number, val: number) {
-    ts.setHours(props.row.tpId, dayIdx, val);
-    if (val === 0) {
-        ts.setNote(props.row.tpId, dayIdx, '');
-    } else {
-        const noteText = cellHint(dayIdx)?.comment || cellHint(dayIdx)?.reasoning;
-        if (noteText) ts.setNote(props.row.tpId, dayIdx, noteText);
-    }
-    const hint = cellHint(dayIdx);
-    if (hint?.status === 'accepted' && val !== hint.inferredHours && ts.currentMonday) {
-        const dateStr = shiftDate(ts.currentMonday, dayIdx);
-        analysis.setEntryStatus(dateStr, props.row.tpId, 'overridden');
-    }
-}
-
-function quickAdd(dayIdx: number) {
-    const hint    = cellHint(dayIdx);
-    const current = ts.getHours(props.row.tpId, dayIdx);
-    if (hint && current === 0) {
-        ts.setHours(props.row.tpId, dayIdx, hint.inferredHours);
-        const noteText = hint.comment || hint.reasoning;
-        if (noteText)
-            ts.setNote(props.row.tpId, dayIdx, noteText);
-        if (ts.currentMonday) {
-            const dateStr = shiftDate(ts.currentMonday, dayIdx);
-            analysis.setEntryStatus(dateStr, props.row.tpId, 'accepted');
-        }
-    } else {
-        ts.setHours(props.row.tpId, dayIdx, current + 0.5);
-    }
-    ts.schedulePromotion(props.row.tpId);
-}
-const days   = computed(() => ts.days);
 
 function selectDay(dayIdx: number) {
     const monday = getMonday(picker.pickerSelected);
@@ -242,12 +167,8 @@ const weHours = computed(() =>
     (ts.getHours(props.row.tpId, 5)) + (ts.getHours(props.row.tpId, 6))
 );
 const weekTotal = computed(() =>
-    +days.value.reduce((acc, _, i) => acc + ts.getHours(props.row.tpId, i), 0).toFixed(1)
+    +ts.days.reduce((acc, _, i) => acc + ts.getHours(props.row.tpId, i), 0).toFixed(1)
 );
-
-function cellCls(d: Day, i: number): string[] {
-    return ts.getDayColCls(i);
-}
 </script>
 
 <style scoped>

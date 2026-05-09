@@ -44,6 +44,8 @@ export type CellMode =
   | "hint-differ" // utente ha inserito un valore diverso
   | "user-edit"; // utente ha editato, nessun hint
 
+export type DayStatus = "ok" | "warn" | "err" | "over" | "skip" | null;
+
 export interface Holiday {
   m: number;
   d: number;

@@ -3,7 +3,7 @@
         <DayLocationPopover ref="popover" />
         <tr class="text-xs ts-totals-bg">
             <td colspan="2" class="text-right pr-3 text-base-content/50 text-xs font-semibold">Ore TP</td>
-            <td v-for="(d, i) in ts.days.slice(0, 5)" :key="i" class="text-center text-xs font-bold" :class="totalsCellCls(d, i, 'tp')">
+            <td v-for="(d, i) in ts.days.slice(0, 5)" :key="i" class="text-center text-xs font-bold" :class="totalsCellCls(i, 'tp')">
                 <template v-if="d.holiday && !(d.holidayType === 'absence' && ts.totalsRow.tp[i] > 0)">{{ d.holidayType === 'absence' ? '🏖️' : '🇮🇹' }}</template>
                 <template v-else>{{ +ts.totalsRow.tp[i].toFixed(1) || '—' }}</template>
             </td>
@@ -16,13 +16,13 @@
             <td colspan="2" class="text-right pr-3 text-base-content/50 text-xs font-semibold">Zucchetti</td>
             <td v-for="(d, i) in ts.days.slice(0, 5)" :key="i" 
                 class="text-center text-xs font-bold" 
-                :class="totalsCellCls(d, i, 'zuc')">
+                :class="totalsCellCls(i, 'zuc')">
                 <template v-if="d.holiday">{{ d.holidayType === 'absence' ? '🏖️' : '🇮🇹' }}</template>
-                <template v-else-if="d.zucHours > 0 || zucGiust(i).length > 0">
+                <template v-else-if="d.zucHours > 0 || badges.getBadges(i).length > 0">
                     <div class="flex flex-col items-center gap-0.5 py-0.5 cursor-pointer" @click="popover?.open(i)">
                         <span v-if="d.zucHours > 0" class="text-success">{{ d.zucHours }}</span>
-                        <div v-if="zucBadges(d, i).length > 0" class="flex flex-wrap gap-0.5 justify-center">
-                            <span v-for="b in zucBadges(d, i)" :key="b.emoji"
+                        <div v-if="badges.getBadges(i).length > 0" class="flex flex-wrap gap-0.5 justify-center">
+                            <span v-for="b in badges.getBadges(i)" :key="b.emoji"
                                   class="ts-badge" :title="b.title">{{ b.emoji }}</span>
                         </div>
                     </div>
@@ -38,7 +38,7 @@
         </tr>
         <tr class="text-xs border-b-2 border-base-300 ts-totals-bg">
             <td colspan="2" class="text-right pr-3 text-base-content/50 text-xs font-semibold">Delta</td>
-            <td v-for="(d, i) in ts.days.slice(0, 5)" :key="i" class="text-center text-xs" :class="totalsCellCls(d, i, 'delta')">
+            <td v-for="(d, i) in ts.days.slice(0, 5)" :key="i" class="text-center text-xs" :class="totalsCellCls(i, 'delta')">
                 <template v-if="d.holiday && !(d.holidayType === 'absence' && ts.totalsRow.tp[i] > 0)">—</template>
                 <template v-else>
                     <span :class="getDeltaHoursCls(ts.totalsRow.delta[i], d.holidayType === 'absence' && ts.totalsRow.tp[i] > 0)">
@@ -58,43 +58,24 @@
 import { ref } from 'vue';
 import { useTimesheetStore } from "../../stores/useTimesheetStore";
 import { useUiStore }                            from '../../stores/useUiStore';
-import { locationEmoji, locationTitle, giustActivityEmojis, formatDeltaHours, getDeltaHoursCls } from '../../utils';
-import type { Day } from '../../types';
-import type { ZucchettiJustification } from '@shared/zucchetti';
+import { useDayStatus }                          from '../../composables/useDayStatus';
+import { useZucchettiBadges }                    from '../../composables/useZucchettiBadges';
+import { formatDeltaHours, getDeltaHoursCls } from '../../utils';
 import DayLocationPopover from './DayLocationPopover.vue';
 
-const ts     = useTimesheetStore();
-const ui     = useUiStore();
+const ts      = useTimesheetStore();
+const ui      = useUiStore();
+const status  = useDayStatus();
+const badges  = useZucchettiBadges();
 
 const popover = ref<InstanceType<typeof DayLocationPopover> | null>(null);
 
-function isToday(i: number): boolean {
-    return ts.getDayColCls(i).includes('today-col');
-}
-
-function totalsCellCls(d: Day, i: number, row: 'tp' | 'zuc' | 'delta'): string[] {
-    const cls = ts.getDayColCls(i);
-    if (row === 'tp' && cls.includes('today-col')) {
+function totalsCellCls(i: number, row: 'tp' | 'zuc' | 'delta'): string[] {
+    const cls = status.getDayColCls(i);
+    if (row === 'tp' && status.isToday(i)) {
         cls.push('text-primary');
     }
     return cls;
-}
-
-function zucGiust(i: number): ZucchettiJustification[] {
-    return ts.weekData?.days[i]?.zucchetti?.giustificativi ?? [];
-}
-
-interface Badge { emoji: string; title: string }
-
-function zucBadges(d: Day, i: number): Badge[] {
-    const badges: Badge[] = [];
-    if (d.location) {
-        badges.push({ emoji: locationEmoji(d.location), title: locationTitle(d.location) });
-    }
-    for (const emoji of giustActivityEmojis(zucGiust(i))) {
-        badges.push({ emoji, title: emoji });
-    }
-    return badges;
 }
 </script>
 

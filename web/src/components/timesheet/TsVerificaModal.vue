@@ -71,12 +71,14 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useTimesheetStore } from '../../stores/useTimesheetStore';
+import { useDayStatus }       from '../../composables/useDayStatus';
 import { formatDeltaHours, getDeltaHoursCls } from '../../utils';
 
 defineProps<{ open: boolean }>();
 defineEmits<{ (e: 'close'): void }>();
 
 const ts     = useTimesheetStore();
+const status = useDayStatus();
 
 interface VerificaRow {
     label:   string;
@@ -90,20 +92,16 @@ interface VerificaRow {
 
 const verificaRows = computed<VerificaRow[]>(() =>
     ts.days.slice(0, 5).map((d, i) => {
-        if (d.holiday) {
-            return { label: d.label, zuc: 0, server: 0, tp: 0, delta: 0, status: 'skip', isToday: false };
-        }
-        const zuc    = d.zucHours;
-        const server = ts.serverTotalsRow[i];
-        const tp     = +ts.totalsRow.tp[i].toFixed(1);
-        const delta  = +(zuc - tp).toFixed(1);
-        const isToday = ts.getDayColCls(i).includes('today-col');
-
-        if (zuc === 0 && tp === 0) return { label: d.label, zuc, server, tp, delta: 0, status: 'skip', isToday };
-        if (delta === 0)           return { label: d.label, zuc, server, tp, delta: 0, status: 'ok',   isToday };
-        if (tp === 0)              return { label: d.label, zuc, server, tp, delta,    status: 'err',  isToday };
-        if (delta < 0)             return { label: d.label, zuc, server, tp, delta,    status: 'over', isToday };
-        return                            { label: d.label, zuc, server, tp, delta,    status: 'warn', isToday };
+        const s = status.getStatus(i);
+        return {
+            label:   d.label,
+            zuc:     d.zucHours,
+            server:  ts.serverTotalsRow[i],
+            tp:      +ts.totalsRow.tp[i].toFixed(1),
+            delta:   ts.totalsRow.delta[i],
+            status:  (s === null ? 'ok' : s) as any,
+            isToday: status.isToday(i)
+        };
     })
 );
 
