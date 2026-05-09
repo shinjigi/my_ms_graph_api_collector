@@ -33,9 +33,11 @@
                     </span>
                 </template>
                 <template v-else>
-                    <span class="flex flex-col items-center gap-0.5">
+                    <span class="flex flex-col items-center gap-0.5 cursor-pointer opacity-80 hover:opacity-100"
+                          @click="ui.toggleWE()" title="Comprimi weekend">
                         <span>Sab</span>
                         <span class="font-normal opacity-60 text-xs">{{ ts.days[5]?.date ?? '' }}</span>
+                        <span class="text-xxs opacity-55">◂◂</span>
                     </span>
                 </template>
             </th>
