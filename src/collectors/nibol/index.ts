@@ -20,7 +20,6 @@ import { dateToString, currentMonthString,    getYearMonth,
 } from "@shared/dates";
 import type { NibolBooking } from "@shared/aggregator";
 import { CONFIG } from "@shared/env-config";
-import { parseISO } from "date-fns";
 import { getJsonRawPath } from "../../json-io";
 
 const log = createLogger("nibol");
