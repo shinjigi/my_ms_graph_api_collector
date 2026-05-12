@@ -2,7 +2,7 @@ import { Page, Frame } from "playwright";
 import { parseArgs } from "node:util";
 import { createLogger } from "../../logger";
 import { startZucchettiSession } from "./session";
-import { scrapeCartellino, validateDay } from "./scraper";
+import { scrapeCartellino, validateDay, waitForCartelloReload } from "./scraper";
 import { MonthData } from "@shared/zucchetti";
 import { parseDateString, getYearMonth, addMonths } from "@shared/dates";
 
@@ -48,6 +48,7 @@ void (async () => {
       state: "visible",
       timeout: 15000,
     });
+    await waitForCartelloReload(newPage);
   };
 
   // Determine the list of months to scrape

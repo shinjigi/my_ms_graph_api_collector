@@ -4,7 +4,7 @@ import { createLogger } from "../../logger";
 
 const log = createLogger("zucchetti-update");
 import { startZucchettiSession } from "./session";
-import { scrapeSingleDay, validateDay, patchRawZucchettiFile } from "./scraper";
+import { scrapeSingleDay, validateDay, patchRawZucchettiFile, waitForCartelloReload } from "./scraper";
 import { aggregateSingleDay } from "../../aggregators/aggregator";
 import type { WeekDayData } from "@shared/week";
 import type { ZucchettiRequestResult } from "@shared/submit";
@@ -104,6 +104,7 @@ export async function submitZucchettiRequest(
       state: "visible",
       timeout: 15000,
     });
+    await waitForCartelloReload(newPage);
   };
 
   try {
@@ -355,8 +356,10 @@ export async function submitZucchettiRequest(
           await closeBtn.click();
         }
         // Zucchetti keeps connections alive — networkidle never fires.
-        // A short fixed wait is enough; postSubmitScrape waits on the grid rows.
-        await newPage.waitForTimeout(3000);
+        // Wait for the loading spinner (#rif_mbbody) to disappear so the richieste
+        // column is fully populated before scraping.
+        await newPage.waitForTimeout(500);
+        await waitForCartelloReload(newPage);
 
         // Re-identify the grid frame after reload (old reference may be stale)
         for (const frame of newPage.frames()) {

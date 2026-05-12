@@ -17,6 +17,21 @@ import { getJsonRawPath } from "../../json-io";
 
 const ZUCC_DIR = getJsonRawPath("zucchetti");
 
+// ── Grid reload wait ──────────────────────────────────────────────────────────
+
+/**
+ * Attende che il div della griglia Cartellino completi il ciclo hidden→visible
+ * che Zucchetti esegue dopo ogni reload (cambio mese, post-submit, ecc.).
+ * Fallback: 3s fissi se il div non cambia visibilità entro 5s.
+ */
+export async function waitForCartelloReload(page: Page, timeout = 15000): Promise<void> {
+  const gridDiv = page.locator('[id$="_Grid1"][class*="cartellino"]');
+  await gridDiv.waitFor({ state: "hidden",  timeout: 5000   }).catch(() => {});
+  await gridDiv.waitFor({ state: "visible", timeout }).catch(async () => {
+    await page.waitForTimeout(3000);
+  });
+}
+
 // ── Scraping ─────────────────────────────────────────────────────────────────
 
 interface TimesheetHeader {
