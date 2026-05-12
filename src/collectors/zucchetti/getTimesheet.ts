@@ -36,7 +36,7 @@ if (values.date) {
 void (async () => {
   // Use shared session for login + Cartellino navigation
   const session = await startZucchettiSession();
-  const { browser, page: newPage } = session;
+  const { context, page: newPage } = session;
 
   const waitStable = async (target: Page | Frame) => {
     await newPage.waitForLoadState("networkidle");
@@ -138,5 +138,5 @@ void (async () => {
   }
   console.log("--- END JSON ---");
 
-  await browser.close();
+  await context.close();
 })();

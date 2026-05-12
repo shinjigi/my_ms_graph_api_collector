@@ -92,7 +92,7 @@ export async function submitZucchettiRequest(
 
   // Use shared session for login + Cartellino navigation (headless resolved from env if not explicit)
   const session = await startZucchettiSession(headless);
-  const { browser, page: newPage } = session;
+  const { context, page: newPage } = session;
 
   const waitStable = async (target: Page | Frame) => {
     await newPage.waitForLoadState("networkidle");
@@ -376,7 +376,7 @@ export async function submitZucchettiRequest(
 
     return result;
   } finally {
-    await browser.close();
+    await context.close();
   }
 }
 

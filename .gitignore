@@ -4,10 +4,11 @@ node_modules/
 .env copy
 .claude/settings.local.json
 web/dist/
-.automation-chrome/nibol/
+.automation-chrome/
 
 data/*
 !data/kb/
 data/kb/*
 !data/kb/us-summaries.json
 graphify-out/*
+src/collectors/zucchetti/session.ts

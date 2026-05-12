@@ -1,11 +1,11 @@
-import { chromium, Browser, BrowserContext, Page, Frame } from "playwright";
+import { BrowserContext, Page, Frame } from "playwright";
 import { createLogger } from "../../logger";
 import { CONFIG } from "@shared/env-config";
+import { createBrowserSession } from "../browser";
 
 const log = createLogger("zucchetti-session");
 
 export interface ZucchettiSession {
-    browser: Browser;
     context: BrowserContext;
     page: Page;
     cookies: string;
@@ -45,9 +45,7 @@ export async function startZucchettiSession(headless?: boolean): Promise<Zucchet
     }
 
     log.info("Avvio browser Chromium...");
-    const browser = await chromium.launch({ headless });
-    const context = await browser.newContext();
-    const page = await context.newPage();
+    const { context, page } = await createBrowserSession({ headless });
 
     // ── 1. Navigazione alla home ─────────────────────────────────────────────
     const homeUrl = `${baseUrl}/hrpzcs01/jsp/home.jsp`;
@@ -301,7 +299,6 @@ export async function startZucchettiSession(headless?: boolean): Promise<Zucchet
     log.info("Sessione inizializzata con successo ✅");
 
     return {
-        browser,
         context,
         page: timesheetPage,
         cookies,

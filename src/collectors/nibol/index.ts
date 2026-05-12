@@ -9,7 +9,7 @@
  */
 import path from "node:path";
 import * as nodeFs from "node:fs/promises";
-import { chromium } from "playwright";
+import { createBrowserSession } from "../browser";
 import { readMeta, writeMeta, shouldSkipMonth, listJsonFiles } from "../../utils";
 import { createLogger } from "../../logger";
 import { dateToString, currentMonthString,    getYearMonth,
@@ -28,14 +28,6 @@ export type { NibolBooking };
 
 const NIBOL_URL = CONFIG.NIBOL_URL;
 
-function getProfileDir(): string {
-  const dir = CONFIG.NIBOL_PROFILE_DIR;
-  if (!dir) {
-    throw new Error("NIBOL_PROFILE_DIR non configurato in .env");
-  }
-  return dir;
-}
-
 async function isLoginRequired(
   page: import("playwright").Page,
 ): Promise<boolean> {
@@ -46,14 +38,11 @@ async function isLoginRequired(
 export async function nibolBookDesk(date: string): Promise<void> {
   // URL expects YYYYMMDD
   const formattedDate = date.replaceAll("-", "");
-  const profileDir = getProfileDir();
-  const context = await chromium.launchPersistentContext(profileDir, {
+  const { context, page } = await createBrowserSession({
     headless: false,
-    slowMo: 500, // Slightly slower to be safer with UI interactions
+    slowMo: 500,
     args: ["--no-sandbox", "--start-maximized"],
   });
-
-  const page = await context.newPage();
   try {
     log.info(`Navigating to home for date: ${formattedDate}`);
     await page.goto(`${NIBOL_URL}/home?day=${formattedDate}`, {
@@ -258,14 +247,11 @@ export async function nibolBookDesk(date: string): Promise<void> {
 }
 
 export async function nibolCheckIn(date: string): Promise<void> {
-  const profileDir = getProfileDir();
-  const context = await chromium.launchPersistentContext(profileDir, {
+  const { context, page } = await createBrowserSession({
     headless: false,
     slowMo: 200,
     args: ["--no-sandbox"],
   });
-
-  const page = await context.newPage();
 
   try {
     await page.goto(`${NIBOL_URL}/checkin`, { waitUntil: "networkidle" });
@@ -300,16 +286,12 @@ export async function nibolFetchCalendarData(range?: {
   start: Date;
   end: Date;
 }): Promise<NibolBooking[]> {
-  const profileDir = getProfileDir();
   const userName = CONFIG.NIBOL_USER_NAME;
-
-  const context = await chromium.launchPersistentContext(profileDir, {
+  const { context, page } = await createBrowserSession({
     headless: false,
     slowMo: 500,
     args: ["--no-sandbox", "--start-maximized"],
   });
-
-  const page = await context.newPage();
 
   try {
     // If range.start is provided, we could try to navigate to that specific month

@@ -84,7 +84,7 @@ const ConfigSchema = z.object({
     ZUCCHETTI_PASSWORD: z.string().nonoptional(),
     ZUCCHETTI_HEADLESS: z.coerce.boolean().default(false),
 
-    NIBOL_PROFILE_DIR: z.string().default("./.automation-chrome/nibol"),
+    AUTOMATION_PROFILE_DIR: z.string().default("./.automation-chrome/automation"),
     NIBOL_URL: z.url({ message: "URL Nibol non valido" }).default("https://app.nibol.com"),
     NIBOL_USER_NAME: z.string().nonoptional(),
 
@@ -156,7 +156,7 @@ export const CONFIG = ConfigSchema.parse({
     ZUCCHETTI_PASSWORD: process.env.ZUCCHETTI_PASSWORD,
     ZUCCHETTI_HEADLESS: process.env.ZUCCHETTI_HEADLESS,
 
-    NIBOL_PROFILE_DIR: process.env.NIBOL_PROFILE_DIR,
+    AUTOMATION_PROFILE_DIR: process.env.AUTOMATION_PROFILE_DIR,
     NIBOL_URL: process.env.NIBOL_URL,
     NIBOL_USER_NAME: process.env.NIBOL_USER_NAME,
 
