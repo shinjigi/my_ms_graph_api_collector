@@ -177,7 +177,7 @@ export async function startZucchettiSession(headless?: boolean): Promise<Zucchet
         await timesheetPage.locator("#rif_mbbody").waitFor({ state: "detached", timeout: 30000 });
         log.info("Spinner #rif_mbbody scomparso. Pagina pronta.");
     } catch (_e) {
-        log.warn("⚠️  #rif_mbbody non è scomparso entro 30s – continuo comunque.");
+        log.warn("⚠️  #rif_mbbody non è scomparso entro 30s – continuo comunque.", _e);
     }
     log.debug("Dump window completo (filtrato)...");
 
@@ -204,8 +204,9 @@ export async function startZucchettiSession(headless?: boolean): Promise<Zucchet
                         result[key] = val;
                     }
                 }
-            } catch (e) {
-                log.warn(`Errore durante l'estrazione della variabile ${key}: ${e}`); // property access on window[key] may throw — skip silently
+            } catch (_e) {
+                // property access on window[key] may throw — skip silently
+                // NOTE: log is not available inside evaluate (browser context)
             }
         }
 

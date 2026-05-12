@@ -74,7 +74,12 @@ export function createLogger(namespace: string): Logger {
     const suffix = args.length
       ? " " +
         args
-          .map((a) => (typeof a === "object" ? JSON.stringify(a) : String(a)))
+          .map((a) => {
+            if (a instanceof Error)
+              return `${a.message}${a.stack ? `\n${a.stack}` : ""}`;
+            if (typeof a === "object") return JSON.stringify(a);
+            return String(a);
+          })
           .join(" ")
       : "";
 

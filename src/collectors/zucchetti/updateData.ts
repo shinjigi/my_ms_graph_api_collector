@@ -354,9 +354,9 @@ export async function submitZucchettiRequest(
           log.info("Closing submission modal...");
           await closeBtn.click();
         }
-        // Wait for the grid iframe to fully reload
-        await newPage.waitForLoadState("networkidle", { timeout: 20000 });
-        await newPage.waitForTimeout(2000);
+        // Zucchetti keeps connections alive — networkidle never fires.
+        // A short fixed wait is enough; postSubmitScrape waits on the grid rows.
+        await newPage.waitForTimeout(3000);
 
         // Re-identify the grid frame after reload (old reference may be stale)
         for (const frame of newPage.frames()) {
