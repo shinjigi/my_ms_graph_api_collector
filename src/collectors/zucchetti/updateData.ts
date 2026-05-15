@@ -4,7 +4,7 @@ import { createLogger } from "../../logger";
 
 const log = createLogger("zucchetti-update");
 import { startZucchettiSession } from "./session";
-import { scrapeSingleDay, validateDay, patchRawZucchettiFile, waitForCartelloReload } from "./scraper";
+import { scrapeSingleDay, validateDay, patchRawZucchettiFile, findGridFrame, selectPeriod } from "./scraper";
 import { aggregateSingleDay } from "../../aggregators/aggregator";
 import type { WeekDayData } from "@shared/week";
 import type { ZucchettiRequestResult } from "@shared/submit";
@@ -112,41 +112,9 @@ export async function submitZucchettiRequest(
   const session = await startZucchettiSession(headless);
   const { context, page: newPage } = session;
 
-  const waitStable = async (target: Page | Frame) => {
-    await newPage.waitForLoadState("networkidle");
-    await target.waitForSelector('select[id$="_TxtAnno"]:not([disabled])', {
-      state: "visible",
-      timeout: 15000,
-    });
-    await target.waitForSelector('select[id$="_TxtMese"]:not([disabled])', {
-      state: "visible",
-      timeout: 15000,
-    });
-    await waitForCartelloReload(newPage);
-  };
-
   try {
     // 1. Identifica il frame che contiene il cartellino (può essere la pagina principale o un iframe)
-    const frames = newPage.frames();
-    let gridFrame: Page | Frame = newPage;
-    let foundGrid = false;
-
-    log.info("Ricerca del frame contenente la griglia del cartellino...");
-    for (const frame of frames) {
-      const rows = await frame.locator('tr[id*="_Grid1_row"]').count();
-      if (rows > 0) {
-        gridFrame = frame;
-        foundGrid = true;
-        log.info(`Griglia trovata nel frame: ${frame.name() || frame.url()}`);
-        break;
-      }
-    }
-
-    if (!foundGrid) {
-      log.warn(
-        "Griglia non trovata nei frames, procedo con la pagina principale.",
-      );
-    }
+    let gridFrame: Page | Frame = await findGridFrame(newPage);
 
     // 1.5 Imposta il periodo corretto (Mese/Anno) se necessario
     const [y, m] = targetDate.split("-");
@@ -154,19 +122,7 @@ export async function submitZucchettiRequest(
     const targetMonth = Number.parseInt(m, 10).toString();
 
     log.info(`Setting target period to ${targetMonth}/${targetYear}...`);
-    const yearSelect = gridFrame
-      .locator('select[id$="_TxtAnno"]')
-      .filter({ visible: true })
-      .first();
-    await yearSelect.selectOption(targetYear);
-    await waitStable(gridFrame);
-
-    const monthSelect = gridFrame
-      .locator('select[id$="_TxtMese"]')
-      .filter({ visible: true })
-      .first();
-    await monthSelect.selectOption(targetMonth);
-    await waitStable(gridFrame);
+    await selectPeriod(newPage, gridFrame, targetYear, targetMonth);
     await newPage.waitForTimeout(2000); // Safety wait for grid to refresh
 
     // 2. Check if existing activities
@@ -374,13 +330,7 @@ export async function submitZucchettiRequest(
           await closeBtn.click();
         }
         // Re-identify the grid frame after modal close (old reference may be stale)
-        for (const frame of newPage.frames()) {
-          const rows = await frame.locator('tr[id*="_Grid1_row"]').count();
-          if (rows > 0) {
-            gridFrame = frame;
-            break;
-          }
-        }
+        gridFrame = await findGridFrame(newPage);
 
         // postSubmitScrape waits for the activity to appear in the richieste cell
         result.dayUpdate = await postSubmitScrape(gridFrame, targetDate, matchedActivity);
@@ -404,6 +354,7 @@ if (isMainModule) {
     "full-day": { type: "boolean" as const, default: false },
     hours: { type: "string" as const, default: "0" },
     minutes: { type: "string" as const, default: "0" },
+    "scrape-after-submit": { type: "boolean" as const, default: false },
   };
 
   const { values } = parseArgs({
@@ -425,6 +376,7 @@ if (isMainModule) {
     fullDay: values["full-day"] as boolean,
     hours: Number.parseInt(values.hours as string, 10),
     minutes: Number.parseInt(values.minutes as string, 10),
+    scrapeAfterSubmit: values["scrape-after-submit"] as boolean,
     // headless resolved from ZUCCHETTI_HEADLESS env var (default true)
   })
     .then((result) => {

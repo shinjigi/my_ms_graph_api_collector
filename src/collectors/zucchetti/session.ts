@@ -65,62 +65,54 @@ export async function startZucchettiSession(headless?: boolean): Promise<Zucchet
         log.info("Nessun popup trovato (o timeout 3s) – ok.");
     }
 
-    // ── 3. Ricerca campi login ───────────────────────────────────────────────
+    // ── 3. Verifica se già autenticati o serve login ─────────────────────────
     const loginSelector = 'input[placeholder="Username"], input[name*="UserName"]';
-    log.info(`Attesa selettore login: ${loginSelector}`);
-    try {
-        await page.waitForSelector(loginSelector, {
-            state: "visible",
-            timeout: 15000,
-        });
+    const alreadyLoggedIn = await page.waitForSelector(loginSelector, {
+        state: "visible",
+        timeout: 4000,
+    }).then(() => false).catch(() => true);
+
+    if (alreadyLoggedIn) {
+        log.info(`Sessione già attiva (nessun form login). URL: ${page.url()}`);
+    } else {
         log.info(`Campo username trovato. URL corrente: ${page.url()}`);
-    } catch (e) {
-        log.error(`❌ Campo username NON trovato entro 15s. URL: ${page.url()}`);
-        // Dump titolo e snippet HTML per capire dove siamo
-        const title = await page.title();
-        const bodySnippet = await page.evaluate(
-            () => document.body?.innerHTML?.slice(0, 500) || "(body vuoto)",
-        );
-        log.error(`Titolo pagina: "${title}"`);
-        log.error(`HTML snippet:\n${bodySnippet}`);
-        throw e;
-    }
 
-    // ── 4. Fill credenziali ──────────────────────────────────────────────────
-    await page
-        .locator('input[placeholder="Username"], input[name*="UserName"]')
-        .first()
-        .fill(username);
-    await page
-        .locator('input[placeholder="Password"], input[type="password"]')
-        .first()
-        .fill(password);
-    log.info("Credenziali inserite. Invio login...");
-
-    // ── 5. Submit ────────────────────────────────────────────────────────────
-    const [navResponse] = await Promise.all([
-        page.waitForNavigation({ waitUntil: "networkidle" }),
-        page
-            .locator('button, input[type="submit"]')
-            .filter({ hasText: /Login|Accedi/i })
+        // ── 4. Fill credenziali ──────────────────────────────────────────────
+        await page
+            .locator('input[placeholder="Username"], input[name*="UserName"]')
             .first()
-            .click(),
-    ]);
-    log.info(`Dopo login: status=${navResponse?.status()} url=${page.url()}`);
+            .fill(username);
+        await page
+            .locator('input[placeholder="Password"], input[type="password"]')
+            .first()
+            .fill(password);
+        log.info("Credenziali inserite. Invio login...");
 
-    // Verifica che non siamo ancora sulla pagina di login (errore credenziali)
-    const currentUrl = page.url();
-    if (currentUrl.includes("home.jsp") || currentUrl.includes("login")) {
-        const errorText = await page.evaluate(() => {
-            const el = document.querySelector('.error, .alert, [class*="error"], [class*="alert"]');
-            return el?.textContent?.trim() || null;
-        });
-        if (errorText) {
-            log.error(`❌ Possibile errore di login rilevato: "${errorText}"`);
-        } else {
-            log.warn(
-                `⚠️  URL post-login ancora su home/login – potrebbe essere normale o errore silenzioso.`,
-            );
+        // ── 5. Submit ────────────────────────────────────────────────────────
+        const [navResponse] = await Promise.all([
+            page.waitForNavigation({ waitUntil: "networkidle" }),
+            page
+                .locator('button, input[type="submit"]')
+                .filter({ hasText: /Login|Accedi/i })
+                .first()
+                .click(),
+        ]);
+        log.info(`Dopo login: status=${navResponse?.status()} url=${page.url()}`);
+
+        // Verifica che non siamo ancora sulla pagina di login (errore credenziali)
+        const currentUrl = page.url();
+        if (currentUrl.includes("home.jsp") || currentUrl.includes("login")) {
+            const errorText = await page.evaluate(() => {
+                const el = document.querySelector('.error, .alert, [class*="error"], [class*="alert"]');
+                return el?.textContent?.trim() || null;
+            });
+            if (errorText) {
+                log.error(`❌ Possibile errore di login rilevato: "${errorText}"`);
+            } else {
+                log.warn(
+                    `⚠️  URL post-login ancora su home/login – potrebbe essere normale o errore silenzioso.`,
+                );
+            }
         }
     }
 

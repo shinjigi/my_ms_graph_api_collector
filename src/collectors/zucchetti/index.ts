@@ -25,10 +25,9 @@ const isMainModule =
 const log = createLogger("zucchetti");
 import type { MonthData } from "@shared/zucchetti";
 import { endOfDay, endOfMonth,  startOfDay } from "date-fns";
-import { getJsonRawPath } from "../../json-io";
+import { writeJson } from "../../json-io";
 import { CONFIG } from "@shared/env-config";
-
-const ZUCC_DIR = getJsonRawPath("zucchetti");
+import { ZUCC_DIR } from "./scraper";
 
 function runScript(scriptPath: string, args: string[]): Promise<string> {
     return new Promise((resolve, reject) => {
@@ -148,7 +147,7 @@ export async function collectZucchetti(range: DateRange | undefined, force = fal
         const monthStr = `${item.year}-${String(item.month).padStart(2, "0")}`;
         const outPath = path.join(ZUCC_DIR, `${monthStr}.json`);
 
-        await fs.writeFile(outPath, JSON.stringify(item.days, null, 2), "utf-8");
+        await writeJson(outPath, item.days);
         await writeMeta(ZUCC_DIR, monthStr, {
             lastExtractedDate: today,
             sources: ["zucchetti"],

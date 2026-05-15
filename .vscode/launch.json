@@ -20,8 +20,23 @@
             "name": "Debug TS (Current File)",
             "runtimeExecutable": "npx",
             "runtimeArgs": ["tsx", "${file}"],
+            "args": ["--date=${input:debugDate}", "--full-day=true"],
             "cwd": "${workspaceFolder}",
             "envFile": "${workspaceFolder}/.env",
+            "env": { "ZUCCHETTI_HEADLESS": "false" },
+            "sourceMaps": true,
+            "console": "integratedTerminal",
+            "skipFiles": ["<node_internals>/**"]
+        },
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Debug zucchetti:update",
+            "runtimeExecutable": "npx",
+            "runtimeArgs": ["tsx", "--env-file=.env", "src/collectors/zucchetti/updateData.ts"],
+            "args": ["--date=${input:debugDate}", "--full-day=true", "--scrape-after-submit=true"],
+            "cwd": "${workspaceFolder}",
+            "env": { "ZUCCHETTI_HEADLESS": "false" },
             "sourceMaps": true,
             "console": "integratedTerminal",
             "skipFiles": ["<node_internals>/**"]
@@ -61,6 +76,14 @@
                 "vite/gui/*": "${webRoot}/*"
             },
             "skipFiles": ["<node_internals>/**", "**/node_modules/**"]
+        }
+    ],
+    "inputs": [
+        {
+            "id": "debugDate",
+            "type": "promptString",
+            "description": "Data (YYYY-MM-DD)",
+            "default": "2026-05-20"
         }
     ]
 }
