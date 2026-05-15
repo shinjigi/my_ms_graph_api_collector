@@ -23,10 +23,28 @@ const isMainModule =
 async function postSubmitScrape(
   page: Page | Frame,
   targetDate: string,
+  activityText?: string,
 ): Promise<WeekDayData> {
   log.info(`Post-submit scrape for ${targetDate}...`);
-  // Wait for grid to reload after submission (iframe reloads after Invia)
   await page.waitForSelector('tr[id*="_Grid1_row"]', { state: "visible", timeout: 20000 });
+  // Wait for the submitted activity to appear in the richieste cell of the target day.
+  // Zucchetti updates cell content asynchronously — grid rows are visible before content arrives.
+  if (activityText) {
+    try {
+      await (page as Page).waitForFunction(
+        ({ date, activity }: { date: string; activity: string }) => {
+          const spans = Array.from(document.querySelectorAll(`span[onclick*="${date}"]`));
+          return spans.some((span) =>
+            span.closest("tr")?.querySelector("td.richieste")?.textContent?.includes(activity),
+          );
+        },
+        { date: targetDate, activity: activityText },
+        { timeout: 15000 },
+      );
+    } catch {
+      log.warn(`Post-submit: richiesta "${activityText}" non ancora visibile nella griglia — procedo comunque.`);
+    }
+  }
   const scraped = await scrapeSingleDay(page, new Date(targetDate));
   if (!scraped)
     throw new Error(`Day ${targetDate} not found in Cartellino grid.`);
@@ -355,13 +373,7 @@ export async function submitZucchettiRequest(
           log.info("Closing submission modal...");
           await closeBtn.click();
         }
-        // Zucchetti keeps connections alive — networkidle never fires.
-        // Wait for the loading spinner (#rif_mbbody) to disappear so the richieste
-        // column is fully populated before scraping.
-        await newPage.waitForTimeout(500);
-        await waitForCartelloReload(newPage);
-
-        // Re-identify the grid frame after reload (old reference may be stale)
+        // Re-identify the grid frame after modal close (old reference may be stale)
         for (const frame of newPage.frames()) {
           const rows = await frame.locator('tr[id*="_Grid1_row"]').count();
           if (rows > 0) {
@@ -370,7 +382,8 @@ export async function submitZucchettiRequest(
           }
         }
 
-        result.dayUpdate = await postSubmitScrape(gridFrame, targetDate);
+        // postSubmitScrape waits for the activity to appear in the richieste cell
+        result.dayUpdate = await postSubmitScrape(gridFrame, targetDate, matchedActivity);
       } catch (err) {
         result.scrapeError = (err as Error).message;
         log.warn(`Post-submit scrape failed: ${result.scrapeError}`);

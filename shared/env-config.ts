@@ -82,7 +82,7 @@ const ConfigSchema = z.object({
     // --- COLLECTORS: ZUCCHETTI & NIBOL ---
     ZUCCHETTI_USERNAME: z.string().nonoptional(),
     ZUCCHETTI_PASSWORD: z.string().nonoptional(),
-    ZUCCHETTI_HEADLESS: z.coerce.boolean().default(false),
+    ZUCCHETTI_HEADLESS: z.preprocess((v) => v !== "false" && Boolean(v), z.boolean()).default(false),
 
     AUTOMATION_PROFILE_DIR: z.string().default("./.automation-chrome/automation"),
     NIBOL_URL: z.url({ message: "URL Nibol non valido" }).default("https://app.nibol.com"),
