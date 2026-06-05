@@ -6,6 +6,9 @@
  */
 import express from "express";
 import cors from "cors";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
+import { existsSync } from "node:fs";
 import { getISOTimestamp } from "@shared/dates";
 import { log } from "../logger";
 
@@ -21,7 +24,10 @@ import { CONFIG } from "@shared/env-config";
 
 
 const app = express();
-const PORT = CONFIG.SERVER_PORT;
+const PORT = CONFIG.SERVER_PORT ?? 3001;
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const WEB_DIST = resolve(__dirname, "../../web/dist");
 
 app.use(cors());
 app.use(express.json());
@@ -39,8 +45,22 @@ app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", ts: getISOTimestamp() });
 });
 
+// --- Frontend statico (build di produzione) ---
+// Serve web/dist se presente; fallback SPA su index.html per ogni rotta non-/api.
+if (existsSync(WEB_DIST)) {
+  app.use(express.static(WEB_DIST));
+  app.get(/^(?!\/api\/).*/, (_req, res) => {
+    res.sendFile(resolve(WEB_DIST, "index.html"));
+  });
+} else {
+  log.warn(`web/dist non trovato (${WEB_DIST}). Esegui 'npm run web:build'.`);
+}
+
 app.listen(PORT, () => {
   log.info(`Server in ascolto su http://localhost:${PORT}`);
+  if (existsSync(WEB_DIST)) {
+    log.info(`UI disponibile su http://localhost:${PORT}`);
+  }
 });
 
 export default app;
