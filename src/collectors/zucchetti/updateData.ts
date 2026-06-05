@@ -323,8 +323,8 @@ export async function submitZucchettiRequest(
     // then re-identify the frame and scrape the updated day data.
     if (scrapeAfterSubmit) {
       try {
-        // Close the success modal (spModalLayer_closebtn_2) — this triggers grid reload
-        const closeBtn = newPage.locator('[id$="_closebtn_2"], [id$="_closebtn"]').first();
+        // Close the success modal — id suffix varies (_0, _2, …); match by class instead
+        const closeBtn = newPage.locator('div.spModalLayer_closebtn').first();
         if (await closeBtn.count() > 0) {
           log.info("Closing submission modal...");
           await closeBtn.click();
