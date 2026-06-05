@@ -45,7 +45,7 @@ BAU ("BAU - Your Team Name") contains multiple User Stories. Map each signal to 
 ### 2b. Vertical US (highest priority — feature work)
 
 Always prefer over support US when signals are specific.
-Keywords: `Credit Broker`, `VW`, `LawSuits`, `Coupon`, `Landing`, `Satispay`, `Sitecore` (feature work), `Promositi`, `Elty`, `Mutui`, `AC Scan`, `IAC`, `Leonteq`.
+Keywords: `Vestigium`, `Credit Broker`, `VW`, `LawSuits`, `Coupon`, `Landing`, `Satispay`, `Sitecore` (feature work), `Promositi`, `Elty`, `Mutui`, `AC Scan`, `IAC`, `Leonteq`.
 
 ### 2c. Final fallback
 
