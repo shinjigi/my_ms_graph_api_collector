@@ -67,7 +67,7 @@ Server endpoints:
 
 ### Collectors
 
-- **Graph API** (calendar, email, teams): MSAL device code flow, `/me/` endpoints
+- **Graph API** (calendar, email, teams): `@azure/identity` interactive auth (Auth Code + PKCE), `/me/` endpoints
 - **Zucchetti** (timesheet): Playwright browser automation via `src/collectors/zucchetti/`
   - `session.ts` — shared login + Cartellino navigation
   - `scraper.ts` — reusable scraping functions (scrapeCartellino, scrapeSingleDay, validateDay)
@@ -79,7 +79,9 @@ Server endpoints:
 
 ### Auth flow
 
-`graphClient.ts` uses MSAL's `PublicClientApplication` with a file-based token cache (`.token-cache.json`). On first run, it prompts the user to authenticate via device code (URL + code in browser). Subsequent runs use `acquireTokenSilent` with the cached refresh token.
+`graphClient.ts` uses `@azure/identity`'s `InteractiveBrowserCredential` (Authorization Code flow + PKCE). On first run it opens the system browser for login and the token is redirected to a loopback `http://localhost` URI. Tokens are stored in an OS-encrypted cache (`@azure/identity-cache-persistence`; DPAPI on Windows); a non-secret `AuthenticationRecord` is persisted to `.auth-record.json` to enable silent login on subsequent runs.
+
+> **Why not device code flow?** The previous MSAL device code flow was blocked tenant-wide by a Conditional Access policy (mitigation against device-code phishing, e.g. Kali365 PHaaS). Auth Code + PKCE is a different, non-phishable grant and is not affected. Requires a `http://localhost` redirect URI registered under "Mobile and desktop applications" + "Allow public client flows" enabled on the App Registration. See `AUTH.md`.
 
 ### Zucchetti automation gotchas
 
@@ -143,7 +145,7 @@ registry=https://registry.npmjs.org/
 
 - Language in code comments and console output is **Italian**.
 - The app requires an Azure Entra ID App Registration with **"Allow public client flows"** enabled and **Delegated** permissions (not Application).
-- `.token-cache.json` contains sensitive tokens and is gitignored.
+- Auth tokens live in an OS-encrypted cache (not a repo file). The non-secret `.auth-record.json` is gitignored. The legacy `.token-cache.json` (MSAL device code) is obsolete.
 
 ## Development Guidelines
 

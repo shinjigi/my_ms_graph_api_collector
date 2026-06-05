@@ -1,77 +1,86 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { PublicClientApplication } from "@azure/msal-node";
-import type { ICachePlugin, TokenCacheContext } from "@azure/msal-node";
+import {
+  InteractiveBrowserCredential,
+  useIdentityPlugin,
+  type AuthenticationRecord,
+} from "@azure/identity";
+import { cachePersistencePlugin } from "@azure/identity-cache-persistence";
 import { Client } from "@microsoft/microsoft-graph-client";
+import { TokenCredentialAuthenticationProvider } from "@microsoft/microsoft-graph-client/authProviders/azureTokenCredentials/index.js";
 import "isomorphic-fetch";
 import { config } from "./config";
 import { createLogger } from "./logger";
 
 const log = createLogger("graph-client");
 
-const TOKEN_CACHE_PATH = path.join(process.cwd(), ".token-cache.json");
+// Token segreti (access/refresh) in cache cifrata dal SO (DPAPI su Windows),
+// gestita dal plugin di persistenza. L'AuthenticationRecord qui sotto contiene
+// solo metadati NON segreti (home account id) usati per il login silenzioso.
+const AUTH_RECORD_PATH = path.join(process.cwd(), ".auth-record.json");
+const TOKEN_CACHE_NAME = "mygraphcollector";
 
-const cachePlugin: ICachePlugin = {
-  beforeCacheAccess: async (ctx: TokenCacheContext) => {
-    if (fs.existsSync(TOKEN_CACHE_PATH)) {
-      ctx.tokenCache.deserialize(fs.readFileSync(TOKEN_CACHE_PATH, "utf-8"));
-    }
-  },
-  afterCacheAccess: async (ctx: TokenCacheContext) => {
-    if (ctx.cacheHasChanged) {
-      fs.writeFileSync(TOKEN_CACHE_PATH, ctx.tokenCache.serialize(), "utf-8");
-    }
-  },
-};
+useIdentityPlugin(cachePersistencePlugin);
 
-const msalClient = new PublicClientApplication({
-  auth: {
+// Scope delegati richiesti, qualificati con la risorsa Graph (consenso dinamico).
+const graphScopes = config.scopes.map(
+  (scope) => `https://graph.microsoft.com/${scope}`,
+);
+
+function loadAuthRecord(): AuthenticationRecord | undefined {
+  if (!fs.existsSync(AUTH_RECORD_PATH)) return undefined;
+  try {
+    return JSON.parse(fs.readFileSync(AUTH_RECORD_PATH, "utf-8")) as AuthenticationRecord;
+  } catch {
+    // Record corrotto: lo ignoriamo, ripartirà il login interattivo.
+    return undefined;
+  }
+}
+
+function saveAuthRecord(record: AuthenticationRecord): void {
+  fs.writeFileSync(AUTH_RECORD_PATH, JSON.stringify(record), "utf-8");
+}
+
+function buildCredential(
+  authenticationRecord?: AuthenticationRecord,
+): InteractiveBrowserCredential {
+  return new InteractiveBrowserCredential({
+    tenantId: config.tenantId,
     clientId: config.clientId,
-    authority: `https://login.microsoftonline.com/${config.tenantId}`,
-  },
-  cache: { cachePlugin },
-});
-
-async function getAccessToken(): Promise<string> {
-  const accounts = await msalClient.getTokenCache().getAllAccounts();
-
-  if (accounts.length > 0) {
-    try {
-      const result = await msalClient.acquireTokenSilent({
-        account: accounts[0],
-        scopes: config.scopes,
-      });
-      if (result?.accessToken) return result.accessToken;
-    } catch {
-      // Silent acquisition failed — fall through to device code
-    }
-  }
-
-  const result = await msalClient.acquireTokenByDeviceCode({
-    scopes: config.scopes,
-    deviceCodeCallback: (response) => {
-      log.info(response.message);
-    },
+    // Redirect su loopback: la libreria sceglie una porta libera a runtime.
+    // In Azure è registrato "http://localhost" (la porta è ignorata nel match).
+    redirectUri: "http://localhost",
+    tokenCachePersistenceOptions: { enabled: true, name: TOKEN_CACHE_NAME },
+    authenticationRecord,
   });
+}
 
-  if (!result?.accessToken) {
-    throw new Error("Impossibile ottenere access token da Azure AD.");
+async function createCredential(): Promise<InteractiveBrowserCredential> {
+  const existingRecord = loadAuthRecord();
+  const credential = buildCredential(existingRecord);
+
+  if (existingRecord) {
+    // Già autenticato in passato: la cache cifrata ha il refresh token,
+    // i prossimi getToken sono silenziosi (nessun browser).
+    return credential;
   }
-  return result.accessToken;
+
+  // Primo avvio: apre il browser sul PC locale (Authorization Code + PKCE).
+  log.info("Primo accesso: apertura browser per il login a Microsoft 365...");
+  const record = await credential.authenticate(graphScopes);
+  if (record) {
+    saveAuthRecord(record);
+    log.info("Login completato, sessione salvata per i prossimi avvii.");
+  }
+  return credential;
 }
 
 export async function createGraphClient(): Promise<Client> {
-  // Non chiamiamo getAccessToken qui fuori!
-  
-  return Client.init({
-    // Questa funzione viene eseguita dal Graph Client PRIMA di ogni richiesta API
-    authProvider: async (done) => {
-      try {
-        const token = await getAccessToken(); // MSAL gestisce la cache internamente
-        done(null, token);
-      } catch (error) {
-        done(error as Error, null);
-      }
-    },
+  const credential = await createCredential();
+
+  const authProvider = new TokenCredentialAuthenticationProvider(credential, {
+    scopes: graphScopes,
   });
+
+  return Client.initWithMiddleware({ authProvider });
 }
