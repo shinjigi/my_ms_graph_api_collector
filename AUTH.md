@@ -9,7 +9,7 @@ Prima i concetti base, poi i flussi, poi dove sta il problema.
 Tre token in gioco:
 
 - **Access token**: il pass d'ingresso verso Graph API. Vita corta (~1h).
-- **Refresh token**: serve a ottenere un nuovo access token senza rifare il login. Vita lunga (giorni/settimane). È quello salvato nel tuo `.token-cache.json`.
+- **Refresh token**: serve a ottenere un nuovo access token senza rifare il login. Vita lunga (giorni/settimane). Salvato in cache cifrata dal SO (vedi "Soluzione adottata").
 - **ID token**: dice *chi* è l'utente (non usato per chiamare API).
 
 **Scope**: i permessi richiesti (es. `Mail.Read`, `Calendars.Read`). I tuoi sono in `config.scopes`.
@@ -20,7 +20,7 @@ Tre token in gioco:
 
 La tua è una **app pubblica** (gira sul tuo PC, non ha un server segreto sicuro dove nascondere una password). Quindi niente "client secret". Le app pubbliche usano flussi pensati per questo.
 
-### 1. Device Code Flow ← quello che usi ORA (e che è bloccato)
+### 1. Device Code Flow ← quello che usavi PRIMA (ora bloccato)
 
 Pensato per dispositivi senza browser/tastiera comoda (smart TV, CLI su server headless).
 
@@ -93,9 +93,54 @@ Unica cosa da preparare lato Azure: aggiungere un **redirect URI** `http://local
 
 ---
 
-Quando vuoi procedere col codice, le due strade restano:
+## Soluzione adottata
 
-- **`@azure/identity` `InteractiveBrowserCredential`** — libreria Microsoft che fa tutto (apre browser, server localhost, PKCE, cache token). Poche righe, una dipendenza nuova.
-- **MSAL a mano** — più codice ma zero dipendenze nuove, mantieni il tuo cache plugin attuale.
+Scelto **`@azure/identity` `InteractiveBrowserCredential`** (Authorization Code flow + PKCE). La libreria Microsoft gestisce da sola: apertura browser, server loopback su porta dinamica, PKCE, `state` anti-CSRF e cache token.
 
-Dimmi se vuoi che proceda e quale strada.
+### Implementazione (`src/graphClient.ts`)
+
+```ts
+useIdentityPlugin(cachePersistencePlugin);
+
+const credential = new InteractiveBrowserCredential({
+  tenantId, clientId,
+  redirectUri: "http://localhost",
+  tokenCachePersistenceOptions: { enabled: true, name: "mygraphcollector" },
+  authenticationRecord, // caricato da .auth-record.json se presente
+});
+
+const authProvider = new TokenCredentialAuthenticationProvider(credential, {
+  scopes: graphScopes, // ["https://graph.microsoft.com/Mail.Read", ...]
+});
+return Client.initWithMiddleware({ authProvider });
+```
+
+### Pacchetti
+
+- `@azure/identity` — `InteractiveBrowserCredential` + provider.
+- `@azure/identity-cache-persistence` — cache token cifrata dal SO (**DPAPI** su Windows). I token segreti NON stanno in un file del repo.
+
+### Persistenza e login silenzioso
+
+- **Token segreti** (access/refresh) → cache cifrata OS, nome `mygraphcollector`.
+- **`AuthenticationRecord`** (metadati NON segreti: home account id) → file `.auth-record.json` (gitignored). Serve a ritrovare l'account per il login silenzioso.
+- **Primo run**: si apre il browser → login → record salvato.
+- **Run successivi**: login silenzioso da cache, nessun browser. Se il record manca/è corrotto, riparte l'interattivo.
+
+### Configurazione Azure (App Registration)
+
+- Redirect URI `http://localhost` sotto **Mobile and desktop applications** (la porta è ignorata nel match loopback).
+- **Allow public client flows** = **Yes**.
+
+### Comportamento
+
+- La firma `createGraphClient()` è invariata → nessun impatto sui chiamanti.
+- Auth scatta durante `npm run collect` (è lì che parte `graphClient.ts`); `serve` (3001) e Vite (5173) sono indipendenti.
+- Cache per-utente/OS: su una macchina o profilo nuovo il browser si riapre una volta.
+
+### Cosa è stato dismesso
+
+- `@azure/msal-node` `acquireTokenByDeviceCode` — rimosso dal flusso (libreria ancora in `package.json`, inutilizzata).
+- `.token-cache.json` (cache MSAL device code) — obsoleto, cancellabile.
+
+Committato in `218215e` sotto TP #329300.
