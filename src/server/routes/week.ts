@@ -28,6 +28,8 @@ import { loadDefaults } from "../../analysers";
 
 export const weekRouter = Router();
 
+const WEEK_DAYS = [0, 1, 2, 3, 4];
+
 const RAW_DIR = path.join(process.cwd(), "data", "raw");
 const AGG_DIR = path.join(process.cwd(), "data", "aggregated");
 
@@ -83,22 +85,31 @@ weekRouter.get("/:date", async (req: Request, res: Response) => {
     // Load raw Nibol data: track scraping coverage via meta lastExtractedDate
     const nibolDir = path.join(RAW_DIR, "nibol");
     const nibolMeta = await readMeta(nibolDir);
-    const nibolByDate = new Map<Date, NibolBooking>();
-    for (const month of monthsToLoad) {
-        const zuccDays = await loadZucchettiMonth(month);
-        zuccAll.push(...zuccDays);
-        const nibolBookings = await loadNibolMonth(month);
-        if (nibolBookings !== null) {
-            for (const b of nibolBookings) nibolByDate.set(b.date, b);
-        }
-    }
+    const nibolByDate = new Map<string, NibolBooking>();
+    await Promise.all(
+        [...monthsToLoad].map(async (month) => {
+            const [zuccDays, nibolBookings] = await Promise.all([
+                loadZucchettiMonth(month),
+                loadNibolMonth(month),
+            ]);
+            zuccAll.push(...zuccDays);
+            if (nibolBookings !== null) {
+                for (const b of nibolBookings) nibolByDate.set(dateToString(b.date), b);
+            }
+        })
+    );
+
+    // Pre-load all aggregated days in parallel
+    const aggDays = await Promise.all(
+        Array.from({ length: 7 }, (_, i) => readAggregatedDay(shiftDate(monday, i)))
+    );
 
     // Build 7-day week response
     for (let i = 0; i < 7; i++) {
         const d = shiftDate(monday, i);
 
         // Aggregated file is the primary source — already contains isWorkday, oreTarget, location
-        const agg = await readAggregatedDay(d);
+        const agg = aggDays[i];
 
         // Fall back to raw Zucchetti for days without an aggregated file
         const zuccDay: ZucchettiDay | null =
@@ -120,7 +131,7 @@ weekRouter.get("/:date", async (req: Request, res: Response) => {
         const nibolDayScraped =
             nibolLastScraped !== null &&
             (isBefore(d, parseDateString(nibolLastScraped)) || isEqual(d, parseDateString(nibolLastScraped)));
-        const nibolBooking = nibolByDate.get(d) ?? (nibolDayScraped ? (agg?.nibol ?? null) : null);
+        const nibolBooking = nibolByDate.get(dateToString(d)) ?? (nibolDayScraped ? (agg?.nibol ?? null) : null);
 
         let location: WeekDayData["location"] = WorkLocation.unknown;
         if (nibolBooking) {
@@ -271,8 +282,8 @@ weekRouter.get("/:date/tp-hours", async (req: Request, res: Response) => {
         for (const item of openItems) {
             const dayHoursMap = entriesByAssignable.get(item.id);
             const dayNoteMap = notesByAssignable.get(item.id);
-            const hours = [0, 1, 2, 3, 4].map((i) => +(dayHoursMap?.get(i) ?? 0).toFixed(2));
-            const notes: Array<string | null> = [0, 1, 2, 3, 4].map(
+            const hours = WEEK_DAYS.map((i) => +(dayHoursMap?.get(i) ?? 0).toFixed(2));
+            const notes: Array<string | null> = WEEK_DAYS.map(
                 (i) => dayNoteMap?.get(i)?.join(" | ") ?? null,
             );
             entries.push({
@@ -296,8 +307,8 @@ weekRouter.get("/:date/tp-hours", async (req: Request, res: Response) => {
                 projectName: "",
                 timeSpent: 0,
             };
-            const hours = [0, 1, 2, 3, 4].map((i) => +(dayHoursMap.get(i) ?? 0).toFixed(2));
-            const notes: Array<string | null> = [0, 1, 2, 3, 4].map(
+            const hours = WEEK_DAYS.map((i) => +(dayHoursMap.get(i) ?? 0).toFixed(2));
+            const notes: Array<string | null> = WEEK_DAYS.map(
                 (i) => dayNoteMap?.get(i)?.join(" | ") ?? null,
             );
             entries.push({
