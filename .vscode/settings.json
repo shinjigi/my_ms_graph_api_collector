@@ -7,5 +7,7 @@
     "[vue]": {
         "editor.defaultFormatter": "esbenp.prettier-vscode"
     },
-    "css.lint.unknownAtRules": "ignore"
+    "css.lint.unknownAtRules": "ignore",
+    "markdown-mermaid.darkModeTheme": "dark",
+    "markdown-mermaid.lightModeTheme": "default"
 }
