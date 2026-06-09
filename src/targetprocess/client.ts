@@ -247,36 +247,16 @@ export class TargetprocessClient {
     projectId: number,
     options: { fromDate?: string } = {},
   ): Promise<TpUserStory[]> {
-    const allItems: TpUserStory[] = [];
-    let skip = 0;
-    const take = 200;
-
     let where = `(Project.Id eq ${projectId})`;
     if (options.fromDate) {
       where += `and(CreateDate gte '${options.fromDate}')`;
     }
-
-    while (true) {
-      const result = await this.request<TpList<TpUserStory>>(
-        "v1",
-        "UserStories",
-        {
-          where,
-          include:
-            "[Id,Name,Description,CreateDate,EndDate,EntityState[Name],Priority[Name],Owner[FullName],Effort,Iteration[Name],Assignments[GeneralUser[FullName]]]",
-          orderby: "CreateDate",
-          take: String(take),
-          skip: String(skip),
-        },
-      );
-
-      allItems.push(...result.Items);
-
-      if (!result.Next || result.Items.length < take) break;
-      skip += take;
-    }
-
-    return allItems;
+    return this.fetchAllPages<TpUserStory>(
+      "UserStories",
+      where,
+      "[Id,Name,Description,CreateDate,EndDate,EntityState[Name],Priority[Name],Owner[FullName],Effort,Iteration[Name],Assignments[GeneralUser[FullName]]]",
+      "CreateDate",
+    );
   }
 
   async getUserStory(usId: number): Promise<TpUserStoryDetail> {
@@ -287,26 +267,12 @@ export class TargetprocessClient {
   }
 
   async getTimesByAssignable(assignableId: number): Promise<TpTimeEntry[]> {
-    const allItems: TpTimeEntry[] = [];
-    let skip = 0;
-    const take = 200;
-
-    while (true) {
-      const result = await this.request<TpList<TpTimeEntry>>("v1", "Times", {
-        where: `(Assignable.Id eq ${assignableId})`,
-        include: "[Id,Date,Spent,Description,User[FullName]]",
-        orderby: "Date",
-        take: String(take),
-        skip: String(skip),
-      });
-
-      allItems.push(...result.Items);
-
-      if (!result.Next || result.Items.length < take) break;
-      skip += take;
-    }
-
-    return allItems;
+    return this.fetchAllPages<TpTimeEntry>(
+      "Times",
+      `(Assignable.Id eq ${assignableId})`,
+      "[Id,Date,Spent,Description,User[FullName]]",
+      "Date",
+    );
   }
 
   /** Paginated fetch from TP v1 — returns all items across all pages. */
@@ -314,17 +280,15 @@ export class TargetprocessClient {
     entity: string,
     where: string,
     include: string,
+    orderby?: string,
   ): Promise<T[]> {
     const all: T[] = [];
     const take = 200;
     let skip = 0;
     while (true) {
-      const result = await this.request<TpList<T>>("v1", entity, {
-        where,
-        include,
-        take: String(take),
-        skip: String(skip),
-      });
+      const params: Record<string, string> = { where, include, take: String(take), skip: String(skip) };
+      if (orderby) params.orderby = orderby;
+      const result = await this.request<TpList<T>>("v1", entity, params);
       all.push(...result.Items);
       if (!result.Next || result.Items.length < take) break;
       skip += take;
@@ -489,7 +453,7 @@ export class TargetprocessClient {
    * depending on the TP version. If this returns unexpected results, switch to
    * a ms-range filter: Date gte '/Date(startMs)/' and Date lte '/Date(endMs)/'.
    */
-  async getTimesByUserAndDate(
+  private async getTimesByUserAndDate(
     userId: number,
     date: Date | string,
   ): Promise<TpTimeEntry[]> {
