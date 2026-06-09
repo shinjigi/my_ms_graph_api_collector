@@ -171,6 +171,15 @@ export interface SyncResult {
     errors: string[];
 }
 
+export async function triggerKbRefresh(): Promise<{ ok: boolean }> {
+    const res = await fetch('/api/hooks/kb-refresh', { method: 'POST' });
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as { error?: string }).error ?? `kb-refresh: ${res.status}`);
+    }
+    return res.json();
+}
+
 export async function syncData(
     scope: "day" | "week",
     date: string,

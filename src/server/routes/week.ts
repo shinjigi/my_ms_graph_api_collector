@@ -196,6 +196,7 @@ weekRouter.get("/:date/tp-hours", async (req: Request, res: Response) => {
                 teamNames: defaults.teamNames,
                 creatorIds,
                 excludedProjects: defaults.excludedProjects,
+                itemsSinceDays: defaults.itemsSinceDays,
             }),
         ]);
 

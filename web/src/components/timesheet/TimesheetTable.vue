@@ -37,6 +37,17 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
                             </svg>
                             <span class="text-xs font-bold text-warning/80 uppercase tracking-wide">Attività ricorrenti — da rendicontare</span>
+                            <button
+                                class="btn btn-ghost btn-xs btn-square ml-auto shrink-0 opacity-40 hover:opacity-100 transition-opacity"
+                                :disabled="kbRefreshing"
+                                @click="handleKbRefresh"
+                                title="Aggiorna lista attività da TargetProcess"
+                            >
+                                <span v-if="kbRefreshing" class="loading loading-spinner loading-xs"></span>
+                                <svg v-else class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                </svg>
+                            </button>
                         </div>
                     </td>
                 </tr>
@@ -94,6 +105,7 @@
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { useTimesheetStore }  from '../../stores/useTimesheetStore';
 import { useUiStore }         from '../../stores/useUiStore';
+import { triggerKbRefresh }   from '../../api';
 import TsRow                  from './TsRow.vue';
 import TsHeader               from './TsHeader.vue';
 import TsTotals               from './TsTotals.vue';
@@ -101,6 +113,20 @@ import type { QuickSortState } from '../../types';
 
 const ts = useTimesheetStore();
 const ui = useUiStore();
+
+const kbRefreshing = ref(false);
+
+async function handleKbRefresh() {
+    kbRefreshing.value = true;
+    try {
+        await triggerKbRefresh();
+    } catch {
+        // kb:update fallito — aggiorno comunque la lista dal live TP
+    } finally {
+        await ts.refreshTpItems();
+        kbRefreshing.value = false;
+    }
+}
 
 const STATE_ORDER: Record<string, number> = { 'Inception': 0, 'Dev/Unit test': 1, 'Testing': 2 };
 

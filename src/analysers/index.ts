@@ -57,6 +57,7 @@ export interface DefaultsConfig {
     teamNames?: string[];
     creatorNames?: string[];
     excludedProjects?: string[];
+    itemsSinceDays?: number;
 }
 
 // ─── Shared utilities ───────────────────────────────────────────────

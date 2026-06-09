@@ -367,6 +367,7 @@ export class TargetprocessClient {
     teamNames?: string[];
     creatorIds?: number[];
     excludedProjects?: string[];
+    itemsSinceDays?: number;
   }): Promise<TpOpenItem[]> {
     const me = await this.getMe();
 
@@ -386,27 +387,42 @@ export class TargetprocessClient {
 
     // Build one where clause per source; TP v1 does not support OR across
     // Assignments.* and Team.* in the same clause.
-    const whereClauses: string[] = [
+    // Apply LastStateChangeDate filter to all queries: UserStories can have
+    // thousands of historical entries (5000+) — limiting to recent items keeps
+    // response time under ~1 second across all parallel queries.
+    const sinceDays = opts?.itemsSinceDays ?? 365;
+    const sinceDate = new Date(Date.now() - sinceDays * 86_400_000)
+      .toISOString()
+      .slice(0, 10);
+    const since = ` and (LastStateChangeDate gte '${sinceDate}')`;
+
+    const baseClauses = [
       `(Assignments.GeneralUser.Id eq ${me.Id})`,
       ...(opts?.teamNames ?? []).map((n) => `(Team.Name eq '${n}')`),
       ...(opts?.creatorIds ?? []).map((id) => `(Owner.Id eq ${id})`),
     ];
+    // UserStories have thousands of historical entries — apply since filter to keep
+    // response time manageable. Tasks are fewer (~1000) and stay unfiltered.
+    const usWhereClauses = baseClauses.map((w) => `${w}${since}`);
+    const taskWhereClauses = baseClauses;
 
     const excludedPatterns = (opts?.excludedProjects ?? []).map((p) => p.toLowerCase());
 
     const allRawUS: Array<TpUserStory & WithExtra> = [];
     const allRawTasks: Array<TpTask & WithExtra> = [];
 
-    await Promise.all(
-      whereClauses.flatMap((where) => [
+    await Promise.all([
+      ...usWhereClauses.map((where) =>
         this.fetchAllPages<TpUserStory & WithExtra>("UserStories", where, US_INCLUDE).then(
           (r) => allRawUS.push(...r),
         ),
+      ),
+      ...taskWhereClauses.map((where) =>
         this.fetchAllPages<TpTask & WithExtra>("Tasks", where, TASK_INCLUDE).then(
           (r) => allRawTasks.push(...r),
         ),
-      ]),
-    );
+      ),
+    ]);
 
     const items: TpOpenItem[] = [];
     const seenIds = new Set<number>();

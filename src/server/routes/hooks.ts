@@ -32,6 +32,25 @@ function runNode(scriptPath: string, args: string[]): Promise<{ stdout: string; 
     });
 }
 
+function runNpmScript(script: string): Promise<{ stdout: string; stderr: string }> {
+    return new Promise((resolve, reject) => {
+        const out: string[] = [];
+        const err: string[] = [];
+        const proc = spawn('npm', ['run', script], {
+            env: { ...process.env },
+            shell: true,
+            cwd: process.cwd(),
+        });
+        proc.stdout.on('data', (c: Buffer) => out.push(c.toString()));
+        proc.stderr.on('data', (c: Buffer) => err.push(c.toString()));
+        proc.on('close', (code) => {
+            if (code !== 0) reject(new Error(`Exit ${code}: ${err.join('')}`));
+            else resolve({ stdout: out.join(''), stderr: err.join('') });
+        });
+        proc.on('error', reject);
+    });
+}
+
 // POST /api/hooks/zucchetti
 // Body: { action: 'fullDaySw' | 'halfDaySw' | 'halfDayLeave', date: 'YYYY-MM-DD' }
 hooksRouter.post('/zucchetti', async (req: Request, res: Response) => {
@@ -98,8 +117,19 @@ hooksRouter.get('/tp-items', async (_req: Request, res: Response) => {
             teamNames: defaults.teamNames,
             creatorIds,
             excludedProjects: defaults.excludedProjects,
+            itemsSinceDays: defaults.itemsSinceDays,
         });
         res.json(items);
+    } catch (err) {
+        res.status(500).json({ error: (err as Error).message });
+    }
+});
+
+// POST /api/hooks/kb-refresh — aggiorna us-summaries.json e restituisce il catalogo aggiornato
+hooksRouter.post('/kb-refresh', async (_req: Request, res: Response) => {
+    try {
+        await runNpmScript('kb:update');
+        res.json({ ok: true });
     } catch (err) {
         res.status(500).json({ error: (err as Error).message });
     }

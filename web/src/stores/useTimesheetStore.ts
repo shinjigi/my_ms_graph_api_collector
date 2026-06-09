@@ -181,6 +181,21 @@ export const useTimesheetStore = defineStore(
             }
         }
 
+        async function refreshTpItems() {
+            const tpData = await fetchTpWeekHours(currentMonday.value);
+            allTasks.value = tpData.entries.map((e: any) => ({
+                project: e.projectName,
+                us: e.usName,
+                tpId: e.tpId,
+                state: e.stateName,
+                totAllTime: e.timeSpent,
+                hours: [...e.hours, 0, 0],
+                notes: [...(e.notes ?? [null, null, null, null, null]), null, null],
+                git: Array.from({ length: 7 }, () => 0),
+                svn: Array.from({ length: 7 }, () => 0),
+            }));
+        }
+
         function getHours(tpId: number, dayIdx: number): number {
             const key = `${tpId}_${dayIdx}`;
             if (key in hoursEdits.value) return hoursEdits.value[key];
@@ -325,6 +340,7 @@ export const useTimesheetStore = defineStore(
             clearEdits,
             clearCellEdit,
             serverTotalsRow,
+            refreshTpItems,
             submitWeekHours,
             submitDayHours,
             schedulePromotion,
