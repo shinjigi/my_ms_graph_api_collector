@@ -10,7 +10,6 @@ web/dist/
 data/*
 !data/kb/
 data/kb/*
-!data/kb/us-summaries.json
 graphify-out/*
 src/collectors/zucchetti/session.ts
 .obsidian/
