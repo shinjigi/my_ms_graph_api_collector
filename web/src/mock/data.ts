@@ -363,7 +363,7 @@ export const TL_EVENTS: TlEvent[] = [
 export const EMAILS: Email[] = [
   {
     dir: "in",
-    from: "giulia.f@euroconsumers.org",
+    from: "giulia.f@example.com",
     to: "me",
     subject: "Re: Deploy process #2026 — test su ACC fallito",
     time: "08:45",
@@ -372,14 +372,14 @@ export const EMAILS: Email[] = [
   {
     dir: "out",
     from: "me",
-    to: "giulia.f@euroconsumers.org",
+    to: "giulia.f@example.com",
     subject: "Re: Deploy process #2026 — risolto, riprovo",
     time: "09:20",
     body: "Ciao Giulia,\n\nho aggiornato il connection string su KeyVault e rilanciato il pipeline.\n\nLorenzo",
   },
   {
     dir: "in",
-    from: "marco.r@euroconsumers.org",
+    from: "marco.r@example.com",
     to: "me",
     subject: "AssetVersioning — errore su staging",
     time: "10:30",
@@ -387,8 +387,8 @@ export const EMAILS: Email[] = [
   },
   {
     dir: "in",
-    from: "pm@euroconsumers.org",
-    to: "team-ita@euroconsumers.org",
+    from: "pm@example.com",
+    to: "team-ita@example.com",
     subject: "FW: PC emails network — aggiornamento sprint",
     time: "11:15",
     body: "Team,\n\nScope ridotto: solo modulo invio, non ricezione.\nDeadline confermata fine sprint.\n\nGrazie",
@@ -404,14 +404,14 @@ export const EMAILS: Email[] = [
   {
     dir: "out",
     from: "me",
-    to: "marco.r@euroconsumers.org",
+    to: "marco.r@example.com",
     subject: "AssetVersioning — fix deployato su staging",
     time: "13:30",
     body: "Marco,\n\nHo ridotto il batch size a 100 items. Fix deployato su staging, puoi verificare.\n\nLorenzo",
   },
   {
     dir: "in",
-    from: "giulia.f@euroconsumers.org",
+    from: "giulia.f@example.com",
     to: "me",
     subject: "Re: Deploy process #2026 — ambiente ok ✓",
     time: "14:00",
@@ -419,8 +419,8 @@ export const EMAILS: Email[] = [
   },
   {
     dir: "in",
-    from: "scrummaster@euroconsumers.org",
-    to: "team-ita@euroconsumers.org",
+    from: "scrummaster@example.com",
+    to: "team-ita@example.com",
     subject: "Recap Sprint Review — action items",
     time: "16:50",
     body: "Ciao a tutti,\n\nAction items:\n- Lorenzo: aggiornare ore TP entro lunedì\n- Marco: chiudere PR #448\n- Giulia: documentare test su Confluence",

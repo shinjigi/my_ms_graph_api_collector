@@ -36,12 +36,12 @@
             <div class="flex items-center gap-2">
                 <div class="avatar placeholder">
                     <div class="bg-neutral text-neutral-content rounded-full w-7">
-                        <span class="text-xs">LD</span>
+                        <span class="text-xs">{{ userInitials }}</span>
                     </div>
                 </div>
                 <div class="text-xs">
-                    <div class="font-medium">L. De Pinto</div>
-                    <div class="text-base-content/40">Altroconsumo</div>
+                    <div class="font-medium">{{ userDisplayName }}</div>
+                    <div class="text-base-content/40">{{ orgName }}</div>
                 </div>
             </div>
         </div>
@@ -56,6 +56,10 @@ import type { ActiveView } from '../../types';
 import SignalBadge from '../common/SignalBadge.vue';
 
 const picker = usePickerStore();
+
+const orgName         = import.meta.env.VITE_ORG_NAME          || '';
+const userDisplayName = import.meta.env.VITE_USER_DISPLAY_NAME || '';
+const userInitials    = import.meta.env.VITE_USER_INITIALS      || '';
 
 const currentDateStr = computed(() => dateToString(picker.pickerSelected));
 

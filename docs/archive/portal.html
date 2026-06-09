@@ -222,8 +222,8 @@
     </nav>
     <div class="p-3 border-t border-base-300">
         <div class="flex items-center gap-2">
-            <div class="avatar placeholder"><div class="bg-neutral text-neutral-content rounded-full w-7"><span class="text-xs">LD</span></div></div>
-            <div class="text-xs"><div class="font-medium">L. De Pinto</div><div class="text-base-content/40">Altroconsumo</div></div>
+            <div class="avatar placeholder"><div class="bg-neutral text-neutral-content rounded-full w-7"><span class="text-xs">UN</span></div></div>
+            <div class="text-xs"><div class="font-medium">User Name</div><div class="text-base-content/40">Your Organisation</div></div>
         </div>
     </div>
 </aside>
@@ -556,7 +556,7 @@
                     <div class="text-xs text-base-content/40 mb-4">Meeting · 146 messaggi questa settimana</div>
                     <div class="space-y-3 max-h-96 overflow-y-auto">
                         <div class="chat chat-start"><div class="chat-header text-xs">Marco R. <time class="text-xs opacity-50">09:02</time></div><div class="chat-bubble chat-bubble-primary text-xs">Buongiorno! Oggi lavoro su #326279.</div></div>
-                        <div class="chat chat-end"><div class="chat-header text-xs">L. De Pinto <time class="text-xs opacity-50">09:06</time></div><div class="chat-bubble chat-bubble-secondary text-xs">Ok, io continuo il Graph API collector. PR in review stasera.</div></div>
+                        <div class="chat chat-end"><div class="chat-header text-xs">User Name <time class="text-xs opacity-50">09:06</time></div><div class="chat-bubble chat-bubble-secondary text-xs">Ok, io continuo il Graph API collector. PR in review stasera.</div></div>
                     </div>
                 </div></div>
             </div>
@@ -711,14 +711,14 @@ const TL_EVENTS = [
 ];
 
 const EMAILS = [
-    { dir:'in',  from:'giulia.f@euroconsumers.org',  to:'me',                                  subject:'Re: Deploy process #2026 — test su ACC fallito',        time:'08:45', body:'Ciao Lorenzo,\n\nho riprovato il deploy su ACC ma continua a dare 500 sul modulo pricing. Ho guardato i log e sembra un problema di configurazione del connection string nel KeyVault.\n\nPuoi verificare? Il ticket su TP è #326279.\n\nGrazie,\nGiulia' },
-    { dir:'out', from:'me',                           to:'giulia.f@euroconsumers.org',           subject:'Re: Deploy process #2026 — risolto, riprovo',           time:'09:20', body:'Ciao Giulia,\n\nho aggiornato il connection string su KeyVault e rilanciato il pipeline. Dovrebbe funzionare ora, ti faccio sapere appena il deploy va a buon fine.\n\nLorenzo' },
-    { dir:'in',  from:'marco.r@euroconsumers.org',   to:'me',                                   subject:'AssetVersioning — errore su staging',                    time:'10:30', body:'Ciao,\n\nc\'è un errore su staging per AssetVersioning. Il processo di migrazione assets si blocca al 34% con OutOfMemoryException.\n\nStack trace allegato. Riesci a darci un\'occhiata oggi?\n\nMarco' },
-    { dir:'in',  from:'pm@euroconsumers.org',         to:'team-ita@euroconsumers.org',           subject:'FW: PC emails network — aggiornamento sprint',          time:'11:15', body:'Team,\n\ninoltro aggiornamento dal Product Owner su PC emails network TP #2026:\n- Scope ridotto: solo modulo invio, non ricezione\n- Deadline confermata fine sprint\n- Priorità alta\n\nFavor di aggiornare le stime su TP.\n\nGrazie' },
+    { dir:'in',  from:'giulia.f@example.com',  to:'me',                                  subject:'Re: Deploy process #2026 — test su ACC fallito',        time:'08:45', body:'Ciao Lorenzo,\n\nho riprovato il deploy su ACC ma continua a dare 500 sul modulo pricing. Ho guardato i log e sembra un problema di configurazione del connection string nel KeyVault.\n\nPuoi verificare? Il ticket su TP è #326279.\n\nGrazie,\nGiulia' },
+    { dir:'out', from:'me',                           to:'giulia.f@example.com',           subject:'Re: Deploy process #2026 — risolto, riprovo',           time:'09:20', body:'Ciao Giulia,\n\nho aggiornato il connection string su KeyVault e rilanciato il pipeline. Dovrebbe funzionare ora, ti faccio sapere appena il deploy va a buon fine.\n\nLorenzo' },
+    { dir:'in',  from:'marco.r@example.com',   to:'me',                                   subject:'AssetVersioning — errore su staging',                    time:'10:30', body:'Ciao,\n\nc\'è un errore su staging per AssetVersioning. Il processo di migrazione assets si blocca al 34% con OutOfMemoryException.\n\nStack trace allegato. Riesci a darci un\'occhiata oggi?\n\nMarco' },
+    { dir:'in',  from:'pm@example.com',         to:'team-ita@example.com',           subject:'FW: PC emails network — aggiornamento sprint',          time:'11:15', body:'Team,\n\ninoltro aggiornamento dal Product Owner su PC emails network TP #2026:\n- Scope ridotto: solo modulo invio, non ricezione\n- Deadline confermata fine sprint\n- Priorità alta\n\nFavor di aggiornare le stime su TP.\n\nGrazie' },
     { dir:'in',  from:'calendar@microsoft.com',       to:'me',                                   subject:'Reminder: Sprint review alle 16:30',                    time:'11:40', body:'Promemoria: Sprint Review è programmato per oggi alle 16:30.\n\nPartecipanti: team BAU ITA Web + PO + SM\nDurata: 30 minuti\nLink Teams: https://teams.microsoft.com/...' },
-    { dir:'out', from:'me',                           to:'marco.r@euroconsumers.org',            subject:'AssetVersioning — fix deployato su staging',            time:'13:30', body:'Marco,\n\nho trovato il problema: il batch size della migrazione era troppo alto per l\'ambiente di staging (512MB heap limit).\n\nHo ridotto il batch size a 100 items e il processo completa correttamente. Fix deployato su staging, puoi verificare.\n\nLorenzo' },
-    { dir:'in',  from:'giulia.f@euroconsumers.org',  to:'me',                                   subject:'Re: Deploy process #2026 — ambiente ok ✓',              time:'14:00', body:'Lorenzo,\n\nconfermato! Il deploy su ACC è andato a buon fine, pricing funziona correttamente.\n\nProcedo con i test di regressione e aggiorno il ticket TP.\n\nGrazie mille!\nGiulia' },
-    { dir:'in',  from:'scrummaster@euroconsumers.org',to:'team-ita@euroconsumers.org',           subject:'Recap Sprint Review — action items',                    time:'16:50', body:'Ciao a tutti,\n\ndi seguito il recap della Sprint Review:\n\nCompleted:\n- Deploy process #2026 ✓\n- AssetVersioning fix ✓\n\nAction items:\n- Lorenzo: aggiornare ore TP entro lunedì\n- Marco: chiudere PR #448 prima del weekend\n- Giulia: documentare test su Confluence\n\nProssima sprint planning: lunedì 16 Mar ore 9:30' },
+    { dir:'out', from:'me',                           to:'marco.r@example.com',            subject:'AssetVersioning — fix deployato su staging',            time:'13:30', body:'Marco,\n\nho trovato il problema: il batch size della migrazione era troppo alto per l\'ambiente di staging (512MB heap limit).\n\nHo ridotto il batch size a 100 items e il processo completa correttamente. Fix deployato su staging, puoi verificare.\n\nLorenzo' },
+    { dir:'in',  from:'giulia.f@example.com',  to:'me',                                   subject:'Re: Deploy process #2026 — ambiente ok ✓',              time:'14:00', body:'Lorenzo,\n\nconfermato! Il deploy su ACC è andato a buon fine, pricing funziona correttamente.\n\nProcedo con i test di regressione e aggiorno il ticket TP.\n\nGrazie mille!\nGiulia' },
+    { dir:'in',  from:'scrummaster@example.com',to:'team-ita@example.com',           subject:'Recap Sprint Review — action items',                    time:'16:50', body:'Ciao a tutti,\n\ndi seguito il recap della Sprint Review:\n\nCompleted:\n- Deploy process #2026 ✓\n- AssetVersioning fix ✓\n\nAction items:\n- Lorenzo: aggiornare ore TP entro lunedì\n- Marco: chiudere PR #448 prima del weekend\n- Giulia: documentare test su Confluence\n\nProssima sprint planning: lunedì 16 Mar ore 9:30' },
 ];
 
 // US cards for today

@@ -94,20 +94,18 @@ function extractJson(text: string): unknown {
 const KB_DIR = path.join(process.cwd(), "data", "kb");
 const KB_FILE = path.join(KB_DIR, "us-summaries.json");
 const ENRICHED_DIR = getJsonRawPath("targetprocess");
+const COLLEAGUES_FILE = path.join(process.cwd(), "config", "colleagues.local.json");
 
 // ─── Priority colleagues ──────────────────────────────────────────────────────
-const COLLEAGUES_PRIORITY = nameSet([
-  "Flavio Passera",
-  "Marco Anselmo",
-  "Michela Della Misericordia",
-  "Susanna Castelletti",
-  "Nicola Achille",
-  "Chiara Bonasi",
-  "Sara Fiano",
-  "Marcella Nardone",
-  "Matteo D'Amario",
-  "Your Team Name",
-]);
+async function loadColleagues(): Promise<ReturnType<typeof nameSet>> {
+  try {
+    const raw = await fs.readFile(COLLEAGUES_FILE, "utf-8");
+    return nameSet(JSON.parse(raw) as string[]);
+  } catch {
+    logger.warn("config/colleagues.local.json non trovato — colleaguesPriority vuoto");
+    return nameSet([]);
+  }
+}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -603,8 +601,11 @@ async function runEnrichmentFromApi(
   force: boolean,
 ): Promise<EnrichedItem[]> {
   logger.info("Recupero item assegnati da TargetProcess...");
-  const me = await client.getMe();
-  const items = await client.getMyAssignedOpenItems();
+  const [me, items, colleaguesPriority] = await Promise.all([
+    client.getMe(),
+    client.getMyAssignedOpenItems(),
+    loadColleagues(),
+  ]);
   logger.info(`Trovati ${items.length} open item.`);
 
   const toProcess = items.filter(
@@ -621,11 +622,11 @@ async function runEnrichmentFromApi(
   const myNameNorm = nameSet([me.FullName]);
   const isRelevantByMeta = (item: TpOpenItem): boolean =>
     nameSetHas(myNameNorm, item.owner) ||
-    nameSetHas(COLLEAGUES_PRIORITY, item.owner) ||
+    nameSetHas(colleaguesPriority, item.owner) ||
     item.assignments.some(
       (a) =>
         nameSetHas(myNameNorm, a.fullName) ||
-        nameSetHas(COLLEAGUES_PRIORITY, a.fullName),
+        nameSetHas(colleaguesPriority, a.fullName),
     );
 
   const preFiltered = toProcess.filter(isRelevantByMeta);
@@ -646,14 +647,14 @@ async function runEnrichmentFromApi(
       (s) => nameSetHas(myNameNorm, s.userName) && s.totalHours > 0,
     );
     const hasColleagueHours = stats.some(
-      (s) => nameSetHas(COLLEAGUES_PRIORITY, s.userName) && s.totalHours > 0,
+      (s) => nameSetHas(colleaguesPriority, s.userName) && s.totalHours > 0,
     );
     const hasColleagueAssigned = item.assignments.some((a: TpAssignmentEntry) =>
-      nameSetHas(COLLEAGUES_PRIORITY, a.fullName),
+      nameSetHas(colleaguesPriority, a.fullName),
     );
     const ownerIsRelevant =
       nameSetHas(myNameNorm, item.owner) ||
-      nameSetHas(COLLEAGUES_PRIORITY, item.owner);
+      nameSetHas(colleaguesPriority, item.owner);
 
     // Phase B — post-filter: discard if no actual team involvement
     if (
