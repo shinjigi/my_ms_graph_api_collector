@@ -8,6 +8,7 @@ import { Router, Request, Response } from 'express';
 import { spawn }  from 'child_process';
 import * as path  from 'path';
 import { TargetprocessClient } from '../../targetprocess/client';
+import { loadDefaults } from '../../analysers';
 import { nibolBookDesk, nibolCheckIn, nibolFetchCalendarData } from '../../collectors/nibol';
 
 export const hooksRouter = Router();
@@ -91,7 +92,13 @@ hooksRouter.get('/nibol/calendar', async (req: Request, res: Response) => {
 hooksRouter.get('/tp-items', async (_req: Request, res: Response) => {
     try {
         const client = new TargetprocessClient();
-        const items  = await client.getMyAssignedOpenItems();
+        const defaults = await loadDefaults();
+        const creatorIds = await client.resolveUserIdsByName(defaults.creatorNames ?? []);
+        const items = await client.getMyAssignedOpenItems({
+            teamNames: defaults.teamNames,
+            creatorIds,
+            excludedProjects: defaults.excludedProjects,
+        });
         res.json(items);
     } catch (err) {
         res.status(500).json({ error: (err as Error).message });

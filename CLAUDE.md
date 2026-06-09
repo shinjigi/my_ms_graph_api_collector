@@ -7,12 +7,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Collect all**: `npm run collect` (all sources from COLLECT_SINCE)
 - **Collect single day**: `npm run collect -- --date=YYYY-MM-DD`
 - **Aggregate**: `npm run aggregate` (raw → per-day bundles)
-- **Analyze**: `npm run analyze -- --date=YYYY-MM-DD` (unified analyzer with fallback chain)
-- **Analyze (force provider)**: `npm run analyze:claude`, `npm run analyze:gemini`, `npm run analyze:cli`
-- **Full pipeline**: `npm run all` (collect → aggregate → analyze → serve)
+- **Analyse**: `npm run analyse -- --date=YYYY-MM-DD` (unified analyzer with fallback chain)
+- **Analyse (force provider)**: `npm run analyse:claude`, `npm run analyse:gemini`, `npm run analyse:cli`, `npm run analyse:ollama`
+- **Full pipeline**: `npm run all` (collect → aggregate → analyse → serve), `npm run all:full` (+ kb:update)
+- **KB refresh** (TP task catalog): `npm run kb:update` (`kb:update:force`, `kb:update:gemini`)
+- **Web build**: `npm run web:build` (delegates to web/)
 - **Server**: `npm run serve` (Express on port 3001)
 - **Frontend dev**: `cd web && npm run dev` (Vite on 5173, proxies /api → 3001)
-- **Type check**: `npx tsc --noEmit` (backend) / `cd web && npx vue-tsc --noEmit` (frontend)
+- **Type check**: `npm run type-check` (backend) / `cd web && npx vue-tsc --noEmit` (frontend)
+- **Lint / check**: `npm run lint` (eslint) · `npm run check` (lint + type-check)
+- **TP CLI**: `npm run tp:projects|tp:userstories|tp:us-detail|tp:log-time`
+- **Zucchetti**: `npm run zucchetti:get` (month extract) · `npm run zucchetti:update` (submit)
 
 ## Architecture
 
@@ -22,9 +27,9 @@ TypeScript monorepo: Express backend + Vue 3 frontend + Playwright automation.
 
 ```
 Collectors (src/collectors/)  →  data/raw/<source>/YYYY-MM.json
-Aggregator (src/analysis/)    →  data/aggregated/YYYY-MM-DD.json
-Analyzer  (src/analysis/)     →  data/proposals/YYYY-MM-DD.json
-Express server (src/server/)  →  /api/week/:date, /api/zucchetti/*, /api/analyze/*
+Aggregator (src/aggregators/) →  data/aggregated/YYYY-MM-DD.json
+Analyser  (src/analysers/)    →  data/proposals/YYYY-MM-DD.json
+Express server (src/server/)  →  /api/week/:date, /api/zucchetti/*, /api/analyse/*
 Vue frontend (web/)           →  http://localhost:5173
 ```
 
@@ -33,14 +38,15 @@ Vue frontend (web/)           →  http://localhost:5173
 Fallback chain: Claude API → OpenAI-compat (Ollama/LM Studio) → Gemini → Claude CLI.
 
 ```
-src/analysis/
-├── analyzer.ts          ← orchestrator: interface, shared logic, analyzeDay(), run()
+src/analysers/
+├── index.ts             ← orchestrator: interface, shared logic, analyzeDay(), run()
 ├── base.ts              ← AnalyzerProvider interface, stripCodeFence, tpmToChars
 ├── prompts.ts           ← prompt templates (static text + variable interpolation)
+├── reducer.ts           ← post-AI entry reduction/normalization
+├── aiRaw.ts             ← raw AI-response persistence helpers
 ├── claudeApiProvider.ts ← Anthropic API (ClaudeApiProvider)
 ├── openAiCompatProvider.ts ← OpenAI-compat / Ollama / LM Studio (OpenAiCompatibleProvider)
 ├── claudeCliProvider.ts ← Claude Code CLI (ClaudeCliProvider)
-├── claudeProvider.ts    ← re-export shim (backwards compat only — prefer direct imports)
 └── geminiProvider.ts    ← Google Generative AI SDK (GeminiProvider)
 ```
 
@@ -58,10 +64,13 @@ src/analysis/
 Post-AI normalization (`normalizeEntries()`): recurring entries are kept fixed, AI entries are scaled proportionally to match the target hours. Safety net for models that struggle with arithmetic.
 
 Server endpoints:
-- `POST /api/analyze/:date` — single day (202 + jobId)
-- `POST /api/analyze/week/:date` — all workdays in week (202 + jobId)
-- `GET /api/analyze/status/:jobId` — poll job status
+- `POST /api/analyse/:date` — single day (202 + jobId)
+- `POST /api/analyse/week/:date` — all workdays in week (202 + jobId)
+- `GET /api/analyse/status/:jobId` — poll job status
 - `GET /api/day/:date` — day signals (calendar, email, teams, commits, browser)
+- `/api/proposals/*` — read/update day proposals
+- `/api/submit/*` — submit approved entries (Zucchetti / TP)
+- `/api/hooks/*` — webhook triggers
 - `GET /api/sync/*` — sync utilities
 - `GET /api/health` — health check
 
@@ -118,8 +127,9 @@ Server endpoints:
 | Path | Purpose |
 |------|---------|
 | `src/` | Backend: collectors, analysis, server |
+| `src/targetprocess/` | TP API client + KB collector (`kb:update`), hours refresh |
 | `web/` | Frontend: Vue 3 + Pinia |
-| `scripts/tp/` | Standalone TargetProcess CLI tools (ts-node) |
+| `scripts/tp/` | Standalone TargetProcess CLI tools (tsx) |
 | `scripts/nibol/` | Nibol desk booking automation (tsx) |
 | `scripts/` | PowerShell automation, morning task, bootstrap |
 | `docs/` | Documentation and planning |

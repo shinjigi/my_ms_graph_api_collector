@@ -24,6 +24,7 @@ import { AggregatedDay, NibolBooking } from "@shared/aggregator";
 import { refreshReportedHours } from "../../targetprocess/refreshHours";
 import { readMeta } from "../../utils";
 import { WORKDAY_HOURS } from "@shared/standards";
+import { loadDefaults } from "../../analysers";
 
 export const weekRouter = Router();
 
@@ -182,11 +183,20 @@ weekRouter.get("/:date/tp-hours", async (req: Request, res: Response) => {
         const fridayStr = shiftDateString(mondayStr, 4);
 
         const tpClient = new TargetprocessClient();
-        const me = await tpClient.getMe();
+        const defaults = await loadDefaults();
+
+        const [me, creatorIds] = await Promise.all([
+            tpClient.getMe(),
+            tpClient.resolveUserIdsByName(defaults.creatorNames ?? []),
+        ]);
 
         const [timeEntries, openItems] = await Promise.all([
             tpClient.getTimesByUserAndDateRange(me.Id, mondayStr, fridayStr),
-            tpClient.getMyAssignedOpenItems(),
+            tpClient.getMyAssignedOpenItems({
+                teamNames: defaults.teamNames,
+                creatorIds,
+                excludedProjects: defaults.excludedProjects,
+            }),
         ]);
 
         // Group time entries by assignable ID and day index

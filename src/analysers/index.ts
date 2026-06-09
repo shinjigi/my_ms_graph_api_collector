@@ -54,6 +54,9 @@ export interface DefaultActivity {
 
 export interface DefaultsConfig {
     recurringActivities: DefaultActivity[];
+    teamNames?: string[];
+    creatorNames?: string[];
+    excludedProjects?: string[];
 }
 
 // ─── Shared utilities ───────────────────────────────────────────────

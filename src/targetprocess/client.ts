@@ -309,13 +309,66 @@ export class TargetprocessClient {
     return allItems;
   }
 
+  /** Paginated fetch from TP v1 — returns all items across all pages. */
+  private async fetchAllPages<T>(
+    entity: string,
+    where: string,
+    include: string,
+  ): Promise<T[]> {
+    const all: T[] = [];
+    const take = 200;
+    let skip = 0;
+    while (true) {
+      const result = await this.request<TpList<T>>("v1", entity, {
+        where,
+        include,
+        take: String(take),
+        skip: String(skip),
+      });
+      all.push(...result.Items);
+      if (!result.Next || result.Items.length < take) break;
+      skip += take;
+    }
+    return all;
+  }
+
   /**
-   * Returns all UserStories and Tasks assigned to the current user that are not in a final state.
-   * Includes TimeSpent so callers can compute the daily balance.
+   * Resolves full names to TP user IDs.
    */
-  async getMyAssignedOpenItems(): Promise<TpOpenItem[]> {
+  async resolveUserIdsByName(names: string[]): Promise<number[]> {
+    if (names.length === 0) return [];
+    const ids: number[] = [];
+    await Promise.all(
+      names.map(async (name) => {
+        const result = await this.request<TpList<{ Id: number }>>("v1", "Users", {
+          where: `(FullName eq '${name}')`,
+          include: "[Id]",
+          take: "5",
+        });
+        for (const u of result.Items) ids.push(u.Id);
+      }),
+    );
+    return ids;
+  }
+
+  /**
+   * Returns open UserStories and Tasks matching any of:
+   *   - assigned to the logged-in user
+   *   - associated with a TP team (Team.Name filter)
+   *   - created by a specific owner (Owner.Id filter)
+   *
+   * Runs one paginated query per filter in parallel, merges and deduplicates.
+   * Items from excludedProjects are removed entirely.
+   *
+   * NOTE: TP v1 does not support boolean filters (EntityState.IsFinal eq false → 400).
+   * Filters non-final state client-side.
+   */
+  async getMyAssignedOpenItems(opts?: {
+    teamNames?: string[];
+    creatorIds?: number[];
+    excludedProjects?: string[];
+  }): Promise<TpOpenItem[]> {
     const me = await this.getMe();
-    const items: TpOpenItem[] = [];
 
     type EntityStateWithFinal = TpEntityRef & { IsFinal: boolean };
     type WithExtra = {
@@ -326,23 +379,43 @@ export class TargetprocessClient {
       CreateDate?: string;
     };
 
-    // NOTE: TP v1 does not support boolean filters (EntityState.IsFinal eq false raises a 400).
-    // We fetch all assigned items and filter client-side by EntityState.IsFinal.
+    const US_INCLUDE =
+      "[Id,Name,Description,EntityState[Name,IsFinal],TimeSpent,Project[Id,Name],Owner[FullName],Assignments[GeneralUser[FullName],Role[Name]],CreateDate,LastStateChangeDate]";
+    const TASK_INCLUDE =
+      "[Id,Name,Description,EntityState[Name,IsFinal],TimeSpent,Project[Id,Name],UserStory[Id,Name,Owner[FullName]],Owner[FullName],Assignments[GeneralUser[FullName],Role[Name]],CreateDate,LastStateChangeDate]";
 
-    // Fetch UserStories assigned to me
-    const usResult = await this.request<TpList<TpUserStory & WithExtra>>(
-      "v1",
-      "UserStories",
-      {
-        where: `(Assignments.GeneralUser.Id eq ${me.Id})`,
-        include:
-          "[Id,Name,Description,EntityState[Name,IsFinal],TimeSpent,Project[Id,Name],Owner[FullName],Assignments[GeneralUser[FullName],Role[Name]],CreateDate,LastStateChangeDate]",
-        take: "200",
-      },
+    // Build one where clause per source; TP v1 does not support OR across
+    // Assignments.* and Team.* in the same clause.
+    const whereClauses: string[] = [
+      `(Assignments.GeneralUser.Id eq ${me.Id})`,
+      ...(opts?.teamNames ?? []).map((n) => `(Team.Name eq '${n}')`),
+      ...(opts?.creatorIds ?? []).map((id) => `(Owner.Id eq ${id})`),
+    ];
+
+    const excludedPatterns = (opts?.excludedProjects ?? []).map((p) => p.toLowerCase());
+
+    const allRawUS: Array<TpUserStory & WithExtra> = [];
+    const allRawTasks: Array<TpTask & WithExtra> = [];
+
+    await Promise.all(
+      whereClauses.flatMap((where) => [
+        this.fetchAllPages<TpUserStory & WithExtra>("UserStories", where, US_INCLUDE).then(
+          (r) => allRawUS.push(...r),
+        ),
+        this.fetchAllPages<TpTask & WithExtra>("Tasks", where, TASK_INCLUDE).then(
+          (r) => allRawTasks.push(...r),
+        ),
+      ]),
     );
 
-    for (const us of usResult.Items) {
-      if (us.EntityState?.IsFinal) continue;
+    const items: TpOpenItem[] = [];
+    const seenIds = new Set<number>();
+
+    const addUS = (us: TpUserStory & WithExtra) => {
+      if (us.EntityState?.IsFinal) return;
+      if (excludedPatterns.some((p) => (us.Project?.Name ?? "").toLowerCase().includes(p))) return;
+      if (seenIds.has(us.Id)) return;
+      seenIds.add(us.Id);
       items.push({
         id: us.Id,
         name: us.Name,
@@ -360,22 +433,13 @@ export class TargetprocessClient {
           ? parseTpDate(us.LastStateChangeDate)
           : undefined,
       });
-    }
+    };
 
-    // Fetch Tasks assigned to me
-    const taskResult = await this.request<TpList<TpTask & WithExtra>>(
-      "v1",
-      "Tasks",
-      {
-        where: `(Assignments.GeneralUser.Id eq ${me.Id})`,
-        include:
-          "[Id,Name,Description,EntityState[Name,IsFinal],TimeSpent,Project[Id,Name],UserStory[Id,Name,Owner[FullName]],Owner[FullName],Assignments[GeneralUser[FullName],Role[Name]],CreateDate,LastStateChangeDate]",
-        take: "200",
-      },
-    );
-
-    for (const task of taskResult.Items) {
-      if (task.EntityState?.IsFinal) continue;
+    const addTask = (task: TpTask & WithExtra) => {
+      if (task.EntityState?.IsFinal) return;
+      if (excludedPatterns.some((p) => (task.Project?.Name ?? "").toLowerCase().includes(p))) return;
+      if (seenIds.has(task.Id)) return;
+      seenIds.add(task.Id);
       items.push({
         id: task.Id,
         name: task.Name,
@@ -393,7 +457,10 @@ export class TargetprocessClient {
           ? parseTpDate(task.LastStateChangeDate)
           : undefined,
       });
-    }
+    };
+
+    for (const us of allRawUS) addUS(us);
+    for (const task of allRawTasks) addTask(task);
 
     return items;
   }
@@ -461,6 +528,7 @@ export class TargetprocessClient {
     type TpUsSearch = TpUserStory & {
       TimeSpent: number;
       Project: { Id: number; Name: string } | null;
+      EntityState: (TpEntityRef & { IsFinal?: boolean }) | null;
     };
     const usResult = await this.request<TpList<TpUsSearch>>(
       "v1",
@@ -479,12 +547,8 @@ export class TargetprocessClient {
         name: us.Name,
         description: us.Description,
         entityType: "UserStory",
-        stateName:
-          (us.EntityState as (TpEntityRef & { IsFinal?: boolean }) | null)
-            ?.Name ?? "",
-        isFinalState:
-          (us.EntityState as (TpEntityRef & { IsFinal?: boolean }) | null)
-            ?.IsFinal ?? false,
+        stateName: us.EntityState?.Name ?? "",
+        isFinalState: us.EntityState?.IsFinal ?? false,
         timeSpent: us.TimeSpent ?? 0,
         projectName: us.Project?.Name ?? "",
         parentName: null,

@@ -248,13 +248,13 @@ or `box-shadow` from rend / holiday states.
 stateDiagram-v2
     [*] --> Dashboard: open UI
     Dashboard --> Timesheet: switch view
-    Timesheet --> QuickFill: click SW/Ferie button
+    Timesheet --> QuickFill: click SW/Holidays button
     QuickFill --> Timesheet: hours distributed
     Timesheet --> Adjust: edit individual cells ±0.5h
     Adjust --> Timesheet: delta updates live
     Timesheet --> Verifica: click Verifica button
     Dashboard --> Submit: approve from US card
-    Submit --> Done: POST /api/submit/:date
+    Submit --> Done: POST /api/submit/{date}
     Done --> Dashboard: next day
     Done --> Hooks: optional
     Hooks --> ZucchettiUpdate: update location
