@@ -132,16 +132,34 @@ classDiagram
 ```mermaid
 flowchart LR
     AGG[AggregatedDay]
-    KB[TP open items<br />KB]
-    DEF[config/defaults.json<br />recurring activities]
+    KB[data/kb/<br />us-summaries.json]
+    DEF[config/defaults.json]
+    RULES[config/<br />master-rules.md]
     CLAUDE[Claude AI<br />haiku-4-5]
     PROP[DayProposal<br />data/proposals/]
 
     AGG --> CLAUDE
     KB --> CLAUDE
     DEF --> CLAUDE
+    RULES --> CLAUDE
     CLAUDE --> PROP
 ```
+
+### Inputs
+
+**`config/defaults.json`** has two responsibilities:
+
+| Field | Purpose |
+|-------|---------|
+| `recurringActivities` | Pre-seeded entries injected into every proposal (standup, overhead). Fixed hours, not scaled by AI. |
+| `teamNames` | TP team names used to scope the open-items query (e.g. `"Your Team Name"`). |
+| `creatorNames` | TP user full names whose items are always included regardless of assignment (e.g. `"Colleague Name"`). |
+| `excludedProjects` | Substring list: items whose `projectName` contains any entry are excluded (e.g. `["CAAS", "CaaS"]`). |
+| `itemsSinceDays` | UserStory lookback window in days (default 365). Prevents fetching thousands of historical items. |
+
+**`data/kb/us-summaries.json`** is the TP task catalog: a local snapshot of open items enriched with AI-generated summaries and tags. The AI analyzer uses it to map activity signals to TP tasks without a live API call. Updated by `npm run kb:update`.
+
+**`config/master-rules.md`** contains AI reasoning rules: signal hierarchy, signal→task mapping, scenario heuristics. Injected into the system prompt at runtime; reloaded on every analysis run.
 
 Claude returns a `DayProposal` where `sum(entries.inferredHours) == oreTarget`:
 
@@ -208,6 +226,16 @@ Day picker buttons distinguish three states visually:
 - **Selected (not today)**: filled primary pill
 - **Today + selected**: filled pill + dot
 
+### Timesheet pinned list
+
+The **"Attività ricorrenti — da rendicontare"** section shows all open TP items that have no hours logged this week. Items are fetched live from the TP API on each week load.
+
+A ↺ refresh button in the section header:
+1. Triggers `POST /api/hooks/kb-refresh` → runs `npm run kb:update` (updates `us-summaries.json` for AI analysis)
+2. Re-fetches the open-items list from the live TP API (`GET /api/week/:date/tp-hours`)
+
+Items included: assigned to me **or** any member of a configured team **or** created by a configured colleague. Items whose `projectName` matches an entry in `excludedProjects` are stripped before the response.
+
 ### Timesheet quick-fill
 
 The timesheet toolbar provides one-click day population across all active TP tasks:
@@ -265,14 +293,72 @@ stateDiagram-v2
 
 ## TargetProcess integration
 
-| Operation         | Endpoint                                            | Notes                                 |
-| ----------------- | --------------------------------------------------- | ------------------------------------- |
-| List open items   | `GET /api/v1/Assignables`                           | Filtered by assignee, non-final state |
-| Log time          | `POST /api/v1/Times`                                | One POST per approved entry           |
-| Delete time entry | `DELETE /api/v1/Times/{id}`                         | Used on re-submit                     |
-| Search items      | `GET /api/v1/Assignables?where=Name contains '...'` | Task panel search                     |
+| Operation         | Endpoint                                            | Notes                                                         |
+| ----------------- | --------------------------------------------------- | ------------------------------------------------------------- |
+| List open items   | `GET /api/v1/UserStories` + `GET /api/v1/Tasks`    | Parallel queries by assignee / team / creator; see below      |
+| Log time          | `POST /api/v1/Times`                                | One POST per approved entry                                   |
+| Delete time entry | `DELETE /api/v1/Times/{id}`                         | Used on re-submit                                             |
+| Search items      | `GET /api/v1/Assignables?where=Name contains '...'` | Task panel search                                             |
+| Resolve user IDs  | `GET /api/v1/Users?where=(FullName eq '...')`       | Maps `creatorNames` config to TP user IDs at request time     |
+| KB refresh        | `POST /api/hooks/kb-refresh` (local)                | Spawns `npm run kb:update`, writes `data/kb/us-summaries.json` |
 
 Authentication: Base64-encoded token as `Authorization: Basic <token>`.
+
+### Open items query strategy
+
+The TP v1 API does not support `OR` across different filter axes in a single request. Open items are therefore collected with **parallel queries**, one per `where` clause, then merged client-side:
+
+```mermaid
+sequenceDiagram
+    participant S as Server
+    participant TP as TargetProcess API
+
+    S->>TP: UserStories where (Assignments.GeneralUser.Id eq me) and since
+    S->>TP: UserStories where (Team.Name eq 'Your Team Name') and since
+    S->>TP: UserStories where (Owner.Id eq <creatorId>) and since
+    S->>TP: Tasks where (Assignments.GeneralUser.Id eq me)
+    S->>TP: Tasks where (Team.Name eq 'Your Team Name')
+    S->>TP: Tasks where (Owner.Id eq <creatorId>)
+    Note over S,TP: All six requests run in parallel (Promise.all)
+    TP-->>S: paginated results (take 200 each page)
+    S->>S: dedup by id, filter IsFinal, strip excludedProjects
+    S-->>S: TpOpenItem[]
+```
+
+**Key constraints discovered from the API:**
+
+| Constraint | Workaround |
+|-----------|-----------|
+| `OR` across `Assignments.*` and `Owner.*` → 400 | One query per clause, merged with `seenIds` Set |
+| `EntityState.IsFinal eq false` → 400 in v1 | Fetch all, filter `IsFinal` client-side |
+| `Team.Name eq 'X'` on UserStory/Task → works | Used directly, no need to resolve member IDs |
+| `since` on Tasks makes results too narrow | `LastStateChangeDate gte` applied to UserStories only; Tasks have no date filter |
+
+### KB refresh flow
+
+`data/kb/us-summaries.json` is a local catalog used by the AI analyzer. It is **not** the live source for the timesheet open-items list (that always comes from the live TP API).
+
+```mermaid
+sequenceDiagram
+    participant U as User (↺ button)
+    participant FE as Vue frontend
+    participant BE as Express server
+    participant KB as us-summaries.json
+    participant TP as TargetProcess API
+
+    U->>FE: click ↺
+    FE->>BE: POST /api/hooks/kb-refresh
+    BE->>BE: spawn npm run kb:update
+    BE->>TP: fetch all open items + generate summaries
+    TP-->>BE: items[]
+    BE->>KB: write us-summaries.json
+    BE-->>FE: { ok: true }
+    FE->>BE: GET /api/week/:date/tp-hours
+    BE->>TP: live open items query (parallel)
+    TP-->>BE: fresh items
+    BE-->>FE: TpWeekResponse
+    FE->>FE: update pinned list
+```
 
 ---
 
