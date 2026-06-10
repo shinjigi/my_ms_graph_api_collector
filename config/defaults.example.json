@@ -1,0 +1,26 @@
+{
+  "teamNames": ["Your Team Name"],
+  "creatorNames": ["Surname Firstname"],
+  "excludedProjects": ["PROJECT_KEY"],
+  "itemsSinceDays": 365,
+  "recurringActivities": [
+    {
+      "id": "standup",
+      "label": "Daily standup / staff meetings",
+      "hours": 0.7,
+      "autoApprove": true,
+      "taskId": null,
+      "comment": "standup meeting"
+    },
+    {
+      "id": "overhead",
+      "label": "Overhead / email / TP",
+      "hours": 0.2,
+      "autoApprove": true,
+      "taskId": null,
+      "comment": "TP"
+    }
+  ],
+  "minHoursForSignals": 0.5,
+  "proposalRoundingStep": 0.25
+}

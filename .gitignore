@@ -13,4 +13,5 @@ data/kb/*
 graphify-out/*
 src/collectors/zucchetti/session.ts
 config/colleagues.local.json
+config/defaults.json
 .obsidian/
